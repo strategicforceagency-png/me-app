@@ -1,4 +1,4 @@
-# ME — lifestyle app personale
+# Habitus — lifestyle app personale
 
 Guardaroba (armadio digitale, crea outfit, prova virtuale), Salute e Fisico (in arrivo).
 

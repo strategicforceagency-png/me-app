@@ -122,7 +122,13 @@ function Auth() {
   };
   return (
     <div className="mx-auto max-w-[430px] min-h-[100dvh] px-6 flex flex-col justify-center">
-      <div className="h-16 w-16 rounded-[20px] bg-brand text-white grid place-items-center text-[22px] font-extrabold shadow-pill">ME</div>
+      <div className="flex items-center gap-3">
+        <img src="./icon.svg" alt="" className="h-14 w-14 rounded-[18px] shadow-pill" />
+        <div>
+          <div className="text-[24px] font-extrabold tracking-tight leading-none">Habitus</div>
+          <div className="text-[13px] text-muted mt-1">Vesti, vivi, diventi.</div>
+        </div>
+      </div>
       <h1 className="mt-6 text-[32px] font-extrabold tracking-tight leading-tight">
         Il tuo stile,
         <br />
