@@ -38,7 +38,7 @@ export function Sheet({
             onClick={onClose}
           />
           <motion.div
-            className={`relative w-full max-w-[430px] bg-white rounded-t-[28px] shadow-2xl flex flex-col ${
+            className={`relative w-full max-w-[430px] bg-surface rounded-t-[28px] shadow-2xl flex flex-col ${
               full ? "h-[92dvh]" : "max-h-[92dvh]"
             }`}
             initial={{ y: "100%" }}
@@ -51,7 +51,7 @@ export function Sheet({
             onDragEnd={(_, i) => (i.offset.y > 120 || i.velocity.y > 600) && onClose()}
           >
             <div className="pt-2.5 pb-1 flex justify-center cursor-grab">
-              <div className="h-1.5 w-10 rounded-full bg-black/15" />
+              <div className="h-1.5 w-10 rounded-full bg-ink/15" />
             </div>
             {(title || eyebrow) && (
               <div className="px-5 pt-2 pb-3 flex items-start justify-between">
@@ -79,7 +79,7 @@ export function Chip({ active, children, onClick }: { active?: boolean; children
     <button
       onClick={onClick}
       className={`px-3.5 py-1.5 rounded-full text-[14px] font-medium border transition ${
-        active ? "bg-brand text-white border-brand" : "bg-white text-ink border-line"
+        active ? "bg-brand text-brand-fg border-gold" : "bg-surface text-ink border-line"
       }`}
     >
       {children}
@@ -105,7 +105,7 @@ export function PrimaryButton({
       type={type}
       onClick={onClick}
       disabled={disabled}
-      className={`h-12 px-6 rounded-full bg-brand text-white font-semibold shadow-pill active:scale-[.98] transition disabled:opacity-40 disabled:shadow-none flex items-center justify-center gap-2 ${className}`}
+      className={`h-12 px-6 rounded-full bg-brand text-brand-fg font-semibold shadow-pill active:scale-[.98] transition disabled:opacity-40 disabled:shadow-none flex items-center justify-center gap-2 ${className}`}
     >
       {children}
     </button>
@@ -121,7 +121,7 @@ export function Field({ label, children }: { label: string; children: ReactNode 
   );
 }
 export const inputCls =
-  "w-full h-12 px-4 rounded-2xl bg-card border border-transparent focus:border-brand focus:bg-white outline-none text-[16px]";
+  "w-full h-12 px-4 rounded-2xl bg-card border border-transparent focus:border-gold focus:bg-surface outline-none text-[16px]";
 
 export function GarmentImg({ g, className = "" }: { g: Garment; className?: string }) {
   const path = garmentPath(g);
@@ -148,7 +148,7 @@ export function Toast({ msg }: { msg: string | null }) {
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 12 }}
-          className="fixed bottom-28 left-1/2 -translate-x-1/2 z-[60] px-4 py-2.5 rounded-full bg-[#3a3a3c] text-white text-[14px] font-medium shadow-lg w-max max-w-[88vw] text-center"
+          className="fixed bottom-28 left-1/2 -translate-x-1/2 z-[60] px-4 py-2.5 rounded-full bg-ink text-bg text-[14px] font-medium shadow-lg w-max max-w-[88vw] text-center"
         >
           {msg}
         </motion.div>

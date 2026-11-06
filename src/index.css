@@ -2,17 +2,57 @@
 @tailwind components;
 @tailwind utilities;
 
-html, body { background: #F5F5F7; color: #111113; -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent; }
+/* Habitus — luxury palette: avorio, nero espresso, oro champagne. Layout ripreso da Navy OS. */
+:root {
+  --bg: 246 243 238;        /* avorio */
+  --surface: 255 255 255;
+  --subtle: 240 236 229;    /* pozzetti immagini, input */
+  --sidebar: 238 233 225;
+  --sidebar-active: 228 221 209;
+  --fg: 22 19 15;           /* nero espresso */
+  --muted: 120 112 101;
+  --line: 228 221 210;
+  --primary: 22 19 15;      /* pulsanti: nero */
+  --primary-fg: 246 241 232;
+  --gold: 168 132 74;       /* oro champagne */
+  --gold-tint: 243 234 218;
+  --glow: 22 19 15;
+  --danger: 176 48 38;
+  --danger-tint: 250 233 230;
+  --mq-a: 228 228 232; --mq-b: 247 247 249; --mq-c: 220 220 225; --mq-line: 210 210 216;
+  color-scheme: light;
+}
+.dark {
+  --bg: 11 10 9;
+  --surface: 21 19 17;
+  --subtle: 30 27 24;
+  --sidebar: 16 14 12;
+  --sidebar-active: 36 32 27;
+  --fg: 241 236 227;
+  --muted: 160 151 138;
+  --line: 44 40 35;
+  --primary: 201 166 107;   /* pulsanti: oro */
+  --primary-fg: 20 17 13;
+  --gold: 205 171 112;
+  --gold-tint: 42 35 24;
+  --glow: 201 166 107;
+  --danger: 240 140 128;
+  --danger-tint: 46 24 22;
+  --mq-a: 58 54 49; --mq-b: 82 77 70; --mq-c: 50 46 42; --mq-line: 70 65 59;
+  color-scheme: dark;
+}
+html, body { background: rgb(var(--bg)); color: rgb(var(--fg)); -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent; }
+.font-display { letter-spacing: -0.01em; }
 body { overscroll-behavior-y: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { scrollbar-width: none; }
 img { -webkit-user-drag: none; -webkit-touch-callout: none; }
 
 @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
-.shimmer { background: linear-gradient(90deg, #ececef 25%, #f6f6f8 50%, #ececef 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite linear; }
-.shimmer-overlay { background: linear-gradient(100deg, transparent 30%, rgba(255,255,255,.75) 50%, transparent 70%); background-size: 200% 100%; animation: shimmer 1.6s infinite linear; }
+.shimmer { background: linear-gradient(90deg, rgb(var(--subtle)) 25%, rgb(var(--surface)) 50%, rgb(var(--subtle)) 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite linear; }
+.shimmer-overlay { background: linear-gradient(100deg, transparent 30%, rgb(var(--surface) / .7) 50%, transparent 70%); background-size: 200% 100%; animation: shimmer 1.6s infinite linear; }
 
-.range { -webkit-appearance: none; appearance: none; width: 100%; height: 6px; border-radius: 99px; background: #E6E6EA; outline: none; }
+.range { -webkit-appearance: none; appearance: none; width: 100%; height: 6px; border-radius: 99px; outline: none; }
 .range::-webkit-slider-thumb { -webkit-appearance: none; width: 26px; height: 26px; border-radius: 50%; background: #fff; box-shadow: 0 1px 6px rgba(0,0,0,.25); border: .5px solid rgba(0,0,0,.06); cursor: pointer; }
 .range::-moz-range-thumb { width: 26px; height: 26px; border-radius: 50%; background: #fff; box-shadow: 0 1px 6px rgba(0,0,0,.25); border: none; }
-.range { background: linear-gradient(#1E5EFF, #1E5EFF) 0/var(--p, 50%) 100% no-repeat #E6E6EA; }
+.range { background: linear-gradient(rgb(var(--gold)), rgb(var(--gold))) 0/var(--p, 50%) 100% no-repeat rgb(var(--line)); }

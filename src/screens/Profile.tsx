@@ -30,13 +30,13 @@ export function Profile() {
   };
 
   return (
-    <div className="px-5 pt-[max(18px,env(safe-area-inset-top))] pb-32">
+    <div className="px-5 lg:px-10 pb-32 lg:pb-12 max-w-[900px]">
       <header className="pt-4 flex items-center gap-3">
         <div className="h-12 w-12 rounded-full overflow-hidden bg-card shrink-0">
           {photo ? <img src={photo} className="w-full h-full object-cover object-top" /> : <MannequinSvg className="w-full h-[200%] -mt-1" />}
         </div>
         <div className="flex-1 min-w-0">
-          <h1 className="text-[26px] font-extrabold tracking-tight leading-tight truncate">Ciao {p?.nome || ""}</h1>
+          <h1 className="font-display text-[32px] lg:text-[40px] font-semibold leading-tight truncate">Ciao {p?.nome || ""}</h1>
           <div className="text-[13px] text-muted">
             Hai {app.garments.length} capi e {favs.length} outfit preferiti
           </div>
@@ -47,7 +47,7 @@ export function Profile() {
       </header>
 
       <div className="mt-5 flex items-center gap-2">
-        <button onClick={() => app.setAddOpen(true)} className="flex-1 h-12 rounded-full text-brand font-semibold flex items-center justify-center gap-1.5">
+        <button onClick={() => app.setAddOpen(true)} className="flex-1 h-12 rounded-full text-gold font-semibold flex items-center justify-center gap-1.5">
           <Plus size={18} /> Aggiungi capo
         </button>
         <PrimaryButton className="flex-1" onClick={() => app.setTab("outfit")}>
@@ -59,7 +59,7 @@ export function Profile() {
       <div className="grid grid-cols-2 gap-3">
         <button
           onClick={() => (p?.avatar_photo_path ? app.setProfile({ avatar_mode: "foto" }) : setTipsOpen(true))}
-          className={`rounded-[20px] bg-white p-2.5 text-left border-2 transition ${p?.avatar_mode === "foto" ? "border-brand" : "border-transparent shadow-soft"}`}
+          className={`rounded-[20px] bg-surface p-2.5 text-left border-2 transition ${p?.avatar_mode === "foto" ? "border-gold" : "border-transparent shadow-soft"}`}
         >
           <div className="aspect-[3/4] rounded-2xl bg-card overflow-hidden grid place-items-center">
             {uploading ? (
@@ -72,21 +72,21 @@ export function Profile() {
           </div>
           <div className="pt-2 px-1">
             <div className="text-[14px] font-semibold">La tua foto</div>
-            <div className={`text-[12px] ${p?.avatar_mode === "foto" ? "text-brand" : "text-muted"}`}>
+            <div className={`text-[12px] ${p?.avatar_mode === "foto" ? "text-gold" : "text-muted"}`}>
               {p?.avatar_mode === "foto" ? "In uso" : p?.avatar_photo_path ? "Tocca per selezionare" : "Carica una foto"}
             </div>
           </div>
         </button>
         <button
           onClick={() => app.setProfile({ avatar_mode: "manichino" })}
-          className={`rounded-[20px] bg-white p-2.5 text-left border-2 transition ${p?.avatar_mode !== "foto" ? "border-brand" : "border-transparent shadow-soft"}`}
+          className={`rounded-[20px] bg-surface p-2.5 text-left border-2 transition ${p?.avatar_mode !== "foto" ? "border-gold" : "border-transparent shadow-soft"}`}
         >
           <div className="aspect-[3/4] rounded-2xl bg-card grid place-items-center py-2">
             <MannequinSvg m={p ?? DEFAULT_MEASURES} className="h-full" />
           </div>
           <div className="pt-2 px-1">
             <div className="text-[14px] font-semibold">Manichino</div>
-            <div className={`text-[12px] ${p?.avatar_mode !== "foto" ? "text-brand" : "text-muted"}`}>
+            <div className={`text-[12px] ${p?.avatar_mode !== "foto" ? "text-gold" : "text-muted"}`}>
               {p?.avatar_mode !== "foto" ? "In uso" : "Tocca per selezionare"}
             </div>
           </div>
@@ -104,11 +104,11 @@ export function Profile() {
 
       <h2 className="mt-8 mb-3 text-[17px] font-bold">I tuoi outfit preferiti</h2>
       {favs.length === 0 ? (
-        <div className="rounded-[20px] bg-white shadow-soft p-5 text-center text-muted text-[14px]">
+        <div className="rounded-[20px] bg-surface shadow-soft p-5 text-center text-muted text-[14px]">
           Crea un outfit e tocca il cuore per salvarlo qui.
         </div>
       ) : (
-        <div className="-mx-5 px-5 flex gap-3 overflow-x-auto no-scrollbar pb-2">
+        <div className="-mx-5 px-5 lg:-mx-10 lg:px-10 flex gap-3 overflow-x-auto no-scrollbar pb-2">
           {favs.map((o) => (
             <OutfitCard key={o.id} o={o} />
           ))}
@@ -155,9 +155,9 @@ function OutfitCard({ o }: { o: Outfit }) {
   };
   return (
     <div className="shrink-0 w-[150px]">
-      <button onClick={open} onContextMenu={(e) => (e.preventDefault(), setMenu(true))} className="relative w-full h-[210px] rounded-[20px] bg-white shadow-soft overflow-hidden grid place-items-center">
+      <button onClick={open} onContextMenu={(e) => (e.preventDefault(), setMenu(true))} className="relative w-full h-[210px] rounded-[20px] bg-surface shadow-soft overflow-hidden grid place-items-center">
         {url ? <img src={url} className="h-full w-full object-cover object-top" /> : <DressedMannequin m={app.profile ?? undefined} top={top} bottom={bottom} scarpe={scarpe} className="h-[190px]" />}
-        <Heart size={18} className="absolute top-2.5 right-2.5 text-red-500 fill-red-500" />
+        <Heart size={18} className="absolute top-2.5 right-2.5 text-gold fill-gold" />
       </button>
       <div className="mt-2 px-1 flex items-center justify-between">
         <div className="min-w-0">
@@ -176,7 +176,7 @@ function OutfitCard({ o }: { o: Outfit }) {
             setMenu(false);
             app.toast("Outfit eliminato");
           }}
-          className="w-full h-12 rounded-full bg-red-50 text-red-600 font-semibold"
+          className="w-full h-12 rounded-full bg-danger-tint text-danger font-semibold"
         >
           Elimina outfit
         </button>

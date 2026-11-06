@@ -25,16 +25,16 @@ export function Wardrobe() {
   );
 
   return (
-    <div className="px-5 pt-[max(18px,env(safe-area-inset-top))]">
+    <div className="px-5 lg:px-10 pb-28 lg:pb-12">
       <header className="flex items-center justify-between pt-4">
-        <h1 className="text-[30px] font-extrabold tracking-tight">Il tuo armadio</h1>
+        <h1 className="font-display text-[36px] lg:text-[44px] font-semibold leading-none">Il tuo armadio</h1>
         <div className="flex items-center gap-2">
           <button onClick={() => setSearching((s) => !s)} className="h-10 w-10 grid place-items-center rounded-full text-ink" aria-label="Cerca">
             <Search size={22} />
           </button>
           <button
             onClick={() => app.setAddOpen(true)}
-            className="h-11 w-11 grid place-items-center rounded-full bg-brand text-white shadow-pill active:scale-95 transition"
+            className="h-11 w-11 max-lg:hidden grid place-items-center rounded-full bg-brand text-brand-fg shadow-pill active:scale-95 transition"
             aria-label="Aggiungi capo"
           >
             <Plus size={24} />
@@ -54,15 +54,15 @@ export function Wardrobe() {
         />
       )}
 
-      <div className="mt-4 -mx-5 px-5 flex gap-6 overflow-x-auto no-scrollbar border-b border-line">
+      <div className="mt-4 -mx-5 px-5 lg:-mx-10 lg:px-10 flex gap-6 overflow-x-auto no-scrollbar border-b border-line">
         {cats.map((c) => (
           <button
             key={c}
             onClick={() => setCat(c)}
-            className={`relative pb-2.5 whitespace-nowrap text-[15px] transition ${cat === c ? "text-brand font-semibold" : "text-muted"}`}
+            className={`relative pb-2.5 whitespace-nowrap text-[15px] transition ${cat === c ? "text-gold font-semibold" : "text-muted"}`}
           >
             {c}
-            {cat === c && <motion.div layoutId="catline" className="absolute left-0 right-0 -bottom-px h-[2px] bg-brand rounded" />}
+            {cat === c && <motion.div layoutId="catline" className="absolute left-0 right-0 -bottom-px h-[2px] bg-gold rounded" />}
           </button>
         ))}
       </div>
@@ -70,13 +70,13 @@ export function Wardrobe() {
       {!app.loading && app.garments.length === 0 && app.pending.length === 0 ? (
         <EmptyWardrobe onAdd={() => app.setAddOpen(true)} />
       ) : (
-        <div className="grid grid-cols-2 gap-3 mt-4 pb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5 gap-3 lg:gap-4 mt-5 pb-6">
           {app.pending.map((p) => (
-            <div key={p.id} className="rounded-[20px] bg-white shadow-soft p-2.5">
+            <div key={p.id} className="rounded-[20px] bg-surface shadow-soft p-2.5">
               <div className="relative aspect-[4/5] rounded-2xl bg-card overflow-hidden">
                 {p.previewUrl && <img src={p.previewUrl} className="w-full h-full object-cover opacity-40" />}
                 <div className="absolute inset-0 grid place-items-center">
-                  <div className="flex flex-col items-center gap-2 text-brand">
+                  <div className="flex flex-col items-center gap-2 text-gold">
                     <Sparkles className="animate-pulse" />
                     <span className="text-[12px] font-medium">Scontorno in corso…</span>
                   </div>
@@ -90,7 +90,7 @@ export function Wardrobe() {
               layout
               key={g.id}
               onClick={() => setDetail(g)}
-              className="text-left rounded-[20px] bg-white shadow-soft p-2.5 active:scale-[.98] transition"
+              className="text-left rounded-[20px] bg-surface shadow-soft p-2.5 active:scale-[.98] transition"
             >
               <div className="aspect-[4/5] rounded-2xl bg-card p-3">
                 <GarmentImg g={g} className="w-full h-full" />
@@ -113,7 +113,7 @@ export function Wardrobe() {
 function EmptyWardrobe({ onAdd }: { onAdd: () => void }) {
   return (
     <div className="mt-16 flex flex-col items-center text-center px-6">
-      <div className="h-24 w-24 rounded-[28px] bg-brand-soft grid place-items-center text-brand">
+      <div className="h-24 w-24 rounded-[28px] bg-brand-soft grid place-items-center text-gold">
         <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
           <path d="M12 6a2 2 0 1 1 2-2" />
           <path d="M12 6v1.5L3 15a1.6 1.6 0 0 0 1 3h16a1.6 1.6 0 0 0 1-3l-9-7.5" />
@@ -160,7 +160,7 @@ export function AddGarmentSheet({ open, onClose }: { open: boolean; onClose: () 
     <>
       <Sheet open={open && !web && !link} onClose={close} title="Aggiungi un capo">
         <div className="flex gap-2">
-          <button onClick={() => setWeb(true)} className="flex-1 h-12 rounded-full bg-brand-soft text-brand font-semibold flex items-center justify-center gap-2">
+          <button onClick={() => setWeb(true)} className="flex-1 h-12 rounded-full bg-gold-tint text-gold font-semibold flex items-center justify-center gap-2">
             <Globe size={18} /> Cerca sul web
           </button>
           <PrimaryButton className="flex-1" onClick={() => cam.current?.click()}>
@@ -168,7 +168,7 @@ export function AddGarmentSheet({ open, onClose }: { open: boolean; onClose: () 
           </PrimaryButton>
         </div>
         <button onClick={() => setLink(true)} className="mt-3 w-full h-12 rounded-2xl bg-card flex items-center gap-3 px-4 text-[15px]">
-          <Link2 size={18} className="text-brand" />
+          <Link2 size={18} className="text-gold" />
           <span className="flex-1 text-left">Incolla link di un prodotto</span>
           <ChevronRight size={18} className="text-muted" />
         </button>
@@ -183,7 +183,7 @@ export function AddGarmentSheet({ open, onClose }: { open: boolean; onClose: () 
           {files.map((f, i) => (
             <div key={i} className="relative aspect-square rounded-2xl overflow-hidden bg-card">
               <img src={URL.createObjectURL(f)} className="w-full h-full object-cover" />
-              <div className="absolute top-1.5 right-1.5 h-5 w-5 rounded-full bg-brand text-white grid place-items-center">
+              <div className="absolute top-1.5 right-1.5 h-5 w-5 rounded-full bg-brand text-brand-fg grid place-items-center">
                 <Check size={13} strokeWidth={3} />
               </div>
               <button onClick={() => setFiles((x) => x.filter((_, j) => j !== i))} className="absolute bottom-1.5 right-1.5 h-6 w-6 rounded-full bg-black/50 text-white grid place-items-center">
@@ -297,11 +297,11 @@ function WebSearchSheet({ open, onClose, onDone }: { open: boolean; onClose: () 
             <button
               key={i}
               onClick={() => toggle(r)}
-              className={`relative aspect-[4/5] rounded-2xl overflow-hidden bg-card border-2 transition ${on ? "border-brand" : "border-transparent"}`}
+              className={`relative aspect-[4/5] rounded-2xl overflow-hidden bg-card border-2 transition ${on ? "border-gold" : "border-transparent"}`}
             >
               <img src={r.thumbnail || r.image} loading="lazy" referrerPolicy="no-referrer" className="w-full h-full object-cover" />
               {on && (
-                <div className="absolute top-2 right-2 h-6 w-6 rounded-full bg-brand text-white grid place-items-center">
+                <div className="absolute top-2 right-2 h-6 w-6 rounded-full bg-brand text-brand-fg grid place-items-center">
                   <Check size={14} strokeWidth={3} />
                 </div>
               )}
@@ -310,7 +310,7 @@ function WebSearchSheet({ open, onClose, onDone }: { open: boolean; onClose: () 
         })}
       </div>
       {sel.length > 0 && (
-        <div className="fixed left-1/2 -translate-x-1/2 bottom-0 w-full max-w-[430px] bg-white/95 backdrop-blur border-t border-line px-5 pt-3 pb-[max(16px,env(safe-area-inset-bottom))]">
+        <div className="fixed left-1/2 -translate-x-1/2 bottom-0 w-full max-w-[430px] bg-surface/95 backdrop-blur border-t border-line px-5 pt-3 pb-[max(16px,env(safe-area-inset-bottom))]">
           <div className="text-[13px] font-semibold mb-2">Foto selezionate:</div>
           <div className="flex items-center gap-2">
             <div className="flex-1 flex gap-2 overflow-x-auto no-scrollbar">
@@ -318,7 +318,7 @@ function WebSearchSheet({ open, onClose, onDone }: { open: boolean; onClose: () 
                 <img key={i} src={s.thumbnail} referrerPolicy="no-referrer" className="h-14 w-14 rounded-xl object-cover shrink-0" />
               ))}
             </div>
-            <button onClick={add} className="h-12 w-12 rounded-full bg-brand text-white grid place-items-center shadow-pill shrink-0" aria-label="Aggiungi">
+            <button onClick={add} className="h-12 w-12 rounded-full bg-brand text-brand-fg grid place-items-center shadow-pill shrink-0" aria-label="Aggiungi">
               <ChevronRight />
             </button>
           </div>
@@ -368,7 +368,7 @@ function LinkSheet({ open, onClose, onDone }: { open: boolean; onClose: () => vo
       {err && <p className="text-muted text-[14px] mt-4">{err}</p>}
       {info && (
         <div className="mt-5 rounded-[20px] bg-card p-3 flex gap-3">
-          <img src={info.image} referrerPolicy="no-referrer" className="h-28 w-24 rounded-xl object-cover bg-white" />
+          <img src={info.image} referrerPolicy="no-referrer" className="h-28 w-24 rounded-xl object-cover bg-surface" />
           <div className="flex-1 min-w-0">
             <div className="font-semibold leading-tight line-clamp-3">{info.nome}</div>
             {info.brand && <div className="text-[13px] text-muted mt-1">{info.brand}</div>}
@@ -468,7 +468,7 @@ function GarmentDetail({ g, onClose }: { g: Garment | null; onClose: () => void 
             </Field>
           </div>
           {cur.source_url && (
-            <a href={cur.source_url} target="_blank" className="block text-brand text-[14px] truncate">
+            <a href={cur.source_url} target="_blank" className="block text-gold text-[14px] truncate">
               Apri la pagina del prodotto →
             </a>
           )}
@@ -479,7 +479,7 @@ function GarmentDetail({ g, onClose }: { g: Garment | null; onClose: () => void 
             <button onClick={recut} disabled={busy} className="flex-1 h-11 rounded-full bg-card text-[14px] font-medium flex items-center justify-center gap-2">
               {busy ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />} Rifai scontorno
             </button>
-            <button onClick={del} className="flex-1 h-11 rounded-full bg-red-50 text-red-600 text-[14px] font-medium flex items-center justify-center gap-2">
+            <button onClick={del} className="flex-1 h-11 rounded-full bg-danger-tint text-danger text-[14px] font-medium flex items-center justify-center gap-2">
               <Trash2 size={16} /> Elimina
             </button>
           </div>

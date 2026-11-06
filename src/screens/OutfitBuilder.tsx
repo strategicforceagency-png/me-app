@@ -120,9 +120,9 @@ export function OutfitBuilder() {
   const empty = !app.garments.length;
 
   return (
-    <div className="min-h-[100dvh] flex flex-col pt-[max(18px,env(safe-area-inset-top))] overflow-hidden">
+    <div className="min-h-[calc(100dvh-64px)] lg:min-h-[100dvh] flex flex-col overflow-hidden">
       <header className="px-5 pt-4 flex items-center justify-between">
-        <h1 className="text-[30px] font-extrabold tracking-tight">Crea il tuo outfit</h1>
+        <h1 className="font-display text-[36px] lg:text-[44px] font-semibold leading-none">Crea il tuo outfit</h1>
         <div className="flex items-center gap-1">
           <button onClick={() => setPickOpen(true)} className="h-10 w-10 grid place-items-center" aria-label="Scegli capo">
             <Search size={22} />
@@ -142,15 +142,15 @@ export function OutfitBuilder() {
               setSlot("top");
               setTop((t) => [...t.slice(0, i), ...t.slice(i + 1), t[i]]);
             }}
-            className={`shrink-0 text-left pb-1 border-b-2 ${i === topG.length - 1 && slot === "top" ? "border-brand" : "border-transparent"}`}
+            className={`shrink-0 text-left pb-1 border-b-2 ${i === topG.length - 1 && slot === "top" ? "border-gold" : "border-transparent"}`}
           >
             <div className="text-[11px] text-muted">Strato {i + 1}</div>
             <div className="flex items-center gap-1.5">
-              <span className={`text-[14px] ${i === topG.length - 1 && slot === "top" ? "text-brand font-semibold" : ""}`}>{g.nome}</span>
+              <span className={`text-[14px] ${i === topG.length - 1 && slot === "top" ? "text-gold font-semibold" : ""}`}>{g.nome}</span>
               {topG.length > 1 && (
                 <X
                   size={15}
-                  className="text-brand"
+                  className="text-gold"
                   onClick={(e) => {
                     e.stopPropagation();
                     setTop((t) => t.filter((_, j) => j !== i));
@@ -229,13 +229,13 @@ export function OutfitBuilder() {
               )}
             </motion.div>
             {photoMode && (tryLoading || tryErr) && (
-              <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 px-3.5 py-2 rounded-full bg-white shadow-soft text-[13px] flex items-center gap-2 max-w-[90%]">
+              <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 px-3.5 py-2 rounded-full bg-surface shadow-soft text-[13px] flex items-center gap-2 max-w-[90%]">
                 {tryLoading ? (
                   <>
-                    <Sparkles size={15} className="text-brand animate-pulse" /> Ti sto vestendo…
+                    <Sparkles size={15} className="text-gold animate-pulse" /> Ti sto vestendo…
                   </>
                 ) : (
-                  <span className="text-red-600 line-clamp-2">{tryErr}</span>
+                  <span className="text-danger line-clamp-2">{tryErr}</span>
                 )}
               </div>
             )}
@@ -245,14 +245,14 @@ export function OutfitBuilder() {
 
       {/* slot selector + hint */}
       {!empty && (
-        <div className="px-5 pb-[calc(96px+env(safe-area-inset-bottom))]">
+        <div className="px-5 pb-[calc(104px+env(safe-area-inset-bottom))] lg:pb-8">
           <div className="mx-auto w-fit p-1 rounded-full bg-card flex gap-1">
             {(Object.keys(SLOT_LABEL) as Slot[]).map((s) => (
               <button
                 key={s}
                 onClick={() => setSlot(s)}
                 disabled={!bySlot[s].length}
-                className={`px-4 h-9 rounded-full text-[14px] font-medium transition disabled:opacity-30 ${slot === s ? "bg-white shadow-soft text-ink" : "text-muted"}`}
+                className={`px-4 h-9 rounded-full text-[14px] font-medium transition disabled:opacity-30 ${slot === s ? "bg-surface shadow-soft text-ink" : "text-muted"}`}
               >
                 {SLOT_LABEL[s]}
               </button>

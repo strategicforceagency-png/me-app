@@ -24,13 +24,13 @@ export function MannequinSvg({ m = DEFAULT_MEASURES, className = "" }: { m?: Mea
     <svg viewBox="0 0 200 500" className={className} aria-hidden>
       <defs>
         <linearGradient id="mq" x1="0" x2="1">
-          <stop offset="0" stopColor="#E4E4E8" />
-          <stop offset=".5" stopColor="#F7F7F9" />
-          <stop offset="1" stopColor="#DCDCE1" />
+          <stop offset="0" stopColor="rgb(var(--mq-a))" />
+          <stop offset=".5" stopColor="rgb(var(--mq-b))" />
+          <stop offset="1" stopColor="rgb(var(--mq-c))" />
         </linearGradient>
       </defs>
       <ellipse cx={100} cy={492} rx={52} ry={6} fill="#000" opacity=".06" />
-      <g fill="url(#mq)" stroke="#D2D2D8" strokeWidth=".8">
+      <g fill="url(#mq)" stroke="rgb(var(--mq-line))" strokeWidth=".8">
         <path d={arm(-1)} />
         <path d={arm(1)} />
         <path d={leg(-1)} />
