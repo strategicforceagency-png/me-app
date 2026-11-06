@@ -63,7 +63,7 @@ export default function App() {
 
 /* ---------------- marchio ---------------- */
 export function Mark({ className = "h-9 w-9" }: { className?: string }) {
-  return <img src="./icon.svg" alt="" className={`${className} rounded-[10px] ring-1 ring-gold/30`} />;
+  return <img src="./habitus.svg" alt="" className={`${className} rounded-[10px] ring-1 ring-gold/30`} />;
 }
 function Wordmark({ sub = true }: { sub?: boolean }) {
   return (
