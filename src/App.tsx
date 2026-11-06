@@ -8,6 +8,7 @@ import { supabase, useSignedUrl } from "./lib/supabase";
 import { OutfitBuilder } from "./screens/OutfitBuilder";
 import { Profile } from "./screens/Profile";
 import { AddGarmentSheet, Wardrobe } from "./screens/Wardrobe";
+import { Health } from "./screens/Health";
 
 /* ---------------- tema chiaro / scuro (come Navy OS) ---------------- */
 type Theme = "light" | "dark";
@@ -91,7 +92,7 @@ const I = (C: typeof Shirt) => (p: { size?: number; className?: string }) => <C 
 const ITEMS: Record<Tab, NavItem> = {
   armadio: { id: "armadio", label: "Armadio", icon: (p) => <Hanger size={p.size ?? 18} className={p.className} /> },
   outfit: { id: "outfit", label: "Outfit", icon: I(Shirt) },
-  salute: { id: "salute", label: "Salute", icon: I(HeartPulse), soon: true },
+  salute: { id: "salute", label: "Salute", icon: I(HeartPulse) },
   fisico: { id: "fisico", label: "Fisico", icon: I(Dumbbell), soon: true },
   profilo: { id: "profilo", label: "Profilo", icon: I(User) },
 };
@@ -207,6 +208,16 @@ function SidebarBody({ onNav }: { onNav?: () => void }) {
 function Shell() {
   const app = useApp();
   const [menu, setMenu] = useState(false);
+  // ritorno dal collegamento Whoop (?whoop=ok)
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    const w = q.get("whoop");
+    if (!w) return;
+    app.setTab("salute");
+    app.toast(w === "ok" ? "Whoop collegato" : w === "annullato" ? "Collegamento Whoop annullato" : `Whoop: ${w}`);
+    history.replaceState(null, "", window.location.pathname);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   return (
     <div className="min-h-[100dvh] bg-bg">
       {/* Barra laterale su computer */}
@@ -234,7 +245,8 @@ function Shell() {
           {app.tab === "armadio" && <Wardrobe />}
           {app.tab === "outfit" && <OutfitBuilder />}
           {app.tab === "profilo" && <Profile />}
-          {(app.tab === "salute" || app.tab === "fisico") && <ComingSoon tab={app.tab} />}
+          {app.tab === "salute" && <Health />}
+          {app.tab === "fisico" && <ComingSoon tab={app.tab} />}
         </div>
       </main>
       {app.tab !== "armadio" && <AddGarmentSheet open={app.addOpen} onClose={() => app.setAddOpen(false)} />}
