@@ -1,4 +1,4 @@
-import { ai, AiError, supabase, uploadImage } from "./supabase";
+import { ai, AiError, friendly, supabase, uploadImage } from "./supabase";
 
 type Deps = {
   uid: string;
@@ -10,6 +10,7 @@ type Deps = {
 type Extra = { nome?: string; categoria?: string; prezzo?: string; brand?: string; source_url?: string };
 
 let warnedNoKey = false;
+let warnedCut = false;
 
 async function runImport(d: Deps, label: string, preview: string | undefined, job: () => Promise<{ path?: string; url?: string }>, source: string, extra: Extra) {
   const id = crypto.randomUUID();
@@ -18,7 +19,11 @@ async function runImport(d: Deps, label: string, preview: string | undefined, jo
   try {
     const src = await job();
     path = src.path;
-    await ai({ action: "import", path: src.path, url: src.url, source, extra });
+    const r = await ai<{ ai_error?: string | null; cutout_ok?: boolean }>({ action: "import", path: src.path, url: src.url, source, extra });
+    if (r.ai_error && !warnedCut) {
+      warnedCut = true;
+      d.toast(friendly(r.ai_error)!.slice(0, 80));
+    }
   } catch (e) {
     if (e instanceof AiError && e.code === "NO_KEY") {
       // AI non configurata: salva comunque il capo senza scontorno

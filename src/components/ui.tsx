@@ -148,7 +148,7 @@ export function Toast({ msg }: { msg: string | null }) {
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 12 }}
-          className="fixed bottom-28 left-1/2 -translate-x-1/2 z-[60] px-4 py-2.5 rounded-full bg-[#3a3a3c] text-white text-[14px] font-medium shadow-lg whitespace-nowrap"
+          className="fixed bottom-28 left-1/2 -translate-x-1/2 z-[60] px-4 py-2.5 rounded-full bg-[#3a3a3c] text-white text-[14px] font-medium shadow-lg w-max max-w-[88vw] text-center"
         >
           {msg}
         </motion.div>

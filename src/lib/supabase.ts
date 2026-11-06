@@ -133,8 +133,14 @@ export async function ai<T = any>(body: Record<string, unknown>): Promise<T> {
     body: JSON.stringify(body),
   });
   const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw new AiError(j.error || `Errore ${r.status}`, j.code);
+  if (!r.ok) throw new AiError(friendly(j.error) || `Errore ${r.status}`, j.code);
   return j as T;
+}
+export function friendly(msg?: string | null) {
+  if (!msg) return msg;
+  if (/quota|billing|rate-limit/i.test(msg)) return "Funzione immagini AI non attiva: abilita la fatturazione su Google AI Studio";
+  if (/demand|overloaded|unavailable/i.test(msg)) return "AI momentaneamente occupata, riprova tra poco";
+  return msg;
 }
 
 /* ---------- image helpers ---------- */

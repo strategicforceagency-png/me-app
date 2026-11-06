@@ -8,8 +8,40 @@ const cors = {
 const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36";
 const GEMINI = "https://generativelanguage.googleapis.com/v1beta/models";
-const TEXT_MODEL = "gemini-2.5-flash";
-const IMAGE_MODEL = "gemini-2.5-flash-image";
+// Models are discovered at runtime (Google retires names often) with automatic fallback.
+let modelCache: { text: string[]; image: string[]; all: string[] } | null = null;
+function ver(n: string) {
+  const m = n.match(/gemini-(\d+(?:\.\d+)?)/);
+  return m ? parseFloat(m[1]) : 0;
+}
+async function models() {
+  if (modelCache) return modelCache;
+  const r = await fetch(`${GEMINI}?key=${geminiKey()}&pageSize=1000`);
+  const j = await r.json();
+  if (!r.ok) throw new Error(j?.error?.message || "Impossibile leggere i modelli AI");
+  // deno-lint-ignore no-explicit-any
+  const gen: string[] = (j.models || []).filter((m: any) => (m.supportedGenerationMethods || []).includes("generateContent")).map((m: any) => String(m.name).replace("models/", ""));
+  const byVer = (a: string[]) => [...a].sort((x, y) => ver(y) - ver(x) || x.length - y.length);
+  const text = [
+    ...byVer(gen.filter((n) => /^gemini-[\d.]+-flash$/.test(n))),
+    ...gen.filter((n) => n === "gemini-flash-latest"),
+    ...byVer(gen.filter((n) => /^gemini-[\d.]+-flash-lite$/.test(n))),
+  ];
+  const image = [
+    ...byVer(gen.filter((n) => /^gemini-[\d.]+-flash-image$/.test(n))),
+    ...gen.filter((n) => /nano-banana/.test(n) && !/preview/.test(n)),
+    ...byVer(gen.filter((n) => /^gemini-[\d.]+-pro-image$/.test(n))),
+    ...byVer(gen.filter((n) => /^gemini-[\d.]+-flash-image-preview$/.test(n))),
+    ...gen.filter((n) => /nano-banana/.test(n) && /preview/.test(n)),
+  ];
+  const envT = Deno.env.get("GEMINI_TEXT_MODEL"), envI = Deno.env.get("GEMINI_IMAGE_MODEL");
+  modelCache = {
+    text: [...(envT ? [envT] : []), ...text].slice(0, 6),
+    image: [...(envI ? [envI] : []), ...image].slice(0, 6),
+    all: gen,
+  };
+  return modelCache;
+}
 
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { ...cors, "Content-Type": "application/json" } });
@@ -39,24 +71,41 @@ async function fetchImage(url: string): Promise<Img> {
 function geminiKey() {
   const k = Deno.env.get("GEMINI_API_KEY");
   if (!k) throw new Error("CHIAVE_AI_MANCANTE");
-  return k;
+  return k.trim();
 }
 
-async function gemini(model: string, parts: unknown[], config: Record<string, unknown> = {}) {
+async function geminiOnce(model: string, parts: unknown[], config: Record<string, unknown>) {
   const r = await fetch(`${GEMINI}/${model}:generateContent?key=${geminiKey()}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ contents: [{ role: "user", parts }], generationConfig: config }),
   });
   const body = await r.json();
-  if (!r.ok) throw new Error(body?.error?.message || `Errore AI ${r.status}`);
+  if (!r.ok) {
+    const e = new Error(body?.error?.message || `Errore AI ${r.status}`) as Error & { retry?: boolean };
+    e.retry = [429, 404, 500, 503].includes(r.status) || /demand|overloaded|no longer available|not found|unavailable/i.test(e.message);
+    throw e;
+  }
   return body?.candidates?.[0]?.content?.parts ?? [];
+}
+async function gemini(kind: "text" | "image", parts: unknown[], config: Record<string, unknown> = {}) {
+  const list = (await models())[kind];
+  let last: unknown = new Error("Nessun modello AI disponibile");
+  for (const m of list) {
+    try {
+      return await geminiOnce(m, parts, config);
+    } catch (e) {
+      last = e;
+      if (!(e as { retry?: boolean }).retry) throw e;
+    }
+  }
+  throw last;
 }
 
 const imgPart = (i: Img) => ({ inline_data: { mime_type: i.mime, data: i.data } });
 
 async function geminiImage(parts: unknown[]): Promise<Img> {
-  const out = await gemini(IMAGE_MODEL, parts, { responseModalities: ["IMAGE", "TEXT"] });
+  const out = await gemini("image", parts, { responseModalities: ["IMAGE", "TEXT"] });
   // deno-lint-ignore no-explicit-any
   const p = out.find((x: any) => x.inline_data || x.inlineData) as any;
   const d = p?.inline_data || p?.inlineData;
@@ -70,7 +119,7 @@ const CATEGORIE = [
 
 async function analyze(img: Img) {
   const out = await gemini(
-    TEXT_MODEL,
+    "text",
     [
       imgPart(img),
       {
@@ -210,6 +259,10 @@ Deno.serve(async (req) => {
         if (!results.length) { try { results = await bingImages(q); } catch { /* none */ } }
         return json({ results });
       }
+      case "models": {
+        const m = await models();
+        return json({ text: m.text, image: m.image, all: m.all });
+      }
       case "link": {
         return json(await readLink(String(body.url)));
       }
@@ -247,7 +300,8 @@ Deno.serve(async (req) => {
         };
         const { data, error } = await sb.from("garments").insert(row).select().single();
         if (error) throw new Error(error.message);
-        return json({ garment: data, cutout_ok: !!cutoutPath });
+        const aiErr = info.status === "rejected" ? String(info.reason) : cut.status === "rejected" ? String(cut.reason) : null;
+        return json({ garment: data, cutout_ok: !!cutoutPath, ai_error: aiErr });
       }
       case "recut": {
         const { data: g } = await sb.from("garments").select("*").eq("id", body.id).single();
