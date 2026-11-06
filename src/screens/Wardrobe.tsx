@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { Camera, Check, ChevronRight, Globe, ImagePlus, Link2, Loader2, Plus, Search, Sparkles, Trash2, X } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Chip, Field, GarmentImg, inputCls, PrimaryButton, Sheet } from "../components/ui";
 import { importFiles, importUrls } from "../lib/importer";
 import { useApp } from "../lib/store";
@@ -239,7 +239,19 @@ export function AddGarmentSheet({ open, onClose }: { open: boolean; onClose: () 
 
 type Result = { image: string; thumbnail: string; title: string; source: string };
 
-function WebSearchSheet({ open, onClose, onDone }: { open: boolean; onClose: () => void; onDone: () => void }) {
+export function WebSearchSheet({
+  open,
+  onClose,
+  onDone,
+  initialQuery,
+  title = "Cerca su internet",
+}: {
+  open: boolean;
+  onClose: () => void;
+  onDone: () => void;
+  initialQuery?: string;
+  title?: string;
+}) {
   const app = useApp();
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(false);
@@ -247,13 +259,23 @@ function WebSearchSheet({ open, onClose, onDone }: { open: boolean; onClose: () 
   const [sel, setSel] = useState<Result[]>([]);
   const [err, setErr] = useState("");
 
-  const search = async (e?: React.FormEvent) => {
+  useEffect(() => {
+    if (open && initialQuery) {
+      setQ(initialQuery);
+      setSel([]);
+      search(undefined, initialQuery);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initialQuery]);
+
+  const search = async (e?: React.FormEvent, override?: string) => {
     e?.preventDefault();
-    if (!q.trim()) return;
+    const query = (override ?? q).trim();
+    if (!query) return;
     setLoading(true);
     setErr("");
     try {
-      const r = await ai<{ results: Result[] }>({ action: "search", query: q });
+      const r = await ai<{ results: Result[] }>({ action: "search", query });
       setRes(r.results);
       if (!r.results.length) setErr("Nessun risultato. Prova con altre parole o incolla il link del prodotto.");
     } catch (e) {
@@ -272,7 +294,7 @@ function WebSearchSheet({ open, onClose, onDone }: { open: boolean; onClose: () 
   };
 
   return (
-    <Sheet open={open} onClose={onClose} title="Cerca su internet" full>
+    <Sheet open={open} onClose={onClose} title={title} full>
       <form onSubmit={search} className="relative">
         <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted" />
         <input

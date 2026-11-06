@@ -1,4 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
+import { analyzeInspiration, buildGuide, igPost } from "./style.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -310,6 +311,49 @@ Deno.serve(async (req) => {
         const p = await upload("garments", cut, "cut");
         await sb.from("garments").update({ image_cutout_path: p }).eq("id", g.id);
         return json({ image_cutout_path: p });
+      }
+      case "ig_post": {
+        // body: { url } → scarica l'immagine del post e la salva nelle ispirazioni
+        const p = await igPost(String(body.url || ""));
+        const img = await fetchImage(p.image);
+        const path = await upload("inspirations", img, "ig");
+        return json({ path, username: p.username, caption: p.caption });
+      }
+      case "inspire": {
+        // body: { id } → analisi dello stile delle immagini di un'ispirazione
+        const { data: insp } = await sb.from("inspirations").select("*").eq("id", body.id).single();
+        if (!insp) throw new Error("Ispirazione non trovata");
+        await sb.from("inspirations").update({ status: "analisi", error: null }).eq("id", insp.id);
+        try {
+          const paths: string[] = (insp.image_paths || []).slice(0, 14);
+          if (!paths.length) throw new Error("Nessuna immagine da analizzare");
+          const imgs = await Promise.all(paths.map((p) => download("inspirations", p)));
+          const analysis = await analyzeInspiration(gemini, imgs, insp.handle);
+          await sb.from("inspirations").update({ analysis, status: "pronto" }).eq("id", insp.id);
+          return json({ analysis });
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          await sb.from("inspirations").update({ status: "errore", error: msg.slice(0, 300) }).eq("id", insp.id);
+          throw e;
+        }
+      }
+      case "style_guide": {
+        const [{ data: picks }, { data: wardrobe }, { data: prof }, { data: insps }] = await Promise.all([
+          sb.from("style_picks").select("kind, value, inspiration_id"),
+          sb.from("garments").select("id, nome, categoria, colore, formalita"),
+          sb.from("profiles").select("*").eq("id", uid).single(),
+          sb.from("inspirations").select("id, handle, title"),
+        ]);
+        if (!picks?.length) throw new Error("Seleziona prima qualche elemento dalle tue ispirazioni");
+        const name = new Map((insps || []).map((i) => [i.id, i.handle ? "@" + i.handle : i.title]));
+        const guide = await buildGuide(
+          gemini,
+          picks.map((p) => ({ kind: p.kind, value: p.value, fonte: (p.inspiration_id && name.get(p.inspiration_id)) || null })),
+          wardrobe || [],
+          prof,
+        );
+        await sb.from("profiles").update({ style_guide: guide }).eq("id", uid);
+        return json({ guide });
       }
       case "tryon": {
         // body: { garment_ids: string[] } ordered bottom->top layers

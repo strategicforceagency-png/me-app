@@ -1,6 +1,6 @@
 import { Session } from "@supabase/supabase-js";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronDown, Dumbbell, HeartPulse, Loader2, LogOut, Menu, Moon, Plus, Shirt, Sun, User, X } from "lucide-react";
+import { ChevronDown, Dumbbell, HeartPulse, Loader2, LogOut, Menu, Moon, Plus, Shirt, Sparkles, Sun, User, X } from "lucide-react";
 import { FormEvent, ReactNode, useEffect, useState } from "react";
 import { Field, inputCls, PrimaryButton, Toast } from "./components/ui";
 import { AppProvider, Tab, useApp } from "./lib/store";
@@ -9,6 +9,7 @@ import { OutfitBuilder } from "./screens/OutfitBuilder";
 import { Profile } from "./screens/Profile";
 import { AddGarmentSheet, Wardrobe } from "./screens/Wardrobe";
 import { Health } from "./screens/Health";
+import { StyleScreen } from "./screens/Style";
 
 /* ---------------- tema chiaro / scuro (come Navy OS) ---------------- */
 type Theme = "light" | "dark";
@@ -92,18 +93,19 @@ const I = (C: typeof Shirt) => (p: { size?: number; className?: string }) => <C 
 const ITEMS: Record<Tab, NavItem> = {
   armadio: { id: "armadio", label: "Armadio", icon: (p) => <Hanger size={p.size ?? 18} className={p.className} /> },
   outfit: { id: "outfit", label: "Outfit", icon: I(Shirt) },
+  stile: { id: "stile", label: "Stile", icon: I(Sparkles) },
   salute: { id: "salute", label: "Salute", icon: I(HeartPulse) },
   fisico: { id: "fisico", label: "Fisico", icon: I(Dumbbell), soon: true },
   profilo: { id: "profilo", label: "Profilo", icon: I(User) },
 };
 /** Gruppi del menu, come i riquadri di Navy OS. */
 const GROUPS: { label: string; items: Tab[] }[] = [
-  { label: "Stile", items: ["armadio", "outfit"] },
+  { label: "Stile", items: ["armadio", "outfit", "stile"] },
   { label: "Corpo", items: ["salute", "fisico"] },
   { label: "Tu", items: ["profilo"] },
 ];
 /** Dock sul telefono: 4 voci + Menu. */
-const DOCK: Tab[] = ["armadio", "outfit", "salute", "fisico"];
+const DOCK: Tab[] = ["armadio", "outfit", "stile", "salute"];
 
 /* ---------------- barra laterale (computer) e menu (telefono) ---------------- */
 function NavGroup({ label, children }: { label: string; children: ReactNode }) {
@@ -245,6 +247,7 @@ function Shell() {
           {app.tab === "armadio" && <Wardrobe />}
           {app.tab === "outfit" && <OutfitBuilder />}
           {app.tab === "profilo" && <Profile />}
+          {app.tab === "stile" && <StyleScreen />}
           {app.tab === "salute" && <Health />}
           {app.tab === "fisico" && <ComingSoon tab={app.tab} />}
         </div>

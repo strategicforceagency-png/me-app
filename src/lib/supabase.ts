@@ -66,6 +66,7 @@ export type Profile = {
   taglia_pantaloni: string | null;
   taglia_scarpe: string | null;
   ingest_token: string | null;
+  style_guide: unknown | null;
 };
 export type OutfitItem = { garment_id: string; slot: Slot; layer: number };
 export type Outfit = {
