@@ -1,9 +1,9 @@
 import { motion } from "framer-motion";
-import { AtSign, Check, Heart, ImagePlus, Instagram, Loader2, Plus, RefreshCw, Search, Shirt, Sparkles, Trash2, Wand2, X } from "lucide-react";
+import { AtSign, Check, Download, Film, Heart, ImagePlus, Instagram, Link2, Loader2, Plus, RefreshCw, Search, Shirt, Sparkles, Trash2, Unlink, Wand2, X } from "lucide-react";
 import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Field, inputCls, PrimaryButton, Sheet } from "../components/ui";
 import { useApp } from "../lib/store";
-import { ai, supabase, uploadImage, useSignedUrl } from "../lib/supabase";
+import { ai, fn, supabase, uploadBlob, uploadImage, useSignedUrl, videoFrames } from "../lib/supabase";
 import { WebSearchSheet } from "./Wardrobe";
 
 /* ---------------- tipi ---------------- */
@@ -374,7 +374,12 @@ function AddInspirationSheet({ open, onClose, onCreated, reload }: { open: boole
   const [links, setLinks] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [busy, setBusy] = useState("");
+  const [ig, setIg] = useState<{ connected: boolean; username: string | null } | null>(null);
   const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    supabase.rpc("instagram_status").then(({ data }) => setIg((data as { connected: boolean; username: string | null }) || null));
+  }, [open]);
 
   const reset = () => {
     setHandle("");
@@ -385,6 +390,45 @@ function AddInspirationSheet({ open, onClose, onCreated, reload }: { open: boole
   const cleanHandle = handle.trim().replace(/^@/, "").replace(/^https?:\/\/(www\.)?instagram\.com\//, "").replace(/\/.*$/, "");
   const urls = links.split(/\s+/).filter((l) => /instagram\.com\/(?:[^/]+\/)?(p|reel|tv)\//.test(l));
   const canGo = mode === "link" ? urls.length > 0 : files.length > 0;
+
+  const analyze = (id: string, user: string | null) => {
+    // analisi in background: la card mostra lo stato
+    ai({ action: "inspire", id })
+      .then(() => app.toast(`Stile ${user ? "di @" + user : ""} analizzato`))
+      .catch((e) => app.toast((e as Error).message))
+      .finally(reload);
+  };
+
+  const connectIg = async () => {
+    setBusy("Apro Instagram…");
+    try {
+      const r = await fn<{ url: string }>("instagram", "start");
+      window.location.href = r.url;
+    } catch (e) {
+      app.toast((e as Error).message);
+      setBusy("");
+    }
+  };
+  const disconnectIg = async () => {
+    await fn("instagram", "disconnect").catch(() => {});
+    setIg({ connected: false, username: null });
+    app.toast("Instagram scollegato");
+  };
+  const autoImport = async () => {
+    if (!cleanHandle) return;
+    setBusy(`Importo i post di @${cleanHandle}…`);
+    try {
+      const r = await fn<{ id: string; username: string; images: number }>("instagram", "discover", { username: cleanHandle, limit: 12 });
+      app.toast(`${r.images} post importati da @${r.username}`);
+      analyze(r.id, r.username);
+      reset();
+      onClose();
+      onCreated(r.id);
+    } catch (e) {
+      app.toast((e as Error).message);
+      setBusy("");
+    }
+  };
 
   const create = async () => {
     try {
@@ -403,8 +447,15 @@ function AddInspirationSheet({ open, onClose, onCreated, reload }: { open: boole
         }
       }
       for (let k = 0; k < files.length; k++) {
-        setBusy(`Carico le immagini ${k + 1}/${files.length}…`);
-        paths.push(await uploadImage("inspirations", app.uid, files[k], "shot"));
+        const f = files[k];
+        if (f.type.startsWith("video/")) {
+          setBusy(`Estraggo i fotogrammi dal video ${k + 1}/${files.length}…`);
+          const frames = await videoFrames(f, 10);
+          for (const fr of frames) paths.push(await uploadBlob("inspirations", app.uid, fr, "frame"));
+        } else {
+          setBusy(`Carico le immagini ${k + 1}/${files.length}…`);
+          paths.push(await uploadImage("inspirations", app.uid, f, "shot"));
+        }
       }
       if (!paths.length) throw new Error("Nessuna immagine caricata");
       setBusy("Creo l'ispirazione…");
@@ -414,11 +465,7 @@ function AddInspirationSheet({ open, onClose, onCreated, reload }: { open: boole
         .select()
         .single();
       if (error) throw error;
-      // analisi in background: la card mostra lo stato
-      ai({ action: "inspire", id: data.id })
-        .then(() => app.toast(`Stile ${user ? "di @" + user : ""} analizzato`))
-        .catch((e) => app.toast((e as Error).message))
-        .finally(reload);
+      analyze(data.id, user);
       reset();
       onClose();
       onCreated(data.id);
@@ -447,14 +494,41 @@ function AddInspirationSheet({ open, onClose, onCreated, reload }: { open: boole
                 <input className={`${inputCls} pl-11`} value={handle} onChange={(e) => setHandle(e.target.value)} placeholder="nomeprofilo" autoCapitalize="none" autoCorrect="off" />
               </div>
             </Field>
+            {ig?.connected ? (
+              <>
+                <PrimaryButton className="w-full" disabled={!cleanHandle || !!busy} onClick={autoImport}>
+                  {busy ? <Loader2 size={17} className="animate-spin" /> : <Download size={17} />} {busy || (cleanHandle ? `Importa i post di @${cleanHandle}` : "Scrivi il nome del profilo")}
+                </PrimaryButton>
+                <div className="flex items-center justify-between text-[12px] text-muted">
+                  <span className="flex items-center gap-1.5">
+                    <Check size={13} className="text-gold" /> Instagram collegato{ig.username ? ` come @${ig.username}` : ""} · funziona con profili Creator/Business
+                  </span>
+                  <button onClick={disconnectIg} className="flex items-center gap-1 hover:text-ink">
+                    <Unlink size={12} /> Scollega
+                  </button>
+                </div>
+                <div className="flex items-center gap-3 text-[11px] uppercase tracking-[0.12em] text-muted pt-1">
+                  <span className="h-px flex-1 bg-line" /> oppure screenshot / video <span className="h-px flex-1 bg-line" />
+                </div>
+              </>
+            ) : (
+              <div className="rounded-[16px] border border-gold/40 bg-gold-tint p-4">
+                <div className="text-[14px] font-semibold flex items-center gap-2">
+                  <Instagram size={16} className="text-gold" /> Importa in automatico
+                </div>
+                <p className="text-[12.5px] text-muted mt-1">Collega il tuo Instagram (account professionale) e importo da solo gli ultimi post di qualsiasi profilo Creator o Business.</p>
+                <button onClick={connectIg} disabled={!!busy} className="mt-3 h-10 px-4 rounded-full bg-brand text-brand-fg text-[13.5px] font-semibold flex items-center gap-2">
+                  {busy ? <Loader2 size={15} className="animate-spin" /> : <Link2 size={15} />} Collega Instagram
+                </button>
+              </div>
+            )}
             {cleanHandle && (
               <a href={`https://www.instagram.com/${cleanHandle}/`} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-gold text-[14px] font-medium">
                 <Instagram size={16} /> Apri @{cleanHandle} su Instagram
               </a>
             )}
-            <div className="rounded-[16px] bg-gold-tint p-4 text-[13px] leading-relaxed">
-              <b>Come fare:</b> apri il profilo, fai <b>3-8 screenshot</b> della griglia o dei post con gli outfit che ti piacciono e caricali qui sotto. Più look vedo, più l'analisi è precisa.
-              <div className="text-muted mt-1.5 text-[12px]">Instagram non permette di leggere i profili in automatico: gli screenshot sono il modo più affidabile.</div>
+            <div className="rounded-[16px] bg-card p-4 text-[13px] leading-relaxed">
+              <b>Senza collegamento:</b> fai <b>3-8 screenshot</b> della griglia o dei post, oppure una <b>registrazione schermo</b> mentre scorri il profilo (15-30 secondi), e caricali qui sotto.
             </div>
           </>
         )}
@@ -477,25 +551,34 @@ function AddInspirationSheet({ open, onClose, onCreated, reload }: { open: boole
 
         {mode !== "link" && (
           <div>
-            <div className="text-[13px] text-muted mb-2">{mode === "instagram" ? "Screenshot del profilo" : "Foto di outfit che ti piacciono"}</div>
+            <div className="text-[13px] text-muted mb-2">{mode === "instagram" ? "Screenshot o registrazione schermo del profilo" : "Foto o video (Reel salvati) di outfit che ti piacciono"}</div>
             <div className="grid grid-cols-4 gap-2">
               <button onClick={() => ref.current?.click()} className="aspect-square rounded-2xl border-2 border-dashed border-line grid place-items-center text-muted">
                 <ImagePlus />
               </button>
               {files.map((f, k) => (
                 <div key={k} className="relative aspect-square rounded-2xl overflow-hidden bg-card">
-                  <img src={URL.createObjectURL(f)} className="w-full h-full object-cover" />
+                  {f.type.startsWith("video/") ? (
+                    <div className="w-full h-full grid place-items-center bg-ink text-gold">
+                      <div className="flex flex-col items-center gap-1">
+                        <Film size={20} />
+                        <span className="text-[10px] text-bg/70">Video</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <img src={URL.createObjectURL(f)} className="w-full h-full object-cover" />
+                  )}
                   <button onClick={() => setFiles((x) => x.filter((_, j) => j !== k))} className="absolute top-1 right-1 h-6 w-6 rounded-full bg-black/55 text-white grid place-items-center">
                     <X size={13} />
                   </button>
                 </div>
               ))}
             </div>
-            <input ref={ref} type="file" accept="image/*" multiple hidden onChange={(e) => e.target.files && setFiles((x) => [...x, ...Array.from(e.target.files!)].slice(0, 14))} />
+            <input ref={ref} type="file" accept="image/*,video/*" multiple hidden onChange={(e) => e.target.files && setFiles((x) => [...x, ...Array.from(e.target.files!)].slice(0, 14))} />
           </div>
         )}
 
-        <PrimaryButton className="w-full" disabled={!canGo || !!busy} onClick={create}>
+        {(mode !== "instagram" || !ig?.connected || files.length > 0) && <PrimaryButton className="w-full" disabled={!canGo || !!busy} onClick={create}>
           {busy ? (
             <>
               <Loader2 size={17} className="animate-spin" /> {busy}
@@ -505,7 +588,7 @@ function AddInspirationSheet({ open, onClose, onCreated, reload }: { open: boole
               <Sparkles size={17} /> Analizza lo stile
             </>
           )}
-        </PrimaryButton>
+        </PrimaryButton>}
       </div>
       <div className="h-4" />
     </Sheet>

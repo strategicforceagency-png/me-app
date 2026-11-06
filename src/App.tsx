@@ -213,6 +213,21 @@ function Shell() {
   // ritorno dal collegamento Whoop (?whoop=ok)
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
+    const ig = q.get("instagram");
+    if (ig) {
+      app.setTab("stile");
+      app.toast(
+        ig === "ok"
+          ? "Instagram collegato"
+          : ig === "annullato"
+            ? "Collegamento Instagram annullato"
+            : ig === "nessun-account-professionale"
+              ? "Nessun account Instagram professionale collegato a una Pagina Facebook"
+              : `Instagram: ${ig}`,
+      );
+      history.replaceState(null, "", window.location.pathname);
+      return;
+    }
     const w = q.get("whoop");
     if (!w) return;
     app.setTab("salute");

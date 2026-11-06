@@ -64,7 +64,7 @@ export async function analyzeInspiration(gemini: GeminiFn, images: Img[], handle
     parts.push(imgPart(im));
   });
   parts.push({
-    text: `Sei un personal shopper e stylist maschile di alto livello. ${handle ? `Queste immagini vengono dal profilo Instagram @${handle}` : "Queste sono immagini di ispirazione"} (possono essere screenshot della griglia, post singoli o foto). Analizza SOLO l'abbigliamento e lo stile, non la persona.
+    text: `Sei un personal shopper e stylist maschile di alto livello. ${handle ? `Queste immagini vengono dal profilo Instagram @${handle}` : "Queste sono immagini di ispirazione"} (possono essere screenshot della griglia, post singoli, foto o fotogrammi di un video). Analizza SOLO l'abbigliamento e lo stile, non la persona.
 Rispondi SOLO con JSON valido, in italiano, con questa struttura:
 {
  "riassunto": "2-3 frasi sullo stile complessivo",
@@ -77,7 +77,7 @@ Rispondi SOLO con JSON valido, in italiano, con questa struttura:
  "vestibilita": "come vestono i capi (slim, regular, oversize, cropped…)",
  "dettagli": ["dettagli ricorrenti: es. maniche risvoltate, orologio in acciaio, calzino a vista…"]
 }
-Regole: 2-4 stili ordinati per peso; 5-8 colori nella palette; 6-12 capi chiave; 3-6 formule; un elemento in "look" per ogni immagine che mostra un outfit (salta immagini senza vestiti). Non inventare brand se non sei ragionevolmente sicuro.`,
+Regole: 2-4 stili ordinati per peso; 5-8 colori nella palette; 6-12 capi chiave; 3-6 formule; un elemento in "look" per ogni immagine che mostra un outfit diverso (salta immagini senza vestiti e fotogrammi quasi identici). Non inventare brand se non sei ragionevolmente sicuro.`,
   });
   const out = await gemini("text", parts, { responseMimeType: "application/json", temperature: 0.4 });
   const a = parseJson<Analysis>(textOf(out), {

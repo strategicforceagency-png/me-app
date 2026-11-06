@@ -219,3 +219,54 @@ async function makeTransparent(url: string): Promise<string> {
   const out: Blob = await new Promise((r) => c.toBlob((b) => r(b!), "image/png"));
   return URL.createObjectURL(out);
 }
+
+/* ---------- chiamata generica a una edge function con sotto-percorso ---------- */
+export async function fn<T = any>(name: string, path: string, body: unknown = {}): Promise<T> {
+  const { data } = await supabase.auth.getSession();
+  const r = await fetch(`${SUPABASE_URL}/functions/v1/${name}/${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", apikey: SUPABASE_KEY, Authorization: `Bearer ${data.session?.access_token}` },
+    body: JSON.stringify(body),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new AiError(j.error || `Errore ${r.status}`, j.code);
+  return j as T;
+}
+
+/* ---------- fotogrammi da un video (Reel, registrazione schermo) ---------- */
+export async function videoFrames(file: File, count = 10, max = 1280): Promise<Blob[]> {
+  const url = URL.createObjectURL(file);
+  const v = document.createElement("video");
+  v.src = url;
+  v.muted = true;
+  v.playsInline = true;
+  v.preload = "auto";
+  await new Promise<void>((res, rej) => {
+    v.onloadedmetadata = () => res();
+    v.onerror = () => rej(new Error("Video non leggibile su questo dispositivo"));
+  });
+  const dur = isFinite(v.duration) && v.duration > 0 ? v.duration : 10;
+  const scale = Math.min(1, max / Math.max(v.videoWidth || max, v.videoHeight || max));
+  const c = document.createElement("canvas");
+  c.width = Math.round((v.videoWidth || 720) * scale);
+  c.height = Math.round((v.videoHeight || 1280) * scale);
+  const ctx = c.getContext("2d")!;
+  const out: Blob[] = [];
+  for (let i = 0; i < count; i++) {
+    const t = Math.min(dur - 0.05, (dur * (i + 0.5)) / count);
+    await new Promise<void>((res) => {
+      v.onseeked = () => res();
+      v.currentTime = t;
+    });
+    ctx.drawImage(v, 0, 0, c.width, c.height);
+    out.push(await new Promise<Blob>((res) => c.toBlob((b) => res(b!), "image/jpeg", 0.85)));
+  }
+  URL.revokeObjectURL(url);
+  return out;
+}
+export async function uploadBlob(bucket: string, uid: string, blob: Blob, prefix = "frame") {
+  const path = `${uid}/${prefix}-${crypto.randomUUID()}.jpg`;
+  const { error } = await supabase.storage.from(bucket).upload(path, blob, { contentType: "image/jpeg" });
+  if (error) throw error;
+  return path;
+}
