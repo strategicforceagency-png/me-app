@@ -4,7 +4,8 @@ import { createClient } from "npm:@supabase/supabase-js@2.45.4";
  * Ricevitore per l'app iOS "Health Auto Export" (automazione REST API).
  * Header: Authorization: Bearer <ingest_token del profilo>
  */
-const json = (d: unknown, s = 200) => new Response(JSON.stringify(d), { status: s, headers: { "Content-Type": "application/json" } });
+const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS" };
+const json = (d: unknown, s = 200) => new Response(JSON.stringify(d), { status: s, headers: { ...cors, "Content-Type": "application/json" } });
 
 const MAP: Record<string, string> = {
   step_count: "steps",
@@ -47,6 +48,7 @@ function convert(metric: string, v: number, units?: string) {
 }
 
 Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ ok: true, info: "Habitus – ricevitore Apple Salute" });
   const token = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "").trim();
   if (!token) return json({ error: "Token mancante" }, 401);
