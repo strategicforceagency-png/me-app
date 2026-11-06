@@ -1,0 +1,18 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body { background: #F5F5F7; color: #111113; -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent; }
+body { overscroll-behavior-y: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { scrollbar-width: none; }
+img { -webkit-user-drag: none; -webkit-touch-callout: none; }
+
+@keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+.shimmer { background: linear-gradient(90deg, #ececef 25%, #f6f6f8 50%, #ececef 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite linear; }
+.shimmer-overlay { background: linear-gradient(100deg, transparent 30%, rgba(255,255,255,.75) 50%, transparent 70%); background-size: 200% 100%; animation: shimmer 1.6s infinite linear; }
+
+.range { -webkit-appearance: none; appearance: none; width: 100%; height: 6px; border-radius: 99px; background: #E6E6EA; outline: none; }
+.range::-webkit-slider-thumb { -webkit-appearance: none; width: 26px; height: 26px; border-radius: 50%; background: #fff; box-shadow: 0 1px 6px rgba(0,0,0,.25); border: .5px solid rgba(0,0,0,.06); cursor: pointer; }
+.range::-moz-range-thumb { width: 26px; height: 26px; border-radius: 50%; background: #fff; box-shadow: 0 1px 6px rgba(0,0,0,.25); border: none; }
+.range { background: linear-gradient(#1E5EFF, #1E5EFF) 0/var(--p, 50%) 100% no-repeat #E6E6EA; }
