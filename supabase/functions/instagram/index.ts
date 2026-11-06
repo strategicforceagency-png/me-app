@@ -3,7 +3,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 /**
  * Instagram – API ufficiale Meta (Instagram API con Facebook Login, Business Discovery).
  * Permette di importare i post di altri profili professionali (Creator/Business) partendo dal @nome.
- * Secrets: META_APP_ID, META_APP_SECRET
+ * Secrets: META_APP_ID, META_APP_SECRET (+ META_CONFIG_ID se si usa Facebook Login for Business)
  */
 const APP_URL = "https://strategicforceagency-png.github.io/me-app/";
 const REDIRECT = `${Deno.env.get("SUPABASE_URL")}/functions/v1/instagram/callback`;
@@ -60,7 +60,10 @@ Deno.serve(async (req) => {
         u.searchParams.set("client_id", env("META_APP_ID"));
         u.searchParams.set("redirect_uri", REDIRECT);
         u.searchParams.set("state", state);
-        u.searchParams.set("scope", SCOPES);
+        // "Facebook Login for Business" usa una configurazione (config_id); il Login classico usa scope
+        const cfg = Deno.env.get("META_CONFIG_ID")?.trim();
+        if (cfg) u.searchParams.set("config_id", cfg);
+        else u.searchParams.set("scope", SCOPES);
         u.searchParams.set("response_type", "code");
         return json({ url: u.toString() });
       }
