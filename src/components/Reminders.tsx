@@ -53,7 +53,7 @@ export function RemindersCard({ compact }: { compact?: boolean }) {
   const iosHint = isIOS() && !isStandalone();
 
   if (compact) {
-    if (active || device === null) return null;
+    if (active || device === null || iosHint) return null; // su iPhone nel browser c'è già l'invito a installare
     return (
       <div className="mt-4 rounded-[22px] border border-gold/40 bg-gold-tint p-5 flex flex-col sm:flex-row sm:items-center gap-3">
         <Bell size={22} className="text-gold shrink-0" />

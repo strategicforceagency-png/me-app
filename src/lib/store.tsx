@@ -62,6 +62,22 @@ export function AppProvider({ uid, email, children }: { uid: string; email: stri
       supabase.from("garments").select("*").order("created_at", { ascending: false }),
       supabase.from("outfits").select("*, outfit_items(garment_id, slot, layer)").order("created_at", { ascending: false }),
     ]);
+    // senza rete: si riparte dall'ultima copia salvata sul telefono
+    const offline = p.error || g.error || o.error;
+    if (offline) {
+      try {
+        const c = JSON.parse(localStorage.getItem(`habitus-cache-${uid}`) || "null");
+        if (c) {
+          setP(c.profile);
+          setG(c.garments || []);
+          setO(c.outfits || []);
+          setLoading(false);
+          return;
+        }
+      } catch {
+        /* nessuna copia */
+      }
+    }
     const gs = (g.data as Garment[]) || [];
     await prefetchUrls(
       "garments",
@@ -75,6 +91,11 @@ export function AppProvider({ uid, email, children }: { uid: string; email: stri
     setG(gs);
     setO((o.data as Outfit[]) || []);
     setLoading(false);
+    try {
+      localStorage.setItem(`habitus-cache-${uid}`, JSON.stringify({ profile: p.data, garments: gs, outfits: o.data || [] }));
+    } catch {
+      /* spazio esaurito: pazienza */
+    }
   }, [uid, email]);
 
   useEffect(() => {
@@ -82,7 +103,16 @@ export function AppProvider({ uid, email, children }: { uid: string; email: stri
   }, [reload]);
 
   const setProfile = async (patch: Partial<Profile>) => {
-    setP((p) => (p ? { ...p, ...patch } : p));
+    setP((p) => {
+      const n = p ? { ...p, ...patch } : p;
+      try {
+        const c = JSON.parse(localStorage.getItem(`habitus-cache-${uid}`) || "null");
+        if (c && n) localStorage.setItem(`habitus-cache-${uid}`, JSON.stringify({ ...c, profile: n }));
+      } catch {
+        /* */
+      }
+      return n;
+    });
     await supabase.from("profiles").update(patch).eq("id", uid);
   };
   const toast = (m: string) => {

@@ -1,1 +1,100 @@
-{ "name": "Habitus", "short_name": "Habitus", "start_url": "./", "display": "standalone", "background_color": "#1F3D2E", "theme_color": "#F4EFE4", "icons": [{ "src": "habitus-512.png?v=3", "sizes": "512x512", "type": "image/png" }, { "src": "habitus-180.png?v=3", "sizes": "180x180", "type": "image/png" }, { "src": "habitus.svg?v=3", "sizes": "any", "type": "image/svg+xml" }] }
+{
+ "id": "./",
+ "name": "Habitus · Accademia del gentleman",
+ "short_name": "Habitus",
+ "description": "La tua accademia personale del gentleman: percorso, stile, corpo e linguaggio.",
+ "lang": "it",
+ "dir": "ltr",
+ "start_url": "./?fonte=app",
+ "scope": "./",
+ "display": "standalone",
+ "display_override": [
+  "standalone",
+  "minimal-ui"
+ ],
+ "orientation": "portrait",
+ "background_color": "#1F3D2E",
+ "theme_color": "#F4EFE4",
+ "categories": [
+  "lifestyle",
+  "education",
+  "health"
+ ],
+ "icons": [
+  {
+   "src": "habitus-192.png?v=4",
+   "sizes": "192x192",
+   "type": "image/png",
+   "purpose": "any"
+  },
+  {
+   "src": "habitus-512.png?v=4",
+   "sizes": "512x512",
+   "type": "image/png",
+   "purpose": "any"
+  },
+  {
+   "src": "habitus-maskable-192.png?v=4",
+   "sizes": "192x192",
+   "type": "image/png",
+   "purpose": "maskable"
+  },
+  {
+   "src": "habitus-maskable-512.png?v=4",
+   "sizes": "512x512",
+   "type": "image/png",
+   "purpose": "maskable"
+  },
+  {
+   "src": "habitus.svg?v=4",
+   "sizes": "any",
+   "type": "image/svg+xml",
+   "purpose": "any"
+  }
+ ],
+ "shortcuts": [
+  {
+   "name": "Oggi",
+   "url": "./?vai=percorso",
+   "icons": [
+    {
+     "src": "habitus-192.png?v=4",
+     "sizes": "192x192"
+    }
+   ]
+  },
+  {
+   "name": "Controllo della settimana",
+   "short_name": "Controllo",
+   "url": "./?vai=revisione",
+   "icons": [
+    {
+     "src": "habitus-192.png?v=4",
+     "sizes": "192x192"
+    }
+   ]
+  },
+  {
+   "name": "Laboratorio del linguaggio",
+   "short_name": "Linguaggio",
+   "url": "./?vai=linguaggio",
+   "icons": [
+    {
+     "src": "habitus-192.png?v=4",
+     "sizes": "192x192"
+    }
+   ]
+  },
+  {
+   "name": "Budget e acquisti",
+   "short_name": "Budget",
+   "url": "./?vai=budget",
+   "icons": [
+    {
+     "src": "habitus-192.png?v=4",
+     "sizes": "192x192"
+    }
+   ]
+  }
+ ]
+}

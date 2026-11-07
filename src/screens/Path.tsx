@@ -5,6 +5,7 @@ import { allLessons, lessonKey } from "../academy/content";
 import { Sheet } from "../components/ui";
 import { activeHabits, currentWeek, GIORNI, Path, PillarId, PILLARS, todayISO, Trial } from "../gentleman/types";
 import { RemindersCard } from "../components/Reminders";
+import { InstallCard } from "../components/InstallCard";
 import { BaselineSheet, dueReview, dueTrials, ReviewSheet, TrialSheet, useProgressData } from "./Progress";
 import { wordOfDay } from "../gentleman/words";
 import { useApp } from "../lib/store";
@@ -109,6 +110,13 @@ function PathView({ path }: { path: Path }) {
   const habits = activeHabits(path, week);
   const habitsDone = habits.filter((h) => has(`h:${h.id}`, true)).length;
   const prog = useProgressData();
+  // numerino sull'icona dell'app: le abitudini che mancano oggi
+  useEffect(() => {
+    const nav = navigator as Navigator & { setAppBadge?: (n?: number) => Promise<void>; clearAppBadge?: () => Promise<void> };
+    const left = habits.length - habitsDone;
+    if (left > 0) nav.setAppBadge?.(left).catch(() => {});
+    else nav.clearAppBadge?.().catch(() => {});
+  }, [habits.length, habitsDone]);
   const due = prog.loaded ? dueReview(path, app.profile?.path_started_at, prog.reviews) : null;
   const trialsDue = prog.loaded ? dueTrials(path, app.profile?.path_started_at, prog.trials) : [];
   const [baseOpen, setBaseOpen] = useState(false);
@@ -203,6 +211,7 @@ function PathView({ path }: { path: Path }) {
         </div>
       </button>
 
+      <InstallCard />
       <RemindersCard compact />
 
       {due && (

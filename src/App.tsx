@@ -45,7 +45,7 @@ export default function App() {
 
 /* ---------------- marchio ---------------- */
 export function Mark({ className = "h-9 w-9" }: { className?: string }) {
-  return <img src="./habitus.svg?v=3" alt="" className={`${className} rounded-[10px] ring-1 ring-gold/30`} />;
+  return <img src="./habitus.svg?v=4" alt="" className={`${className} rounded-[10px] ring-1 ring-gold/30`} />;
 }
 function Wordmark({ sub = true }: { sub?: boolean }) {
   return (
@@ -215,17 +215,40 @@ function SidebarBody({ onNav }: { onNav?: () => void }) {
 function Shell() {
   const app = useApp();
   const [last, setLast] = useState<Record<string, Tab>>({});
+  const [online, setOnline] = useState(navigator.onLine);
+  useEffect(() => {
+    let hidden = 0;
+    const vis = () => {
+      if (document.hidden) hidden = Date.now();
+      else if (hidden && Date.now() - hidden > 5 * 60 * 1000) app.reload();
+    };
+    const on = () => {
+      setOnline(true);
+      app.reload();
+    };
+    const off = () => setOnline(false);
+    document.addEventListener("visibilitychange", vis);
+    window.addEventListener("online", on);
+    window.addEventListener("offline", off);
+    return () => {
+      document.removeEventListener("visibilitychange", vis);
+      window.removeEventListener("online", on);
+      window.removeEventListener("offline", off);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   useEffect(() => {
     setLast((l) => ({ ...l, [groupOf(app.tab).id]: app.tab }));
     window.scrollTo({ top: 0 });
   }, [app.tab]);
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
-    if (q.get("vai") === "revisione") {
+    const vai = q.get("vai");
+    if (vai === "revisione") {
       app.setTab("percorso");
-      window.dispatchEvent(new CustomEvent("habitus:revisione"));
-      history.replaceState(null, "", window.location.pathname);
-    }
+      setTimeout(() => window.dispatchEvent(new CustomEvent("habitus:revisione")), 600);
+    } else if (vai && ["percorso", "linguaggio", "budget", "accademia", "fisico", "progressi", "armadio"].includes(vai)) app.setTab(vai as Tab);
+    if (q.size) history.replaceState(null, "", window.location.pathname);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   // ritorno dal collegamento Whoop (?whoop=ok)
@@ -277,6 +300,11 @@ function Shell() {
 
       <main className="lg:pl-[248px]">
         <div className="mx-auto w-full max-w-[1180px] pt-3 lg:pt-8">
+          {!online && (
+            <div className="mx-5 lg:mx-10 mb-3 rounded-full bg-burgundy/10 text-burgundy text-[12.5px] font-medium px-4 py-2 text-center">
+              Sei senza rete: vedi l'ultima copia salvata. Le modifiche torneranno possibili appena sei di nuovo online.
+            </div>
+          )}
           <SubTabs />
           {app.tab === "budget" && <BudgetScreen />}
           {app.tab === "progressi" && <ProgressScreen />}
