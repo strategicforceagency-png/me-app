@@ -223,7 +223,7 @@ async function makeTransparent(url: string): Promise<string> {
 /* ---------- chiamata generica a una edge function con sotto-percorso ---------- */
 export async function fn<T = any>(name: string, path: string, body: unknown = {}): Promise<T> {
   const { data } = await supabase.auth.getSession();
-  const r = await fetch(`${SUPABASE_URL}/functions/v1/${name}/${path}`, {
+  const r = await fetch(`${SUPABASE_URL}/functions/v1/${name}${path ? "/" + path : ""}`, {
     method: "POST",
     headers: { "Content-Type": "application/json", apikey: SUPABASE_KEY, Authorization: `Bearer ${data.session?.access_token}` },
     body: JSON.stringify(body),

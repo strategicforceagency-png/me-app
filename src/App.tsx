@@ -1,6 +1,6 @@
 import { Session } from "@supabase/supabase-js";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronDown, Dumbbell, HeartPulse, Loader2, LogOut, Menu, Moon, Plus, Shirt, Sparkles, Sun, User, X } from "lucide-react";
+import { ChevronDown, Dumbbell, GraduationCap, HeartPulse, Loader2, LogOut, Menu, Moon, Plus, Shirt, Sparkles, Sun, User, X } from "lucide-react";
 import { FormEvent, ReactNode, useEffect, useState } from "react";
 import { Field, inputCls, PrimaryButton, Toast } from "./components/ui";
 import { AppProvider, Tab, useApp } from "./lib/store";
@@ -10,6 +10,7 @@ import { Profile } from "./screens/Profile";
 import { AddGarmentSheet, Wardrobe } from "./screens/Wardrobe";
 import { Health } from "./screens/Health";
 import { StyleScreen } from "./screens/Style";
+import { AcademyScreen } from "./screens/Academy";
 
 /* ---------------- tema chiaro / scuro (come Navy OS) ---------------- */
 type Theme = "light" | "dark";
@@ -88,12 +89,13 @@ function Hanger({ size = 24, className = "" }: { size?: number; className?: stri
   );
 }
 
-type NavItem = { id: Tab; label: string; icon: (p: { size?: number; className?: string }) => JSX.Element; soon?: boolean };
+type NavItem = { id: Tab; label: string; short?: string; icon: (p: { size?: number; className?: string }) => JSX.Element; soon?: boolean };
 const I = (C: typeof Shirt) => (p: { size?: number; className?: string }) => <C size={p.size ?? 18} className={p.className} strokeWidth={1.8} />;
 const ITEMS: Record<Tab, NavItem> = {
   armadio: { id: "armadio", label: "Armadio", icon: (p) => <Hanger size={p.size ?? 18} className={p.className} /> },
   outfit: { id: "outfit", label: "Outfit", icon: I(Shirt) },
   stile: { id: "stile", label: "Stile", icon: I(Sparkles) },
+  accademia: { id: "accademia", label: "Accademia", short: "Impara", icon: I(GraduationCap) },
   salute: { id: "salute", label: "Salute", icon: I(HeartPulse) },
   fisico: { id: "fisico", label: "Fisico", icon: I(Dumbbell), soon: true },
   profilo: { id: "profilo", label: "Profilo", icon: I(User) },
@@ -101,11 +103,12 @@ const ITEMS: Record<Tab, NavItem> = {
 /** Gruppi del menu, come i riquadri di Navy OS. */
 const GROUPS: { label: string; items: Tab[] }[] = [
   { label: "Stile", items: ["armadio", "outfit", "stile"] },
+  { label: "Impara", items: ["accademia"] },
   { label: "Corpo", items: ["salute", "fisico"] },
   { label: "Tu", items: ["profilo"] },
 ];
 /** Dock sul telefono: 4 voci + Menu. */
-const DOCK: Tab[] = ["armadio", "outfit", "stile", "salute"];
+const DOCK: Tab[] = ["armadio", "outfit", "stile", "accademia", "salute"];
 
 /* ---------------- barra laterale (computer) e menu (telefono) ---------------- */
 function NavGroup({ label, children }: { label: string; children: ReactNode }) {
@@ -263,6 +266,7 @@ function Shell() {
           {app.tab === "outfit" && <OutfitBuilder />}
           {app.tab === "profilo" && <Profile />}
           {app.tab === "stile" && <StyleScreen />}
+          {app.tab === "accademia" && <AcademyScreen />}
           {app.tab === "salute" && <Health />}
           {app.tab === "fisico" && <ComingSoon tab={app.tab} />}
         </div>
@@ -272,7 +276,7 @@ function Shell() {
       {/* Dock sospesa sul telefono (stile Navy OS): 4 voci + Menu, la voce attiva è una pillola piena */}
       <nav
         aria-label="Navigazione rapida"
-        className="fixed inset-x-3 bottom-[calc(8px+env(safe-area-inset-bottom))] z-40 mx-auto grid max-w-[460px] grid-cols-5 gap-1 rounded-[26px] border border-line bg-surface/90 p-1.5 shadow-dock backdrop-blur-md lg:hidden"
+        className="fixed inset-x-3 bottom-[calc(8px+env(safe-area-inset-bottom))] z-40 mx-auto grid max-w-[480px] grid-cols-6 gap-0.5 rounded-[26px] border border-line bg-surface/90 p-1.5 shadow-dock backdrop-blur-md lg:hidden"
       >
         {DOCK.map((id) => {
           const it = ITEMS[id];
@@ -281,7 +285,7 @@ function Shell() {
             <button
               key={id}
               onClick={() => app.setTab(id)}
-              className={`relative flex min-h-[52px] flex-col items-center justify-center gap-0.5 rounded-[20px] text-[11px] font-semibold transition-colors ${
+              className={`relative flex min-h-[52px] flex-col items-center justify-center gap-0.5 rounded-[20px] text-[10.5px] font-semibold transition-colors ${
                 on ? "text-brand-fg" : "text-muted"
               }`}
             >
@@ -289,11 +293,11 @@ function Shell() {
               <span className="relative">
                 <it.icon size={20} />
               </span>
-              <span className="relative">{it.label}</span>
+              <span className="relative">{it.short || it.label}</span>
             </button>
           );
         })}
-        <button onClick={() => setMenu(true)} className="flex min-h-[52px] flex-col items-center justify-center gap-0.5 rounded-[20px] text-[11px] font-semibold text-muted active:bg-card">
+        <button onClick={() => setMenu(true)} className="flex min-h-[52px] flex-col items-center justify-center gap-0.5 rounded-[20px] text-[10.5px] font-semibold text-muted active:bg-card">
           <Menu size={20} strokeWidth={1.8} />
           Menu
         </button>

@@ -25,7 +25,7 @@ type Ctx = {
   setDraft: (d: Draft | null) => void;
 };
 export type Draft = { top: string[]; bottom: string | null; scarpe: string | null; preview?: string | null };
-export type Tab = "armadio" | "outfit" | "stile" | "salute" | "fisico" | "profilo";
+export type Tab = "armadio" | "outfit" | "stile" | "accademia" | "salute" | "fisico" | "profilo";
 
 const C = createContext<Ctx>(null as unknown as Ctx);
 export const useApp = () => useContext(C);
