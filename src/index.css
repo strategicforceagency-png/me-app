@@ -4,47 +4,56 @@
 
 /* Habitus — luxury palette: avorio, nero espresso, oro champagne. Layout ripreso da Navy OS. */
 :root {
-  --bg: 246 243 238;        /* avorio */
-  --surface: 255 255 255;
-  --subtle: 240 236 229;    /* pozzetti immagini, input */
-  --sidebar: 238 233 225;
-  --sidebar-active: 228 221 209;
-  --fg: 22 19 15;           /* nero espresso */
-  --muted: 120 112 101;
-  --line: 228 221 210;
-  --primary: 22 19 15;      /* pulsanti: nero */
-  --primary-fg: 246 241 232;
-  --gold: 168 132 74;       /* oro champagne */
-  --gold-tint: 243 234 218;
-  --glow: 22 19 15;
-  --danger: 176 48 38;
-  --danger-tint: 250 233 230;
-  --ok: 74 140 98; --warn: 201 150 50; --bad: 190 70 58;
-  --mq-a: 228 228 232; --mq-b: 247 247 249; --mq-c: 220 220 225; --mq-line: 210 210 216;
+  /* club inglese: avorio carta, verde bottiglia, ottone, bordeaux */
+  --bg: 244 239 228;
+  --surface: 255 253 248;
+  --subtle: 237 231 217;
+  --sidebar: 234 227 211;
+  --sidebar-active: 222 213 192;
+  --fg: 24 36 30;
+  --muted: 108 108 96;
+  --line: 224 216 198;
+  --primary: 31 61 46;      /* verde bottiglia */
+  --primary-fg: 244 239 228;
+  --gold: 160 124 58;       /* ottone */
+  --gold-tint: 239 229 207;
+  --on-gold: 20 30 24;
+  --burgundy: 112 30 42;
+  --hero: 31 61 46;
+  --hero-fg: 244 239 228;
+  --glow: 31 61 46;
+  --danger: 128 32 44;
+  --danger-tint: 246 228 228;
+  --ok: 52 110 74; --warn: 190 140 46; --bad: 160 50 50;
+  --mq-a: 226 223 214; --mq-b: 246 243 236; --mq-c: 216 212 202; --mq-line: 206 201 190;
   color-scheme: light;
 }
 .dark {
-  --bg: 11 10 9;
-  --surface: 21 19 17;
-  --subtle: 30 27 24;
-  --sidebar: 16 14 12;
-  --sidebar-active: 36 32 27;
-  --fg: 241 236 227;
-  --muted: 160 151 138;
-  --line: 44 40 35;
-  --primary: 201 166 107;   /* pulsanti: oro */
-  --primary-fg: 20 17 13;
-  --gold: 205 171 112;
-  --gold-tint: 42 35 24;
-  --glow: 201 166 107;
-  --danger: 240 140 128;
-  --danger-tint: 46 24 22;
-  --ok: 108 190 138; --warn: 230 180 80; --bad: 236 112 98;
-  --mq-a: 58 54 49; --mq-b: 82 77 70; --mq-c: 50 46 42; --mq-line: 70 65 59;
+  --bg: 13 20 17;           /* verde notte */
+  --surface: 21 31 26;
+  --subtle: 29 41 35;
+  --sidebar: 16 25 21;
+  --sidebar-active: 34 48 41;
+  --fg: 237 230 214;
+  --muted: 152 160 148;
+  --line: 40 54 47;
+  --primary: 196 162 92;    /* ottone */
+  --primary-fg: 13 20 17;
+  --gold: 200 166 96;
+  --gold-tint: 44 44 31;
+  --on-gold: 13 20 17;
+  --burgundy: 170 70 82;
+  --hero: 24 48 37;
+  --hero-fg: 237 230 214;
+  --glow: 196 162 92;
+  --danger: 232 128 120;
+  --danger-tint: 48 24 24;
+  --ok: 110 186 136; --warn: 226 178 82; --bad: 232 112 100;
+  --mq-a: 56 66 60; --mq-b: 80 92 85; --mq-c: 48 58 52; --mq-line: 68 80 73;
   color-scheme: dark;
 }
 html, body { background: rgb(var(--bg)); color: rgb(var(--fg)); -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent; }
-.font-display { letter-spacing: -0.01em; }
+.font-display { letter-spacing: 0; font-weight: 400 !important; }
 body { overscroll-behavior-y: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { scrollbar-width: none; }

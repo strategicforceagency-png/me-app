@@ -8,6 +8,10 @@ export default {
       colors: {
         brand: { DEFAULT: v("primary"), fg: v("primary-fg"), soft: v("gold-tint") },
         gold: { DEFAULT: v("gold"), tint: v("gold-tint") },
+        ongold: v("on-gold"),
+        burgundy: v("burgundy"),
+        hero: v("hero"),
+        herofg: v("hero-fg"),
         ink: v("fg"),
         muted: v("muted"),
         line: v("line"),
@@ -19,7 +23,7 @@ export default {
       },
       fontFamily: {
         sans: ["Figtree", "Inter", "-apple-system", "system-ui", "sans-serif"],
-        display: ["'Cormorant Garamond'", "Georgia", "serif"],
+        display: ["'Libre Caslon Display'", "'Libre Caslon Text'", "Georgia", "serif"],
       },
       boxShadow: {
         soft: "0 1px 2px rgb(20 16 10 / .04), 0 6px 20px -6px rgb(20 16 10 / .10)",

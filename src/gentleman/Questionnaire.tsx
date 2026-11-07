@@ -147,7 +147,7 @@ export function Questionnaire({ onClose, onDone }: { onClose: () => void; onDone
                 <div className="relative h-24 w-24">
                   <div className="absolute inset-0 rounded-full border border-gold/30" />
                   <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-gold animate-spin" />
-                  <img src="./habitus.svg" className="absolute inset-4 rounded-[14px]" />
+                  <img src="./habitus.svg?v=3" className="absolute inset-4 rounded-[14px]" />
                 </div>
                 <div>
                   <div className="font-display text-[30px] font-semibold leading-tight">Sto costruendo il tuo percorso</div>
@@ -170,7 +170,7 @@ export function Questionnaire({ onClose, onDone }: { onClose: () => void; onDone
               </motion.div>
             ) : i < 0 ? (
               <motion.div key="intro" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex-1 flex flex-col justify-center py-10">
-                <img src="./habitus.svg" className="h-14 w-14 rounded-[16px] ring-1 ring-gold/30" />
+                <img src="./habitus.svg?v=3" className="h-14 w-14 rounded-[16px] ring-1 ring-gold/30" />
                 <div className="text-[11px] uppercase tracking-[0.16em] text-gold font-bold mt-8">Accademia Habitus</div>
                 <h1 className="font-display text-[42px] font-semibold leading-[1.03] mt-2">Prima di cominciare, conosciamoci.</h1>
                 <p className="text-[16px] text-muted mt-4 leading-relaxed">
@@ -236,7 +236,7 @@ export function Questionnaire({ onClose, onDone }: { onClose: () => void; onDone
                             }}
                             className={`w-full text-left px-4 py-3.5 rounded-[16px] border text-[15.5px] transition flex items-center gap-3 disabled:opacity-40 ${on ? "border-gold bg-gold-tint font-semibold" : "border-line bg-surface"}`}
                           >
-                            <span className={`h-5 w-5 rounded-[6px] border grid place-items-center shrink-0 ${on ? "bg-gold border-gold text-[#14110D]" : "border-line"}`}>{on && <Check size={13} strokeWidth={3} />}</span>
+                            <span className={`h-5 w-5 rounded-[6px] border grid place-items-center shrink-0 ${on ? "bg-gold border-gold text-ongold" : "border-line"}`}>{on && <Check size={13} strokeWidth={3} />}</span>
                             {o}
                           </button>
                         );
@@ -247,7 +247,7 @@ export function Questionnaire({ onClose, onDone }: { onClose: () => void; onDone
                     <div>
                       <div className="grid grid-cols-5 gap-2">
                         {[1, 2, 3, 4, 5].map((n) => (
-                          <button key={n} onClick={() => set(n, true)} className={`h-16 rounded-[16px] border text-[22px] font-display font-semibold transition ${val === n ? "border-gold bg-gold text-[#14110D]" : "border-line bg-surface"}`}>
+                          <button key={n} onClick={() => set(n, true)} className={`h-16 rounded-[16px] border text-[22px] font-display font-semibold transition ${val === n ? "border-gold bg-gold text-ongold" : "border-line bg-surface"}`}>
                             {n}
                           </button>
                         ))}

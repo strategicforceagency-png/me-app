@@ -147,7 +147,7 @@ export function LanguageScreen() {
       <p className="text-muted text-[14px] mt-2">Scrivi un messaggio o registra un vocale: analizzo come ti esprimi e ti mostro come lo direbbe un gentleman.</p>
 
       {/* parola del giorno */}
-      <div className="mt-5 rounded-[22px] bg-ink text-bg p-5 relative overflow-hidden">
+      <div className="mt-5 rounded-[22px] bg-hero text-herofg p-5 relative overflow-hidden">
         <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-gold/25 blur-3xl" />
         <div className="relative">
           <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-gold flex items-center gap-2">
@@ -330,7 +330,7 @@ function ResultView({ a, kind, onBack }: { a: Analysis; kind: string; onBack: ()
       <button onClick={onBack} className="flex items-center gap-1.5 text-[14px] text-muted mb-4">
         <ArrowLeft size={16} /> Laboratorio
       </button>
-      <div className="rounded-[24px] bg-ink text-bg p-6 relative overflow-hidden">
+      <div className="rounded-[24px] bg-hero text-herofg p-6 relative overflow-hidden">
         <div className="absolute -right-12 -top-12 h-48 w-48 rounded-full bg-gold/25 blur-3xl" />
         <div className="relative flex items-center gap-5">
           <div className="h-20 w-20 rounded-full border-2 border-gold grid place-items-center shrink-0">
@@ -382,7 +382,7 @@ function ResultView({ a, kind, onBack }: { a: Analysis; kind: string; onBack: ()
         </section>
 
         {a.consiglio && (
-          <div className="rounded-[18px] bg-ink text-bg px-5 py-4 text-[14.5px]">
+          <div className="rounded-[18px] bg-hero text-herofg px-5 py-4 text-[14.5px]">
             <b className="text-gold">Il consiglio del maestro. </b>
             {a.consiglio}
           </div>

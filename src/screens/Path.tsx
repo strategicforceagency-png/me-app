@@ -59,7 +59,7 @@ export function PathScreen() {
   if (!path)
     return (
       <div className="px-5 lg:px-10 pb-28 lg:pb-12">
-        <div className="rounded-[26px] bg-ink text-bg p-7 lg:p-10 relative overflow-hidden mt-2">
+        <div className="rounded-[26px] bg-hero text-herofg p-7 lg:p-10 relative overflow-hidden mt-2">
           <div className="absolute -right-16 -top-16 h-64 w-64 rounded-full bg-gold/20 blur-3xl" />
           <div className="relative max-w-[560px]">
             <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-gold">Accademia Habitus</div>
@@ -67,7 +67,7 @@ export function PathScreen() {
             <p className="mt-4 text-[15.5px] leading-relaxed opacity-80">
               Stile, portamento, linguaggio, fisico, salute, grooming e cultura. Rispondi a qualche domanda e costruisco il tuo programma personale di 12 settimane, nello spirito del gentiluomo inglese.
             </p>
-            <button onClick={() => app.setQuizOpen(true)} className="mt-7 h-12 px-6 rounded-full bg-gold text-[#14110D] font-semibold flex items-center gap-2">
+            <button onClick={() => app.setQuizOpen(true)} className="mt-7 h-12 px-6 rounded-full bg-gold text-ongold font-semibold flex items-center gap-2">
               {hasDraft ? "Riprendi il questionario" : "Inizia il questionario"} <ArrowRight size={18} />
             </button>
             <p className="text-[12px] opacity-60 mt-3">Circa 6 minuti · puoi interrompere e riprendere</p>
@@ -150,7 +150,7 @@ function PathView({ path }: { path: Path }) {
       </header>
 
       {/* Archetipo */}
-      <button onClick={() => setArchOpen(true)} className="mt-5 w-full text-left rounded-[24px] bg-ink text-bg p-6 relative overflow-hidden">
+      <button onClick={() => setArchOpen(true)} className="mt-5 w-full text-left rounded-[24px] bg-hero text-herofg p-6 relative overflow-hidden">
         <div className="absolute -right-12 -top-12 h-52 w-52 rounded-full bg-gold/25 blur-3xl" />
         <div className="relative">
           <div className="flex items-center justify-between">
@@ -186,7 +186,7 @@ function PathView({ path }: { path: Path }) {
               const on = has(`h:${h.id}`, true);
               return (
                 <button key={h.id} onClick={() => toggle(`h:${h.id}`, true)} className="w-full flex items-center gap-3 py-2 text-left">
-                  <span className={`h-6 w-6 rounded-full border grid place-items-center shrink-0 transition ${on ? "bg-gold border-gold text-[#14110D]" : "border-line"}`}>{on && <Check size={14} strokeWidth={3} />}</span>
+                  <span className={`h-6 w-6 rounded-full border grid place-items-center shrink-0 transition ${on ? "bg-gold border-gold text-ongold" : "border-line"}`}>{on && <Check size={14} strokeWidth={3} />}</span>
                   <span className={`flex-1 text-[14.5px] ${on ? "line-through text-muted" : ""}`}>{h.titolo}</span>
                   <span className="text-[10.5px] uppercase tracking-[0.1em] text-muted">{h.quando}</span>
                 </button>
@@ -280,7 +280,7 @@ function PathView({ path }: { path: Path }) {
                     <div className="flex gap-3">
                       <button
                         onClick={() => toggle(`m:${m.id}`, false)}
-                        className={`h-7 w-7 rounded-full border grid place-items-center shrink-0 transition ${on ? "bg-gold border-gold text-[#14110D]" : "border-line"}`}
+                        className={`h-7 w-7 rounded-full border grid place-items-center shrink-0 transition ${on ? "bg-gold border-gold text-ongold" : "border-line"}`}
                         aria-label="Completa"
                       >
                         {on && <Check size={15} strokeWidth={3} />}

@@ -132,7 +132,7 @@ function AcademyHome({ done, go }: { done: Set<string>; go: (v: View) => void })
         <p className="text-muted text-[14px] mt-2">Stile, galateo, linguaggio, grooming e accessori: le regole del gentleman, una lezione alla volta.</p>
       </header>
 
-      <div className="mt-6 rounded-[22px] bg-ink text-bg p-5 relative overflow-hidden">
+      <div className="mt-6 rounded-[22px] bg-hero text-herofg p-5 relative overflow-hidden">
         <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-gold/25 blur-3xl" />
         <div className="relative flex items-center gap-4">
           <div className="h-14 w-14 rounded-full border border-gold/40 grid place-items-center text-gold shrink-0">
@@ -154,7 +154,7 @@ function AcademyHome({ done, go }: { done: Set<string>; go: (v: View) => void })
               <div className="text-[11px] uppercase tracking-[0.12em] opacity-60">{n ? "Continua" : "Inizia da qui"} · {next.course.titolo}</div>
               <div className="text-[15px] font-semibold truncate">{next.lesson.titolo}</div>
             </div>
-            <span className="h-9 w-9 rounded-full bg-gold text-[#14110D] grid place-items-center shrink-0">
+            <span className="h-9 w-9 rounded-full bg-gold text-ongold grid place-items-center shrink-0">
               <ArrowRight size={17} />
             </span>
           </button>
@@ -214,7 +214,7 @@ function CourseView({ course, done, go }: { course: Course; done: Set<string>; g
           const ok = done.has(lessonKey(course, l));
           return (
             <button key={l.id} onClick={() => go({ c: course.id, l: l.id })} className="w-full flex items-center gap-3.5 px-4 py-3.5 text-left">
-              <span className={`h-8 w-8 rounded-full grid place-items-center text-[13px] font-semibold shrink-0 ${ok ? "bg-gold text-[#14110D]" : "bg-card text-muted"}`}>
+              <span className={`h-8 w-8 rounded-full grid place-items-center text-[13px] font-semibold shrink-0 ${ok ? "bg-gold text-ongold" : "bg-card text-muted"}`}>
                 {ok ? <Check size={16} strokeWidth={2.5} /> : i + 1}
               </span>
               <div className="flex-1 min-w-0">
@@ -457,7 +457,7 @@ function Maestro({ course, lesson }: { course: Course; lesson: Lesson }) {
     setBusy(false);
   };
   return (
-    <section className="mt-10 rounded-[22px] bg-ink text-bg p-5 relative overflow-hidden">
+    <section className="mt-10 rounded-[22px] bg-hero text-herofg p-5 relative overflow-hidden">
       <div className="absolute -left-10 -bottom-12 h-40 w-40 rounded-full bg-gold/20 blur-3xl" />
       <div className="relative">
         <div className="flex items-center gap-2">
@@ -470,7 +470,7 @@ function Maestro({ course, lesson }: { course: Course; lesson: Lesson }) {
           <div className="mt-4 space-y-3 max-h-[420px] overflow-y-auto pr-1">
             {msgs.map((m, i) => (
               <div key={i} className={m.role === "user" ? "flex justify-end" : ""}>
-                <div className={`rounded-[16px] px-3.5 py-2.5 text-[14px] leading-relaxed max-w-[92%] ${m.role === "user" ? "bg-gold text-[#14110D]" : "bg-white/[.06] border border-white/10"}`}>
+                <div className={`rounded-[16px] px-3.5 py-2.5 text-[14px] leading-relaxed max-w-[92%] ${m.role === "user" ? "bg-gold text-ongold" : "bg-white/[.06] border border-white/10"}`}>
                   {m.role === "user" ? m.text : <RichText text={m.text} />}
                 </div>
               </div>
@@ -506,7 +506,7 @@ function Maestro({ course, lesson }: { course: Course; lesson: Lesson }) {
             placeholder="Scrivi la tua domanda…"
             className="flex-1 h-11 px-4 rounded-full bg-white/[.07] border border-white/10 text-[15px] placeholder:text-white/40 outline-none focus:border-gold"
           />
-          <button type="submit" disabled={!q.trim() || busy} className="h-11 w-11 rounded-full bg-gold text-[#14110D] grid place-items-center disabled:opacity-40" aria-label="Invia">
+          <button type="submit" disabled={!q.trim() || busy} className="h-11 w-11 rounded-full bg-gold text-ongold grid place-items-center disabled:opacity-40" aria-label="Invia">
             <Send size={17} />
           </button>
         </form>

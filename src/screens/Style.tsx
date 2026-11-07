@@ -123,7 +123,7 @@ export function StyleScreen() {
         {guide ? (
           <GuideView guide={guide} onShop={setShop} onRebuild={build} building={building} picks={picks.length} />
         ) : (
-          <div className="rounded-[22px] bg-ink text-bg p-6 relative overflow-hidden">
+          <div className="rounded-[22px] bg-hero text-herofg p-6 relative overflow-hidden">
             <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-gold/20 blur-2xl" />
             <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-gold">Personal shopper</div>
             <div className="font-display text-[28px] font-semibold leading-tight mt-2">Costruisci il tuo stile</div>
@@ -133,7 +133,7 @@ export function StyleScreen() {
               <li>3. Crea la tua guida: stile, palette, outfit e cosa comprare</li>
             </ol>
             <div className="mt-5 flex flex-wrap gap-2">
-              <button onClick={() => setAddOpen(true)} className="h-11 px-5 rounded-full bg-gold text-[#14110D] font-semibold flex items-center gap-2">
+              <button onClick={() => setAddOpen(true)} className="h-11 px-5 rounded-full bg-gold text-ongold font-semibold flex items-center gap-2">
                 <Plus size={17} /> Aggiungi ispirazione
               </button>
               {picks.length > 0 && (
@@ -196,7 +196,7 @@ function GuideView({ guide, onShop, onRebuild, building, picks }: { guide: Guide
   const byId = new Map(app.garments.map((g) => [g.id, g]));
   return (
     <div className="space-y-3">
-      <div className="rounded-[22px] bg-ink text-bg p-6 relative overflow-hidden">
+      <div className="rounded-[22px] bg-hero text-herofg p-6 relative overflow-hidden">
         <div className="absolute -right-12 -top-12 h-48 w-48 rounded-full bg-gold/25 blur-3xl" />
         <div className="relative">
           <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-gold">Il tuo stile</div>
@@ -345,7 +345,7 @@ function InspirationCard({ i, count, onOpen }: { i: Inspiration; count: number; 
           </div>
         )}
         {count > 0 && (
-          <div className="absolute top-2 right-2 h-6 min-w-6 px-1.5 rounded-full bg-gold text-[#14110D] text-[11px] font-bold grid place-items-center">
+          <div className="absolute top-2 right-2 h-6 min-w-6 px-1.5 rounded-full bg-gold text-ongold text-[11px] font-bold grid place-items-center">
             {count}
           </div>
         )}
@@ -603,7 +603,7 @@ function HeartBtn({ on, onClick, className = "" }: { on: boolean; onClick: () =>
         e.stopPropagation();
         onClick();
       }}
-      className={`h-8 w-8 rounded-full grid place-items-center transition ${on ? "bg-gold text-[#14110D]" : "bg-surface/90 text-muted border border-line"} ${className}`}
+      className={`h-8 w-8 rounded-full grid place-items-center transition ${on ? "bg-gold text-ongold" : "bg-surface/90 text-muted border border-line"} ${className}`}
       aria-label={on ? "Rimuovi dal mio stile" : "Aggiungi al mio stile"}
     >
       <Heart size={15} className={on ? "fill-current" : ""} />

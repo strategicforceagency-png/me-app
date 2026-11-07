@@ -29,7 +29,7 @@ function readTheme(): Theme {
 }
 function applyTheme(t: Theme) {
   document.documentElement.classList.toggle("dark", t === "dark");
-  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", t === "dark" ? "#0B0A09" : "#F6F3EE");
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", t === "dark" ? "#0D1411" : "#F4EFE4");
 }
 applyTheme(readTheme());
 export function useTheme() {
@@ -70,7 +70,7 @@ export default function App() {
 
 /* ---------------- marchio ---------------- */
 export function Mark({ className = "h-9 w-9" }: { className?: string }) {
-  return <img src="./habitus.svg" alt="" className={`${className} rounded-[10px] ring-1 ring-gold/30`} />;
+  return <img src="./habitus.svg?v=3" alt="" className={`${className} rounded-[10px] ring-1 ring-gold/30`} />;
 }
 function Wordmark({ sub = true }: { sub?: boolean }) {
   return (
@@ -78,7 +78,7 @@ function Wordmark({ sub = true }: { sub?: boolean }) {
       <Mark />
       <div className="leading-none">
         <div className="font-display text-[22px] font-semibold tracking-[0.18em] uppercase">Habitus</div>
-        {sub && <div className="text-[10.5px] tracking-[0.14em] uppercase text-gold mt-1">Vesti · vivi · diventi</div>}
+        {sub && <div className="text-[10.5px] tracking-[0.14em] uppercase text-gold mt-1">Accademia del gentleman</div>}
       </div>
     </div>
   );
@@ -378,7 +378,7 @@ function Auth() {
   };
   return (
     <div className="min-h-[100dvh] bg-bg lg:grid lg:grid-cols-2">
-      <div className="hidden lg:flex flex-col justify-between bg-[#14110D] text-[#F1ECE3] p-12">
+      <div className="hidden lg:flex flex-col justify-between bg-[#1F3D2E] text-[#F4EFE4] p-12">
         <Wordmark />
         <div>
           <div className="font-display text-[56px] leading-[1.02] font-semibold">
@@ -388,10 +388,10 @@ function Auth() {
             <br />
             il tuo fisico.
           </div>
-          <div className="mt-6 h-px w-24 bg-[#C9A66B]" />
-          <p className="mt-6 text-[#A0978A] max-w-[380px]">Habitus: dal latino, l'abito, l'abitudine e il corpo. Tutto ciò che ti rende te, in un unico posto.</p>
+          <div className="mt-6 h-px w-24 bg-[#C8A65E]" />
+          <p className="mt-6 text-[#B9C2B4] max-w-[380px]">Habitus: dal latino, l'abito, l'abitudine e il corpo. Tutto ciò che ti rende te, in un unico posto.</p>
         </div>
-        <div className="text-[12px] tracking-[0.14em] uppercase text-[#C9A66B]">Vesti · vivi · diventi</div>
+        <div className="text-[12px] tracking-[0.14em] uppercase text-[#C8A65E]">Accademia del gentleman</div>
       </div>
       <div className="mx-auto w-full max-w-[430px] min-h-[100dvh] px-6 flex flex-col justify-center">
         <div className="lg:hidden">
