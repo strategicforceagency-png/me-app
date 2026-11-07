@@ -1,10 +1,11 @@
 import { Session } from "@supabase/supabase-js";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronDown, Compass, Dumbbell, Feather, GraduationCap, HeartPulse, Loader2, LogOut, Moon, Plus, Shirt, Sparkles, Sun, TrendingUp, User, Wallet } from "lucide-react";
+import { ChevronDown, Compass, Fingerprint, Dumbbell, Feather, GraduationCap, HeartPulse, Loader2, LogOut, Moon, Plus, Shirt, Sparkles, Sun, TrendingUp, User, Wallet } from "lucide-react";
 import { FormEvent, ReactNode, useEffect, useState } from "react";
 import { Field, inputCls, PrimaryButton, Toast } from "./components/ui";
 import { AppProvider, Tab, useApp } from "./lib/store";
 import { useTheme } from "./lib/theme";
+import { passkeyError, passkeySupported, signInPasskey } from "./lib/passkey";
 import { BudgetScreen } from "./screens/Budget";
 import { ProgressScreen } from "./screens/Progress";
 import { supabase, useSignedUrl } from "./lib/supabase";
@@ -366,6 +367,18 @@ function Auth() {
   const [nome, setNome] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [pkBusy, setPkBusy] = useState(false);
+  const passkey = async () => {
+    setPkBusy(true);
+    setErr("");
+    try {
+      await signInPasskey();
+    } catch (e) {
+      const m = passkeyError(e);
+      if (m) setErr(m);
+    }
+    setPkBusy(false);
+  };
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setBusy(true);
@@ -415,14 +428,24 @@ function Auth() {
           </h1>
         </div>
         <p className="mt-3 text-muted">{mode === "in" ? "Accedi per continuare" : "Crea il tuo account personale"}</p>
-        <form onSubmit={submit} className="mt-8 space-y-4">
+        {mode === "in" && passkeySupported() && (
+          <>
+            <button onClick={passkey} disabled={pkBusy} className="mt-8 w-full h-14 rounded-full bg-brand text-brand-fg text-[16px] font-semibold flex items-center justify-center gap-2.5 shadow-pill">
+              {pkBusy ? <Loader2 size={19} className="animate-spin" /> : <Fingerprint size={20} />} Accedi con passkey
+            </button>
+            <div className="mt-6 flex items-center gap-3 text-[12px] uppercase tracking-[0.14em] text-muted">
+              <span className="h-px flex-1 bg-line" /> oppure con la password <span className="h-px flex-1 bg-line" />
+            </div>
+          </>
+        )}
+        <form onSubmit={submit} className={`${mode === "in" && passkeySupported() ? "mt-5" : "mt-8"} space-y-4`}>
           {mode === "up" && (
             <Field label="Nome">
               <input className={inputCls} value={nome} onChange={(e) => setNome(e.target.value)} required />
             </Field>
           )}
           <Field label="Email">
-            <input className={inputCls} type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            <input className={inputCls} type="email" autoComplete="username webauthn" value={email} onChange={(e) => setEmail(e.target.value)} required />
           </Field>
           <Field label="Password">
             <input
@@ -436,7 +459,7 @@ function Auth() {
             />
           </Field>
           {err && <p className="text-[14px] text-danger">{err}</p>}
-          <PrimaryButton type="submit" className="w-full" disabled={busy}>
+          <PrimaryButton type="submit" className={`w-full ${mode === "in" && passkeySupported() ? "!bg-card !text-ink !shadow-none" : ""}`} disabled={busy}>
             {busy && <Loader2 size={18} className="animate-spin" />} {mode === "in" ? "Accedi" : "Crea account"}
           </PrimaryButton>
         </form>

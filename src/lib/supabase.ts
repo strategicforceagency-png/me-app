@@ -5,7 +5,7 @@ export const SUPABASE_URL = "https://zoyjsvkwetecbmgzcecq.supabase.co";
 export const SUPABASE_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpveWpzdmt3ZXRlY2JtZ3pjZWNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM5Nzk1MDAsImV4cCI6MjEwOTU1NTUwMH0.mSuFGdHoULR1Per5ioSRScowXbXcGESyXWAeRzWEGxQ";
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { experimental: { passkey: true } } });
 
 export const CATEGORIE = [
   "Felpe e Maglioni",

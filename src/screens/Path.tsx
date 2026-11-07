@@ -6,6 +6,7 @@ import { Sheet } from "../components/ui";
 import { activeHabits, currentWeek, GIORNI, Path, PillarId, PILLARS, todayISO, Trial } from "../gentleman/types";
 import { RemindersCard } from "../components/Reminders";
 import { InstallCard } from "../components/InstallCard";
+import { PasskeyInvite } from "../components/Passkeys";
 import { BaselineSheet, dueReview, dueTrials, ReviewSheet, TrialSheet, useProgressData } from "./Progress";
 import { wordOfDay } from "../gentleman/words";
 import { useApp } from "../lib/store";
@@ -212,6 +213,7 @@ function PathView({ path }: { path: Path }) {
       </button>
 
       <InstallCard />
+      <PasskeyInvite />
       <RemindersCard compact />
 
       {due && (

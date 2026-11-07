@@ -1,5 +1,6 @@
 import { Camera, Download, Heart, Loader2, LogOut, Moon, Plus, Settings, Shirt, SlidersHorizontal, Sun, Trash2 } from "lucide-react";
 import { RemindersCard } from "../components/Reminders";
+import { PasskeysCard } from "../components/Passkeys";
 import { useTheme } from "../lib/theme";
 import { useRef, useState } from "react";
 import { DEFAULT_MEASURES, DressedMannequin, MannequinSvg, Measures } from "../components/Mannequin";
@@ -335,6 +336,7 @@ function AccountTools() {
   };
   return (
     <div className="mt-8 max-w-[720px] space-y-3">
+      <PasskeysCard />
       <RemindersCard />
       <div className="rounded-[22px] bg-surface shadow-soft divide-y divide-line">
         <button onClick={toggle} className="w-full flex items-center gap-3 px-5 py-4 text-left">
