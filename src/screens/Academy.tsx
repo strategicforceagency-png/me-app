@@ -353,7 +353,7 @@ function BlockView({ b }: { b: Block }) {
         <div className="rounded-[18px] border border-gold/40 bg-gold-tint p-4 flex gap-3">
           <Lightbulb size={19} className="text-gold shrink-0 mt-0.5" />
           <p className="text-[14.5px] leading-relaxed">
-            <b>Consiglio del maestro. </b>
+            <b>Il consiglio di Alfred. </b>
             {inline(b.text)}
           </p>
         </div>
@@ -482,9 +482,9 @@ function Maestro({ course, lesson }: { course: Course; lesson: Lesson }) {
       <div className="relative">
         <div className="flex items-center gap-2">
           <Sparkles size={16} className="text-gold" />
-          <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-gold">Chiedi al maestro</div>
+          <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-gold">Chiedi ad Alfred</div>
         </div>
-        <p className="text-[13.5px] opacity-70 mt-1">Hai un dubbio su questa lezione o un caso concreto? Il maestro conosce anche il tuo armadio e il tuo stile.</p>
+        <p className="text-[13.5px] opacity-70 mt-1">Hai un dubbio su questa lezione o un caso concreto? Alfred conosce anche il tuo armadio e il tuo stile.</p>
 
         {msgs.length > 0 && (
           <div className="mt-4 space-y-3 max-h-[420px] overflow-y-auto pr-1">
@@ -497,7 +497,7 @@ function Maestro({ course, lesson }: { course: Course; lesson: Lesson }) {
             ))}
             {busy && (
               <div className="flex items-center gap-2 text-[13px] opacity-70">
-                <Loader2 size={14} className="animate-spin" /> Il maestro sta rispondendo…
+                <Loader2 size={14} className="animate-spin" /> Alfred sta rispondendo…
               </div>
             )}
             <div ref={endRef} />

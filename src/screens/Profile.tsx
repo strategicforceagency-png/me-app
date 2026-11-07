@@ -147,7 +147,7 @@ export function Profile() {
             const r = await fn<{ scheda: SchedaData }>("conoscenza", "", { action: "me" });
             await app.setProfile({ scheda: r.scheda });
           }}
-          empty="Habitus impara a conoscerti da quello che scrivi al Maestro, dai controlli settimanali, dall'armadio, dagli acquisti e dalle scelte che fai. Più lo usi, più i consigli diventano tuoi. Premi Aggiorna per costruire la prima versione."
+          empty="Habitus impara a conoscerti da quello che scrivi ad Alfred, dai controlli settimanali, dall'armadio, dagli acquisti e dalle scelte che fai. Più lo usi, più i consigli diventano tuoi. Premi Aggiorna per costruire la prima versione."
           catHint="Aggiungi tu un dettaglio su di te"
         />
       </div>

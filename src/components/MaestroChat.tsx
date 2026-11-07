@@ -1,5 +1,6 @@
+import { AlfredIcon } from "./AlfredIcon";
 import { AnimatePresence, motion } from "framer-motion";
-import { Eraser, Loader2, MessageCircle, Mic, SendHorizontal, Volume2, VolumeX, X } from "lucide-react";
+import { Eraser, Loader2, Mic, SendHorizontal, Volume2, VolumeX, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useApp } from "../lib/store";
 import { fn, supabase, learnMe } from "../lib/supabase";
@@ -38,8 +39,11 @@ function speak(text: string) {
   const u = new SpeechSynthesisUtterance(plain(text));
   u.lang = "it-IT";
   const v = window.speechSynthesis.getVoices().filter((x) => x.lang.startsWith("it"));
-  u.voice = v.find((x) => /luca|alice|federica|paola/i.test(x.name) && /enhanced|premium/i.test(x.name)) || v.find((x) => /enhanced|premium/i.test(x.name)) || v[0] || null;
-  u.rate = 1.02;
+  // Alfred ha una voce maschile, pacata
+  const male = /luca|paolo|cosimo|diego|giorgio|roberto|marco|andrea|riccardo|male|uomo/i;
+  u.voice = v.find((x) => male.test(x.name) && /enhanced|premium|neural/i.test(x.name)) || v.find((x) => male.test(x.name)) || v.find((x) => /enhanced|premium/i.test(x.name)) || v[0] || null;
+  u.rate = 0.96;
+  u.pitch = 0.9;
   window.speechSynthesis.speak(u);
 }
 const getVoice = () => {
@@ -149,7 +153,7 @@ export function MaestroChat() {
       /* */
     }
     if (!v) window.speechSynthesis?.cancel();
-    app.toast(v ? "Il Maestro leggerà le risposte ad alta voce" : "Lettura ad alta voce disattivata");
+    app.toast(v ? "Alfred leggerà le risposte ad alta voce" : "Lettura ad alta voce disattivata");
   };
 
   if (app.quizOpen) return null;
@@ -164,10 +168,10 @@ export function MaestroChat() {
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.6, opacity: 0 }}
             onClick={() => setOpen(true)}
-            aria-label="Parla con il Maestro"
-            className="fixed right-4 bottom-[calc(88px+env(safe-area-inset-bottom))] lg:right-8 lg:bottom-8 z-[35] h-14 w-14 rounded-full bg-hero text-gold shadow-dock ring-1 ring-gold/40 grid place-items-center"
+            aria-label="Parla con Alfred"
+            className="fixed right-4 bottom-[calc(88px+env(safe-area-inset-bottom))] lg:right-8 lg:bottom-8 z-[35] h-14 w-14 rounded-full shadow-dock grid place-items-center"
           >
-            <MessageCircle size={24} strokeWidth={1.8} />
+            <AlfredIcon size={56} className="text-gold" />
           </motion.button>
         )}
       </AnimatePresence>
@@ -183,10 +187,10 @@ export function MaestroChat() {
             className="fixed z-[55] inset-0 lg:inset-auto lg:right-8 lg:bottom-8 lg:h-[640px] lg:max-h-[calc(100vh-64px)] lg:w-[420px] lg:rounded-[26px] lg:shadow-dock lg:ring-1 lg:ring-line bg-bg flex flex-col overflow-hidden"
           >
             <div className="bg-hero text-herofg px-4 pb-3.5 pt-[calc(14px+env(safe-area-inset-top))] lg:pt-4 flex items-center gap-3">
-              <div className="h-10 w-10 rounded-full ring-1 ring-gold/50 grid place-items-center font-display text-[20px] text-gold">M</div>
+              <AlfredIcon size={40} className="text-gold shrink-0" />
               <div className="flex-1 min-w-0">
-                <div className="font-display text-[20px] leading-none">Il Maestro</div>
-                <div className="text-[12px] opacity-70 mt-1">Il tuo mentore personale</div>
+                <div className="font-display text-[20px] leading-none">Alfred</div>
+                <div className="text-[12px] opacity-70 mt-1">Il suo maggiordomo personale</div>
               </div>
               <button onClick={toggleVoice} className="h-9 w-9 grid place-items-center rounded-full hover:bg-white/10" aria-label="Lettura ad alta voce">
                 {voice ? <Volume2 size={18} className="text-gold" /> : <VolumeX size={18} className="opacity-70" />}
@@ -210,7 +214,7 @@ export function MaestroChat() {
               {msgs?.length === 0 && (
                 <div className="pt-4">
                   <div className="rounded-[20px] bg-surface shadow-soft p-4 text-[14.5px] leading-relaxed">
-                    Buonasera{app.profile?.nome ? `, ${app.profile.nome.split(" ")[0]}` : ""}. Chiedimi pure: cosa indossare, come comportarti, come dire qualcosa con eleganza, su cosa lavorare nel percorso. Conosco il tuo armadio, il tuo percorso e il tuo quaderno.
+                    {new Date().getHours() < 13 ? "Buongiorno" : "Buonasera"}, signorino{app.profile?.nome ? ` ${app.profile.nome.split(" ")[0]}` : ""}. Alfred, al suo servizio. Che si tratti di cosa indossare, di come comportarsi o di trovare le parole giuste, mi chieda pure: conosco il suo armadio, il suo percorso e, mi permetta, anche qualche sua debolezza.
                   </div>
                   <div className="mt-3 flex flex-col gap-2">
                     {SUGGESTIONS.map((s) => (
@@ -237,7 +241,7 @@ export function MaestroChat() {
                   </div>
                 ) : (
                   <div key={m.id || i} className="flex gap-2">
-                    <div className="h-7 w-7 rounded-full bg-hero text-gold grid place-items-center font-display text-[13px] shrink-0 mt-0.5">M</div>
+                    <AlfredIcon size={28} className="text-gold shrink-0 mt-0.5" />
                     <div className="max-w-[88%] rounded-[18px] rounded-tl-[6px] bg-surface shadow-soft px-3.5 py-2.5 text-[14.5px] leading-relaxed">
                       <RichText text={m.text} />
                       {"speechSynthesis" in window && (
@@ -283,7 +287,7 @@ export function MaestroChat() {
                       send();
                     }
                   }}
-                  placeholder="Scrivi o detta al Maestro…"
+                  placeholder="Scrivi o detta ad Alfred…"
                   className="flex-1 min-h-[44px] max-h-[140px] resize-none rounded-[22px] bg-card px-4 py-2.5 text-[16px] outline-none focus:ring-1 focus:ring-gold"
                 />
                 <button onClick={() => send()} disabled={!text.trim() || busy} className="h-11 w-11 rounded-full bg-brand text-brand-fg grid place-items-center shrink-0 disabled:opacity-40" aria-label="Invia">

@@ -1270,7 +1270,7 @@ export function LettersScreen() {
 
   return (
     <div className="px-5 lg:px-10 pb-28 lg:pb-12 max-w-[860px]">
-      <Title t="Lettere e messaggi" sub="Le parole giuste, nel tuo modo di dirle. Scrivi cosa vuoi dire anche in modo grezzo: il Maestro ti propone tre versioni da gentleman." />
+      <Title t="Lettere e messaggi" sub="Le parole giuste, nel tuo modo di dirle. Scrivi cosa vuoi dire anche in modo grezzo: Alfred ti propone tre versioni da gentleman." />
 
       <div className="mt-5 rounded-[24px] bg-surface shadow-soft p-5">
         <Label>Cosa devi scrivere</Label>

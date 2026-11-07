@@ -313,7 +313,7 @@ export function ReviewSheet({ open, week, onClose, onDone }: { open: boolean; we
       {nota ? (
         <div className="pb-8 space-y-5">
           <div className="rounded-[20px] bg-hero text-herofg p-6">
-            <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-gold">Il maestro ha ripreso le misure</div>
+            <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-gold">Alfred ha ripreso le misure</div>
             <p className="mt-3 text-[15.5px] leading-relaxed">{nota}</p>
           </div>
           <button onClick={close} className="w-full h-12 rounded-full bg-brand text-brand-fg font-semibold">
@@ -699,7 +699,7 @@ export function ProgressScreen() {
       {/* Diario del maestro */}
       {(path.adattamenti || []).length > 0 && (
         <>
-          <H icon={<Sparkles size={13} className="text-gold" />}>Il diario del maestro</H>
+          <H icon={<Sparkles size={13} className="text-gold" />}>Il diario di Alfred</H>
           <div className="space-y-2.5">
             {[...(path.adattamenti || [])].reverse().map((a) => (
               <div key={a.data} className="rounded-[18px] bg-surface shadow-soft p-4">

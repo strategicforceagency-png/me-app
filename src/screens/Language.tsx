@@ -383,7 +383,7 @@ function ResultView({ a, kind, onBack }: { a: Analysis; kind: string; onBack: ()
 
         {a.consiglio && (
           <div className="rounded-[18px] bg-hero text-herofg px-5 py-4 text-[14.5px]">
-            <b className="text-gold">Il consiglio del maestro. </b>
+            <b className="text-gold">Il consiglio di Alfred. </b>
             {a.consiglio}
           </div>
         )}
