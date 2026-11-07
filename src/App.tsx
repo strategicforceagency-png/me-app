@@ -2,7 +2,7 @@ import { Session } from "@supabase/supabase-js";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronDown, Compass, Fingerprint, Dumbbell, Feather, GraduationCap, HeartPulse, Loader2, LogOut, Moon, Plus, Shirt, Sparkles, Sun, TrendingUp, User, Wallet, Inbox, Heart, Gift, UtensilsCrossed, PenLine } from "lucide-react";
 import { FormEvent, ReactNode, useEffect, useState } from "react";
-import { Field, inputCls, PrimaryButton, Toast } from "./components/ui";
+import { Field, inputCls, PrimaryButton, Sheet, Toast } from "./components/ui";
 import { AppProvider, Tab, useApp } from "./lib/store";
 import { useTheme } from "./lib/theme";
 import { passkeyError, passkeySupported, signInPasskey } from "./lib/passkey";
@@ -81,36 +81,110 @@ function Hanger({ size = 24, className = "" }: { size?: number; className?: stri
 type NavItem = { id: Tab; label: string; short?: string; icon: (p: { size?: number; className?: string }) => JSX.Element; soon?: boolean };
 const I = (C: typeof Shirt) => (p: { size?: number; className?: string }) => <C size={p.size ?? 18} className={p.className} strokeWidth={1.8} />;
 const ITEMS: Record<Tab, NavItem> = {
-  percorso: { id: "percorso", label: "Il mio percorso", short: "Oggi", icon: I(Compass) },
+  percorso: { id: "percorso", label: "Oggi", short: "Oggi", icon: I(Compass) },
   linguaggio: { id: "linguaggio", label: "Linguaggio", icon: I(Feather) },
   armadio: { id: "armadio", label: "Armadio", icon: (p) => <Hanger size={p.size ?? 18} className={p.className} /> },
   outfit: { id: "outfit", label: "Outfit", icon: I(Shirt) },
   stile: { id: "stile", label: "Ispirazioni", icon: I(Sparkles) },
-  budget: { id: "budget", label: "Budget e acquisti", short: "Budget", icon: I(Wallet) },
+  budget: { id: "budget", label: "Budget", short: "Budget", icon: I(Wallet) },
   progressi: { id: "progressi", label: "Progressi", icon: I(TrendingUp) },
   contenuti: { id: "contenuti", label: "Contenuti", icon: I(Inbox) },
-  persone: { id: "persone", label: "Persone e ricorrenze", short: "Persone", icon: I(Heart) },
+  persone: { id: "persone", label: "Persone", short: "Persone", icon: I(Heart) },
   regali: { id: "regali", label: "Regali", icon: I(Gift) },
-  uscite: { id: "uscite", label: "Uscite e serate", short: "Uscite", icon: I(UtensilsCrossed) },
-  lettere: { id: "lettere", label: "Lettere e messaggi", short: "Lettere", icon: I(PenLine) },
-  accademia: { id: "accademia", label: "Accademia", short: "Impara", icon: I(GraduationCap) },
+  uscite: { id: "uscite", label: "Uscite", short: "Uscite", icon: I(UtensilsCrossed) },
+  lettere: { id: "lettere", label: "Lettere", short: "Lettere", icon: I(PenLine) },
+  accademia: { id: "accademia", label: "Lezioni", short: "Lezioni", icon: I(GraduationCap) },
   salute: { id: "salute", label: "Salute", icon: I(HeartPulse) },
-  fisico: { id: "fisico", label: "Fisico", icon: I(Dumbbell) },
+  fisico: { id: "fisico", label: "Allenamento", short: "Allenamento", icon: I(Dumbbell) },
   profilo: { id: "profilo", label: "Profilo", icon: I(User) },
 };
-/** Gruppi del menu, come i riquadri di Navy OS. */
-const GROUPS: { id: string; label: string; short: string; icon: NavItem["icon"]; items: Tab[] }[] = [
-  { id: "oggi", label: "Percorso", short: "Oggi", icon: I(Compass), items: ["percorso", "progressi"] },
-  { id: "impara", label: "Accademia", short: "Impara", icon: I(GraduationCap), items: ["accademia", "contenuti", "linguaggio"] },
-  { id: "stile", label: "Stile", short: "Stile", icon: (p) => <Hanger size={p.size ?? 18} className={p.className} />, items: ["armadio", "outfit", "stile", "budget"] },
-  { id: "corpo", label: "Corpo", short: "Corpo", icon: I(Dumbbell), items: ["fisico", "salute"] },
-  { id: "vita", label: "Vita", short: "Vita", icon: I(Heart), items: ["persone", "regali", "uscite", "lettere"] },
-  { id: "tu", label: "Tu", short: "Tu", icon: I(User), items: ["profilo"] },
+/** Le cinque aree, uguali nel menu laterale e nella barra in basso. Il profilo sta in alto a destra. */
+const GROUPS: { id: string; label: string; icon: NavItem["icon"]; items: Tab[] }[] = [
+  { id: "oggi", label: "Oggi", icon: I(Compass), items: ["percorso", "progressi"] },
+  { id: "accademia", label: "Accademia", icon: I(GraduationCap), items: ["accademia", "contenuti", "linguaggio"] },
+  { id: "stile", label: "Stile", icon: (p) => <Hanger size={p.size ?? 18} className={p.className} />, items: ["armadio", "outfit", "stile", "budget"] },
+  { id: "corpo", label: "Corpo", icon: I(Dumbbell), items: ["fisico", "salute"] },
+  { id: "vita", label: "Vita", icon: I(Heart), items: ["persone", "regali", "uscite", "lettere"] },
 ];
-const groupOf = (t: Tab) => GROUPS.find((g) => g.items.includes(t)) || GROUPS[0];
+const groupOf = (t: Tab) => GROUPS.find((g) => g.items.includes(t)) || { id: "tu", label: "Tu", icon: I(User), items: ["profilo"] as Tab[] };
+
+/** Segnali nel menu: proposte da approvare, ricorrenze vicine, controllo della settimana. */
+type Badges = Partial<Record<Tab, number>>;
+function useBadges(tab: Tab) {
+  const [b, setB] = useState<Badges>({});
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const [k, t, p] = await Promise.all([
+        supabase.from("knowledge").select("id", { count: "exact", head: true }).eq("stato", "proposta"),
+        supabase.from("tutorials").select("id", { count: "exact", head: true }).eq("stato", "proposta"),
+        supabase.from("people").select("date"),
+      ]);
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+      let soon = 0;
+      for (const x of (p.data as { date: { data: string }[] }[]) || [])
+        for (const d of x.date || []) {
+          const mmdd = String(d.data || "").slice(-5);
+          if (!/^\d{2}-\d{2}$/.test(mmdd)) continue;
+          let n = new Date(`${now.getFullYear()}-${mmdd}T00:00:00`).getTime();
+          if (n < today) n = new Date(`${now.getFullYear() + 1}-${mmdd}T00:00:00`).getTime();
+          if ((n - today) / 86400000 <= 7) soon++;
+        }
+      if (alive) setB({ contenuti: (k.count || 0) + (t.count || 0), persone: soon });
+    })().catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [tab]);
+  return b;
+}
+const groupBadge = (g: { items: Tab[] }, b: Badges) => g.items.reduce((n, id) => n + (b[id] || 0), 0);
+
+/** Aggiunta rapida: le cose che si aggiungono più spesso, da qualunque schermata. */
+function QuickAdd({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const app = useApp();
+  const go = (fn: () => void) => {
+    onClose();
+    setTimeout(fn, 150);
+  };
+  const opts: { icon: ReactNode; label: string; hint: string; run: () => void }[] = [
+    { icon: <Inbox size={20} />, label: "Un contenuto da analizzare", hint: "Profilo, reel, video, articolo", run: () => app.setTab("contenuti") },
+    { icon: <Hanger size={20} />, label: "Un capo nell'armadio", hint: "Foto, link o etichetta", run: () => app.setAddOpen(true) },
+    { icon: <Heart size={20} strokeWidth={1.8} />, label: "Una persona o un'idea per lei", hint: "Date, gusti, cose che le piacciono", run: () => app.setTab("persone") },
+    { icon: <TrendingUp size={20} strokeWidth={1.8} />, label: "Peso e misure", hint: "Aggiorna i progressi", run: () => app.setTab("progressi") },
+    { icon: <Wallet size={20} strokeWidth={1.8} />, label: "Una spesa", hint: "Acquisti, sarto, calzolaio", run: () => app.setTab("budget") },
+    { icon: <PenLine size={20} strokeWidth={1.8} />, label: "Un messaggio da scrivere", hint: "Biglietto, lettera, invito", run: () => app.setTab("lettere") },
+  ];
+  return (
+    <Sheet open={open} onClose={onClose} title="Cosa vuoi aggiungere?">
+      <div className="grid gap-2 pb-6 sm:grid-cols-2">
+        {opts.map((o) => (
+          <button key={o.label} onClick={() => go(o.run)} className="flex items-center gap-3 rounded-[18px] bg-card p-4 text-left hover:ring-1 hover:ring-gold">
+            <span className="h-10 w-10 rounded-full bg-surface grid place-items-center text-gold shrink-0">{o.icon}</span>
+            <span className="min-w-0">
+              <span className="block text-[15px] font-semibold">{o.label}</span>
+              <span className="block text-[12.5px] text-muted">{o.hint}</span>
+            </span>
+          </button>
+        ))}
+      </div>
+    </Sheet>
+  );
+}
+
+function Avatar({ size = 32 }: { size?: number }) {
+  const app = useApp();
+  const photo = useSignedUrl("avatars", app.profile?.avatar_photo_path);
+  return (
+    <span className="rounded-full overflow-hidden bg-gold-tint grid place-items-center font-display text-gold shrink-0" style={{ height: size, width: size, fontSize: size * 0.45 }}>
+      {photo ? <img src={photo} className="h-full w-full object-cover object-top" /> : (app.profile?.nome || "?").slice(0, 1).toUpperCase()}
+    </span>
+  );
+}
 
 /** Sotto-sezioni dell'area corrente, in alto sul telefono. */
-function SubTabs() {
+function SubTabs({ badges }: { badges: Badges }) {
   const app = useApp();
   const g = groupOf(app.tab);
   if (g.items.length < 2) return null;
@@ -120,7 +194,8 @@ function SubTabs() {
         const on = app.tab === id;
         return (
           <button key={id} onClick={() => app.setTab(id)} className={`h-9 px-4 rounded-full text-[13.5px] font-semibold shrink-0 transition ${on ? "bg-brand text-brand-fg" : "bg-card text-muted"}`}>
-            {ITEMS[id].short && id !== "percorso" ? ITEMS[id].short : id === "percorso" ? "Oggi" : ITEMS[id].label}
+            {ITEMS[id].short || ITEMS[id].label}
+            {!!badges[id] && <span className={`ml-1.5 rounded-full px-1.5 text-[11px] ${on ? "bg-white/20" : "bg-gold text-ongold"}`}>{badges[id]}</span>}
           </button>
         );
       })}
@@ -147,8 +222,8 @@ function NavGroup({ label, children }: { label: string; children: ReactNode }) {
     }
   };
   return (
-    <div className="mt-3 rounded-[16px] border border-line bg-surface/50 p-1.5">
-      <button onClick={cambia} className="flex w-full items-center gap-2 rounded-[10px] px-2 py-1 text-[11px] font-bold uppercase tracking-[0.12em] text-muted hover:text-ink">
+    <div className="mt-1.5">
+      <button onClick={cambia} className="flex w-full items-center gap-2 rounded-[8px] px-2.5 py-0.5 text-[10.5px] font-bold uppercase tracking-[0.14em] text-muted hover:text-ink">
         <span className="h-1.5 w-1.5 rounded-full bg-gold" />
         <span className="flex-1 text-left">{label}</span>
         <ChevronDown size={14} className={`transition-transform ${chiuso ? "-rotate-90" : ""}`} />
@@ -160,29 +235,32 @@ function NavGroup({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function SidebarBody({ onNav }: { onNav?: () => void }) {
+function SidebarBody({ onNav, badges, onAdd }: { onNav?: () => void; badges: Badges; onAdd: () => void }) {
   const app = useApp();
   const { theme, toggle } = useTheme();
-  const photo = useSignedUrl("avatars", app.profile?.avatar_photo_path);
   const go = (t: Tab) => {
     app.setTab(t);
     onNav?.();
   };
   return (
     <div className="flex h-full flex-col">
-      <div className="px-4 pt-5 pb-3">
-        <Wordmark />
+      <div className="px-4 pt-4 pb-1 flex items-center gap-2">
+        <div className="flex-1 min-w-0">
+          <Wordmark />
+        </div>
+        <button
+          onClick={() => {
+            onAdd();
+            onNav?.();
+          }}
+          className="h-9 w-9 shrink-0 grid place-items-center rounded-full bg-brand text-brand-fg shadow-pill active:scale-[.96] transition"
+          aria-label="Aggiungi"
+          title="Aggiungi"
+        >
+          <Plus size={18} />
+        </button>
       </div>
-      <button
-        onClick={() => {
-          app.setAddOpen(true);
-          onNav?.();
-        }}
-        className="mx-3 mb-1 flex h-10 items-center gap-2 rounded-full bg-brand px-4 text-[14px] font-semibold text-brand-fg shadow-pill active:scale-[.98] transition"
-      >
-        <Plus size={17} /> Aggiungi capo
-      </button>
-      <nav className="flex-1 overflow-y-auto px-3 pb-3" aria-label="Navigazione principale">
+      <nav className="flex-1 overflow-y-auto px-3 pt-2 pb-3" aria-label="Navigazione principale">
         {GROUPS.map((g) => (
           <NavGroup key={g.label} label={g.label}>
             {g.items.map((id) => {
@@ -192,34 +270,33 @@ function SidebarBody({ onNav }: { onNav?: () => void }) {
                 <button
                   key={id}
                   onClick={() => go(id)}
-                  className={`relative flex min-h-11 w-full items-center gap-2.5 rounded-[9px] px-2.5 text-[14.5px] transition-colors ${
+                  className={`relative flex h-[31px] w-full items-center gap-2.5 rounded-[9px] px-2.5 text-[14px] transition-colors ${
                     on ? "bg-sidebar-active font-bold text-ink" : "text-muted hover:bg-sidebar-active/60 hover:text-ink"
                   }`}
                 >
-                  {on && <span className="absolute left-0 top-2.5 bottom-2.5 w-[3px] rounded-full bg-gold" />}
+                  {on && <span className="absolute left-0 top-2 bottom-2 w-[3px] rounded-full bg-gold" />}
                   <it.icon size={18} />
                   <span className="flex-1 text-left">{it.label}</span>
-                  {it.soon && <span className="text-[10px] uppercase tracking-[0.1em] text-gold">Presto</span>}
+                  {!!badges[id] && <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-gold text-ongold text-[11px] font-bold grid place-items-center">{badges[id]}</span>}
                 </button>
               );
             })}
           </NavGroup>
         ))}
       </nav>
-      <div className="border-t border-line px-3 py-3 space-y-1">
-        <button onClick={toggle} className="flex h-10 w-full items-center gap-2.5 rounded-[9px] px-2.5 text-[14px] text-muted hover:bg-sidebar-active/60 hover:text-ink">
-          {theme === "dark" ? <Sun size={18} strokeWidth={1.8} /> : <Moon size={18} strokeWidth={1.8} />}
-          {theme === "dark" ? "Tema chiaro" : "Tema scuro"}
-        </button>
+      <div className="border-t border-line px-3 py-3">
         <div className="flex items-center gap-2.5 rounded-[12px] border border-line bg-surface p-1.5">
-          <div className="h-8 w-8 rounded-full overflow-hidden bg-card grid place-items-center text-[13px] font-semibold">
-            {photo ? <img src={photo} className="h-full w-full object-cover object-top" /> : (app.profile?.nome || "?").slice(0, 1).toUpperCase()}
-          </div>
-          <button onClick={() => go("profilo")} className="min-w-0 flex-1 text-left">
-            <div className="truncate text-[13px] font-semibold">{app.profile?.nome}</div>
-            <div className="truncate text-[11px] text-muted">{app.email}</div>
+          <button onClick={() => go("profilo")} className="min-w-0 flex-1 text-left flex items-center gap-2.5">
+            <Avatar />
+            <span className="min-w-0">
+            <span className="block truncate text-[13px] font-semibold">{app.profile?.nome}</span>
+            <span className="block truncate text-[11px] text-muted">Profilo e impostazioni</span>
+            </span>
           </button>
-          <button onClick={() => supabase.auth.signOut()} className="h-8 w-8 grid place-items-center text-muted hover:text-ink" aria-label="Esci">
+          <button onClick={toggle} className="h-8 w-8 grid place-items-center text-muted hover:text-ink" aria-label={theme === "dark" ? "Tema chiaro" : "Tema scuro"} title={theme === "dark" ? "Tema chiaro" : "Tema scuro"}>
+            {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+          </button>
+          <button onClick={() => supabase.auth.signOut()} className="h-8 w-8 grid place-items-center text-muted hover:text-ink" aria-label="Esci" title="Esci">
             <LogOut size={16} />
           </button>
         </div>
@@ -230,6 +307,8 @@ function SidebarBody({ onNav }: { onNav?: () => void }) {
 
 function Shell() {
   const app = useApp();
+  const badges = useBadges(app.tab);
+  const [addMenu, setAddMenu] = useState(false);
   const [last, setLast] = useState<Record<string, Tab>>({});
   const [online, setOnline] = useState(navigator.onLine);
   useEffect(() => {
@@ -296,7 +375,7 @@ function Shell() {
     <div className="min-h-[100dvh] bg-bg">
       {/* Barra laterale su computer */}
       <aside className="fixed inset-y-0 left-0 hidden w-[248px] border-r border-line bg-sidebar lg:block">
-        <SidebarBody />
+        <SidebarBody badges={badges} onAdd={() => setAddMenu(true)} />
       </aside>
 
       {/* Intestazione su telefono */}
@@ -305,11 +384,11 @@ function Shell() {
           <Wordmark sub={false} />
         </button>
         <div className="ml-auto flex items-center gap-1">
-          <button onClick={() => app.setAddOpen(true)} className="h-9 w-9 grid place-items-center rounded-full bg-brand text-brand-fg shadow-pill" aria-label="Aggiungi capo">
+          <button onClick={() => setAddMenu(true)} className="h-9 w-9 grid place-items-center rounded-full bg-brand text-brand-fg shadow-pill" aria-label="Aggiungi">
             <Plus size={19} />
           </button>
-          <button onClick={() => app.setTab("profilo")} className="h-9 w-9 grid place-items-center text-ink" aria-label="Profilo">
-            <User size={20} strokeWidth={1.8} />
+          <button onClick={() => app.setTab("profilo")} className={`h-9 w-9 grid place-items-center rounded-full ${app.tab === "profilo" ? "ring-2 ring-gold" : ""}`} aria-label="Profilo e impostazioni">
+            <Avatar size={32} />
           </button>
         </div>
       </header>
@@ -321,7 +400,7 @@ function Shell() {
               Sei senza rete: vedi l'ultima copia salvata. Le modifiche torneranno possibili appena sei di nuovo online.
             </div>
           )}
-          <SubTabs />
+          <SubTabs badges={badges} />
           {app.tab === "budget" && <BudgetScreen />}
           {app.tab === "progressi" && <ProgressScreen />}
           {app.tab === "contenuti" && <ContentsScreen />}
@@ -343,11 +422,12 @@ function Shell() {
       {app.tab !== "armadio" && <AddGarmentSheet open={app.addOpen} onClose={() => app.setAddOpen(false)} />}
 
       <MaestroChat />
+      <QuickAdd open={addMenu} onClose={() => setAddMenu(false)} />
 
       {/* Dock sul telefono: le cinque aree; dentro ogni area le sotto-sezioni sono in alto */}
       <nav
         aria-label="Navigazione rapida"
-        className="fixed inset-x-3 bottom-[calc(8px+env(safe-area-inset-bottom))] z-40 mx-auto grid max-w-[520px] grid-cols-6 gap-0.5 rounded-[26px] border border-line bg-surface/90 p-1.5 shadow-dock backdrop-blur-md lg:hidden"
+        className="fixed inset-x-3 bottom-[calc(8px+env(safe-area-inset-bottom))] z-40 mx-auto grid max-w-[480px] grid-cols-5 gap-0.5 rounded-[26px] border border-line bg-surface/90 p-1.5 shadow-dock backdrop-blur-md lg:hidden"
       >
         {GROUPS.map((g) => {
           const on = groupOf(app.tab).id === g.id;
@@ -360,8 +440,9 @@ function Shell() {
               {on && <motion.span layoutId="dock" className="absolute inset-0 rounded-[20px] bg-brand shadow-pill" transition={{ type: "spring", damping: 30, stiffness: 380 }} />}
               <span className="relative">
                 <g.icon size={20} />
+                {groupBadge(g, badges) > 0 && <span className={`absolute -top-1 -right-1.5 h-2.5 w-2.5 rounded-full ring-2 ${on ? "bg-gold ring-brand" : "bg-gold ring-surface"}`} />}
               </span>
-              <span className="relative">{g.short}</span>
+              <span className="relative">{g.label}</span>
             </button>
           );
         })}
