@@ -4,6 +4,7 @@ import { Sheet } from "../components/ui";
 import { CORSI } from "../academy/content";
 import { useApp } from "../lib/store";
 import { fn, supabase, uploadBlob, uploadImage, useSignedUrl, videoFrames } from "../lib/supabase";
+import { illustrateContent, TutorialRow, TutorialView, useTutorials } from "./Tutorials";
 
 /* ------------------------------------------------------------------ */
 /* tipi                                                                */
@@ -77,6 +78,9 @@ export async function processContent(c: Pick<Content, "id" | "status" | "media" 
       notify();
     }
     await fn("contenuti", "", { action: "verifica", id: c.id });
+    notify();
+    // i tutorial trovati ricevono le illustrazioni (se la fatturazione di Gemini è attiva)
+    illustrateContent(c.id);
   } catch {
     /* l'errore è salvato sul contenuto */
   } finally {
@@ -196,8 +200,9 @@ export function KnowledgeCard({ k, onDecide, compact }: { k: Knowledge; onDecide
   );
 }
 
-function ContentSheet({ c, knowledge, onClose, onChanged }: { c: Content | null; knowledge: Knowledge[]; onClose: () => void; onChanged: () => void }) {
+function ContentSheet({ c, knowledge, onClose, onChanged, onTutorial }: { c: Content | null; knowledge: Knowledge[]; onClose: () => void; onChanged: () => void; onTutorial: (id: string) => void }) {
   const app = useApp();
+  const tut = useTutorials();
   if (!c) return <Sheet open={false} onClose={onClose}>{null}</Sheet>;
   const items = knowledge.filter((k) => k.content_id === c.id);
   const busy = running.has(c.id);
@@ -248,6 +253,18 @@ function ContentSheet({ c, knowledge, onClose, onChanged }: { c: Content | null;
             <Loader2 size={16} className="animate-spin text-gold" /> {STEP[c.status]}
           </div>
         )}
+        {(tut.list || [])
+          .filter((t) => t.content_id === c.id && t.stato !== "scartato")
+          .map((t) => (
+            <TutorialRow
+              key={t.id}
+              t={t}
+              onOpen={() => {
+                onClose();
+                onTutorial(t.id);
+              }}
+            />
+          ))}
         {items.map((k) => (
           <KnowledgeCard
             key={k.id}
@@ -304,6 +321,10 @@ export function ContentsScreen() {
   const ref = useRef<HTMLInputElement>(null);
 
   const proposte = knowledge.filter((k) => k.stato === "proposta");
+  const tut = useTutorials();
+  const tutProposte = (tut.list || []).filter((t) => t.stato === "proposta");
+  const tutOk = (tut.list || []).filter((t) => t.stato === "approvato");
+  const [openTut, setOpenTut] = useState<string | null>(null);
   const approvate = knowledge.filter((k) => k.stato === "approvata");
   const temi = ["Tutti", ...Array.from(new Set(approvate.map((k) => k.tema)))];
 
@@ -419,14 +440,24 @@ export function ContentsScreen() {
       </div>
 
       <div className="mt-6 flex gap-1.5 overflow-x-auto no-scrollbar">
-        {seg("proposte", "Da approvare", proposte.length)}
-        {seg("quaderno", "Quaderno", approvate.length)}
+        {seg("proposte", "Da approvare", proposte.length + tutProposte.length)}
+        {seg("quaderno", "Quaderno", approvate.length + tutOk.length)}
         {seg("contenuti", "Contenuti", contents.filter((c) => running.has(c.id)).length)}
       </div>
 
+      {view === "proposte" && tutProposte.length > 0 && (
+        <>
+          <H right={<span className="text-[12px] text-muted">in stile WikiHow</span>}>Tutorial da approvare</H>
+          <div className="space-y-2.5">
+            {tutProposte.map((t) => (
+              <TutorialRow key={t.id} t={t} onOpen={() => setOpenTut(t.id)} />
+            ))}
+          </div>
+        </>
+      )}
       {view === "proposte" && (
         <>
-          {proposte.length === 0 ? (
+          {proposte.length === 0 && tutProposte.length === 0 ? (
             <div className="mt-4 rounded-[20px] bg-surface shadow-soft p-6 text-center text-[14px] text-muted">
               <Inbox size={26} className="mx-auto text-gold mb-2" />
               Nessuna proposta in attesa. Porta un contenuto e qui troverai ogni insegnamento, con la verifica e le fonti.
@@ -450,9 +481,19 @@ export function ContentsScreen() {
         </>
       )}
 
+      {view === "quaderno" && tutOk.length > 0 && (
+        <>
+          <H>Tutorial</H>
+          <div className="space-y-2.5">
+            {tutOk.map((t) => (
+              <TutorialRow key={t.id} t={t} onOpen={() => setOpenTut(t.id)} />
+            ))}
+          </div>
+        </>
+      )}
       {view === "quaderno" && (
         <>
-          {approvate.length === 0 ? (
+          {approvate.length === 0 && tutOk.length === 0 ? (
             <div className="mt-4 rounded-[20px] bg-surface shadow-soft p-6 text-center text-[14px] text-muted">
               <BookMarked size={26} className="mx-auto text-gold mb-2" />
               Il quaderno è vuoto. Gli insegnamenti che approvi finiscono qui, e nei corsi dell'Accademia a cui appartengono.
@@ -501,7 +542,8 @@ export function ContentsScreen() {
         </div>
       )}
 
-      <ContentSheet c={current} knowledge={knowledge} onClose={() => setOpen(null)} onChanged={reload} />
+      <ContentSheet c={current} knowledge={knowledge} onClose={() => setOpen(null)} onChanged={reload} onTutorial={(id) => setOpenTut(id)} />
+      <TutorialView t={(tut.list || []).find((t) => t.id === openTut) || null} onClose={() => setOpenTut(null)} onChanged={tut.reload} />
     </div>
   );
 }
@@ -538,11 +580,10 @@ export function ProposalsBadge() {
   const app = useApp();
   const [n, setN] = useState(0);
   useEffect(() => {
-    supabase
-      .from("knowledge")
-      .select("id", { count: "exact", head: true })
-      .eq("stato", "proposta")
-      .then(({ count }) => setN(count || 0));
+    Promise.all([
+      supabase.from("knowledge").select("id", { count: "exact", head: true }).eq("stato", "proposta"),
+      supabase.from("tutorials").select("id", { count: "exact", head: true }).eq("stato", "proposta"),
+    ]).then(([a, b]) => setN((a.count || 0) + (b.count || 0)));
   }, []);
   if (!n) return null;
   return (
@@ -550,9 +591,9 @@ export function ProposalsBadge() {
       <Inbox size={24} className="text-gold shrink-0" />
       <div className="flex-1">
         <div className="font-semibold text-[15.5px]">
-          {n} insegnament{n === 1 ? "o" : "i"} da approvare
+          {n} propost{n === 1 ? "a" : "e"} da approvare
         </div>
-        <div className="text-[13px] text-muted">Verificati sul web: decidi tu cosa entra nel quaderno.</div>
+        <div className="text-[13px] text-muted">Insegnamenti e tutorial verificati sul web: decidi tu cosa entra.</div>
       </div>
       <ChevronRight size={18} className="text-muted" />
     </button>

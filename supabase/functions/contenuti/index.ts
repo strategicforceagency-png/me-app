@@ -58,6 +58,53 @@ async function models() {
   textModels = [...by(gen.filter((n) => /^gemini-[\d.]+-flash$/.test(n))), ...gen.filter((n) => n === "gemini-flash-latest"), ...by(gen.filter((n) => /^gemini-[\d.]+-flash-lite$/.test(n)))].slice(0, 5);
   return textModels;
 }
+let imageModels: string[] | null = null;
+async function imgModels() {
+  if (imageModels) return imageModels;
+  const j = await (await fetch(`${GEM}/v1beta/models?key=${key()}&pageSize=1000`)).json();
+  // deno-lint-ignore no-explicit-any
+  const gen: string[] = (j.models || []).filter((m: any) => (m.supportedGenerationMethods || []).includes("generateContent")).map((m: any) => String(m.name).replace("models/", ""));
+  const ver = (n: string) => parseFloat(n.match(/gemini-(\d+(?:\.\d+)?)/)?.[1] || "0");
+  const by = (a: string[]) => [...a].sort((x, y) => ver(y) - ver(x));
+  imageModels = [
+    ...by(gen.filter((n) => /^gemini-[\d.]+-flash-image$/.test(n))),
+    ...gen.filter((n) => /nano-banana/.test(n) && !/preview/.test(n)),
+    ...by(gen.filter((n) => /^gemini-[\d.]+-pro-image$/.test(n))),
+    ...by(gen.filter((n) => /^gemini-[\d.]+-flash-image-preview$/.test(n))),
+  ].slice(0, 4);
+  return imageModels;
+}
+/** Disegna un'immagine; errore con code QUOTA se il piano gratuito non lo consente. */
+async function drawImage(parts: unknown[]): Promise<{ mime: string; data: string }> {
+  let last = "Nessun modello di immagini disponibile";
+  let quota = false;
+  for (const m of await imgModels()) {
+    const r = await fetch(`${GEM}/v1beta/models/${m}:generateContent?key=${key()}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ contents: [{ role: "user", parts }], generationConfig: { responseModalities: ["IMAGE", "TEXT"] } }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      last = j?.error?.message || `Errore ${r.status}`;
+      if (r.status === 429 || /quota|billing|free tier/i.test(last)) quota = true;
+      continue;
+    }
+    // deno-lint-ignore no-explicit-any
+    const p = (j.candidates?.[0]?.content?.parts || []).find((x: any) => x.inline_data || x.inlineData);
+    const d = p?.inline_data || p?.inlineData;
+    if (d?.data) return { mime: d.mime_type || d.mimeType || "image/png", data: d.data };
+    last = "Il modello non ha restituito un'immagine";
+  }
+  throw Object.assign(new Error(quota ? "Le illustrazioni richiedono la fatturazione attiva su Google AI Studio (sul piano gratuito i modelli che disegnano hanno quota zero)." : last), { code: quota ? "QUOTA" : "ERR" });
+}
+function fromB64(b64: string) {
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
 // deno-lint-ignore no-explicit-any
 async function gemini(parts: unknown[], opts: { json?: boolean; search?: boolean; temperature?: number } = {}): Promise<{ text: string; grounding: any }> {
   let last = "Nessun modello AI disponibile";
@@ -279,6 +326,51 @@ Deno.serve(async (req) => {
     const { data: { user } } = await sb.auth.getUser(auth.replace("Bearer ", ""));
     if (!user) return json({ error: "Non autenticato" }, 401);
     const b = await req.json();
+
+    if (b.action === "illustra") {
+      // body: { tutorial_id, step } → disegna l'illustrazione di un passaggio
+      const { data: t } = await sb.from("tutorials").select("*").eq("id", b.tutorial_id).single();
+      if (!t) return json({ error: "Tutorial non trovato" }, 404);
+      const i = Number(b.step) || 0;
+      const steps = t.data.passaggi || [];
+      if (!steps[i]) return json({ error: "Passaggio non trovato" }, 400);
+      await sb.from("tutorials").update({ img_status: "in_corso", img_error: null }).eq("id", t.id);
+      const parts: unknown[] = [];
+      // stile coerente: si passa l'illustrazione precedente come riferimento
+      const prev = steps.slice(0, i).reverse().find((p: { img?: string }) => p.img);
+      if (prev?.img) {
+        const { data } = await sb.storage.from("tutorials").download(prev.img);
+        if (data) {
+          parts.push({ text: "Immagine di riferimento per lo STILE (stessi colori, stesso tratto, stesso personaggio):" });
+          parts.push({ inline_data: { mime_type: data.type || "image/png", data: toB64(await data.arrayBuffer()) } });
+        }
+      }
+      parts.push({
+        text: `Illustrazione didattica in stile WikiHow per il passaggio ${i + 1} del tutorial "${t.titolo}".
+Stile: illustrazione digitale pulita, colori pieni e morbidi, contorni sottili, ombre leggere, sfondo bianco o grigio chiarissimo, formato orizzontale 4:3. Uomo adulto elegante, stile classico britannico. Inquadratura ravvicinata e chiara sul gesto; se utile una freccia per mostrare il movimento.
+NIENTE testo, lettere, numeri, loghi o filigrane.
+Cosa mostrare: ${steps[i].illustrazione || steps[i].titolo}
+Passaggio: ${steps[i].titolo} — ${steps[i].testo}`,
+      });
+      try {
+        const img = await drawImage(parts);
+        const path = `${user.id}/${t.id}/passo-${i + 1}-${crypto.randomUUID().slice(0, 6)}.${img.mime.includes("jpeg") ? "jpg" : "png"}`;
+        const { error } = await sb.storage.from("tutorials").upload(path, fromB64(img.data), { contentType: img.mime });
+        if (error) throw new Error(error.message);
+        const { data: fresh } = await sb.from("tutorials").select("data").eq("id", t.id).single();
+        const d = fresh?.data || t.data;
+        if (d.passaggi[i]?.img) await sb.storage.from("tutorials").remove([d.passaggi[i].img]);
+        d.passaggi[i].img = path;
+        const all = d.passaggi.every((p: { img?: string }) => p.img);
+        await sb.from("tutorials").update({ data: d, img_status: all ? "fatto" : "in_corso" }).eq("id", t.id);
+        return json({ ok: true, path, done: all });
+      } catch (e) {
+        const err = e as Error & { code?: string };
+        await sb.from("tutorials").update({ img_status: err.code === "QUOTA" ? "bloccato" : "da_fare", img_error: err.message.slice(0, 300) }).eq("id", t.id);
+        return json({ error: err.message, code: err.code }, err.code === "QUOTA" ? 402 : 500);
+      }
+    }
+
     id = String(b.id || "");
     const { data: c } = await sb.from("contents").select("*").eq("id", id).single();
     if (!c) return json({ error: "Contenuto non trovato" }, 404);
@@ -334,10 +426,11 @@ Deno.serve(async (req) => {
         text: `Sei il direttore dell'Accademia di Habitus, scuola personale per diventare un gentleman (gentiluomo inglese anni '60-'70 adattato all'Italia di oggi). Manuel ti ha portato questo contenuto (${c.title || c.source || "file"}). Fai una CERNITA COMPLETA di tutto ciò che il contenuto insegna, consiglia o afferma, non solo i vestiti: come vestirsi e abbinare, cravatte, pochette e accessori, scarpe, galateo e comportamento, appuntamenti e relazioni, grooming, linguaggio, fisico, salute, mentalità. Guarda i video per intero e ascolta l'audio: spesso i consigli sono detti a voce. Ignora sponsorizzazioni, codici sconto e inviti a seguire.
 
 Rispondi SOLO con JSON valido in italiano:
-{"titolo":"titolo breve e chiaro del contenuto","riassunto":"2-3 frasi su cosa insegna","temi":["temi presenti"],"insegnamenti":[{"tema":"uno tra ${TEMI.join(", ")}","corso":"uno tra ${CORSI.join(", ")} oppure null","titolo":"titolo breve","affermazione":"cosa sostiene il contenuto, riportato fedelmente anche se discutibile","dettaglio":"come lo spiega, esempi, passaggi pratici","dove":"es. video 1 al minuto 0:40, immagine 3, didascalia, testo"}],"stile":null}
+{"titolo":"titolo breve e chiaro del contenuto","riassunto":"2-3 frasi su cosa insegna","temi":["temi presenti"],"insegnamenti":[{"tema":"uno tra ${TEMI.join(", ")}","corso":"uno tra ${CORSI.join(", ")} oppure null","titolo":"titolo breve","affermazione":"cosa sostiene il contenuto, riportato fedelmente anche se discutibile","dettaglio":"come lo spiega, esempi, passaggi pratici","dove":"es. video 1 al minuto 0:40, immagine 3, didascalia, testo"}],"stile":null,"tutorial":[]}
 
 Regole:
 - Fino a 15 insegnamenti, concreti e utili; unisci i doppioni; non aggiungere tue opinioni qui: la verifica viene dopo.
+- "tutorial": se il contenuto (o uno dei suoi video) è un TUTORIAL pratico che mostra COME FARE qualcosa passo per passo (es. un nodo di cravatta, piegare una pochette, lucidare le scarpe, radersi, stirare una camicia, apparecchiare, allacciare i gemelli, fare un esercizio), crea per ciascuno (massimo 3) una guida in stile WikiHow: {"titolo":"Come …","corso":"uno tra ${CORSI.join(", ")} oppure null","tema":"uno dei temi","intro":"2 frasi: a cosa serve e quando","difficolta":"facile | media | impegnativa","minuti":5,"occorrente":["cosa serve"],"passaggi":[{"titolo":"azione breve all'imperativo","testo":"spiegazione chiara di 2-4 frasi, con i dettagli che si vedono nel video","consiglio":"facoltativo","attenzione":"facoltativo","momento":"es. 0:42","illustrazione":"descrizione visiva PRECISA per un illustratore di cosa disegnare in questo passaggio: posizione delle mani, dell'oggetto, angolazione, cosa evidenziare con una freccia"}],"consigli":["…"],"errori":["errori comuni da evitare"]}. Da 4 a 12 passaggi, nell'ordine esatto del video, senza saltare gesti importanti. Se non è un tutorial, lascia [].
 - "stile": compilalo SOLO se ci sono outfit o capi visibili, con questa struttura: ${STILE_SCHEMA} ("immagine" = indice di una IMMAGINE, non dei video). Altrimenti null.`,
       });
       let out;
@@ -369,8 +462,18 @@ Regole:
           .single();
         inspiration_id = insp?.id || null;
       }
+      // tutorial in stile WikiHow (da approvare)
+      const tuts = (Array.isArray(out.tutorial) ? out.tutorial : []).filter((t: { passaggi?: unknown[] }) => (t?.passaggi || []).length >= 3).slice(0, 3);
+      await sb.from("tutorials").delete().eq("content_id", id).eq("stato", "proposta");
+      for (const t of tuts) {
+        // deno-lint-ignore no-explicit-any
+        t.passaggi = t.passaggi.slice(0, 12).map((p: any) => ({ titolo: String(p.titolo || ""), testo: String(p.testo || ""), consiglio: p.consiglio || null, attenzione: p.attenzione || null, momento: p.momento || null, illustrazione: String(p.illustrazione || p.titolo || ""), img: null }));
+        await sb.from("tutorials").insert({ user_id: user.id, content_id: id, corso: CORSI.includes(t.corso) ? t.corso : null, tema: TEMI.includes(t.tema) ? t.tema : "Altro", titolo: String(t.titolo || "Tutorial"), data: t });
+      }
+      delete out.tutorial;
+      out.tutorial_creati = tuts.length;
       await sb.from("contents").update({ analysis: out, title: c.title || out.titolo, status: "verifica", inspiration_id }).eq("id", id);
-      return json({ ok: true, insegnamenti: out.insegnamenti.length, stile: !!out.stile });
+      return json({ ok: true, insegnamenti: out.insegnamenti.length, stile: !!out.stile, tutorial: tuts.length });
     }
 
     if (b.action === "verifica") {
@@ -417,6 +520,28 @@ Usa "opinione" per gusti personali o convenzioni di stile su cui gli esperti non
       };
       // 4 verifiche alla volta
       for (let i = 0; i < ins.length; i += 4) await Promise.all(ins.slice(i, i + 4).map(one));
+
+      // verifica dei tutorial: ogni passaggio confrontato con le fonti
+      const { data: tuts } = await sb.from("tutorials").select("id, titolo, data").eq("content_id", id).eq("stato", "proposta");
+      await Promise.all(
+        (tuts || []).map(async (t: { id: string; titolo: string; data: { passaggi: { titolo: string; testo: string }[] } }) => {
+          const steps = t.data.passaggi.map((p, i) => `${i + 1}. ${p.titolo}: ${p.testo}`).join("\n");
+          try {
+            const r = await gemini([{ text: `Verifica questo tutorial con fonti autorevoli (sartorie, camicerie e calzolai storici, manuali di galateo, testate serie di stile maschile, dermatologi per la rasatura). Controlla che i passaggi siano corretti, completi e nell'ordine giusto.
+
+Tutorial: ${t.titolo}
+${steps}
+
+Rispondi SOLO con JSON: {"verdetto":"fondato | in_parte | infondato | non_verificabile","spiegazione":"2-3 frasi","correzioni":[{"passaggio":numero,"nota":"cosa correggere o aggiungere"}]}` }], { search: true, temperature: 0.1 });
+            const v = parseJson(r.text) || {};
+            // deno-lint-ignore no-explicit-any
+            const fonti = ((r.grounding?.groundingChunks || []) as any[]).map((g) => g.web).filter((w) => w?.uri).reduce((acc: { titolo: string; url: string }[], w) => (acc.some((a) => a.titolo === w.title) ? acc : [...acc, { titolo: w.title || new URL(w.uri).hostname, url: w.uri }]), []).slice(0, 5);
+            await sb.from("tutorials").update({ verifica: { verdetto: VERDETTI.includes(v.verdetto) ? v.verdetto : "non_verificabile", spiegazione: v.spiegazione || "", correzioni: Array.isArray(v.correzioni) ? v.correzioni.slice(0, 12) : [], fonti } }).eq("id", t.id);
+          } catch (e) {
+            await sb.from("tutorials").update({ verifica: { verdetto: "non_verificabile", spiegazione: `Verifica non riuscita: ${(e as Error).message}`, correzioni: [], fonti: [] } }).eq("id", t.id);
+          }
+        }),
+      );
       if (results.length) {
         const { error } = await sb.from("knowledge").insert(results);
         if (error) throw new Error(error.message);
