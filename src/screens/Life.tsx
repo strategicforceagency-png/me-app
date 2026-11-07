@@ -1,8 +1,9 @@
-import { CalendarPlus, Check, ChevronRight, Copy, ExternalLink, Gift, Heart, Lightbulb, Loader2, MapPin, Plus, Search, Sparkles, Star, Trash2, UtensilsCrossed, X } from "lucide-react";
-import { ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import { Camera, CalendarPlus, Check, ChevronRight, Copy, ExternalLink, Gift, Heart, Lightbulb, Loader2, MapPin, Plus, Search, Sparkles, Star, Trash2, UtensilsCrossed, X } from "lucide-react";
+import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { SchedaCard, type SchedaData } from "../components/Scheda";
 import { inputCls, Sheet } from "../components/ui";
 import { useApp } from "../lib/store";
-import { fn, supabase } from "../lib/supabase";
+import { fn, supabase, uploadImage, useSignedUrl } from "../lib/supabase";
 
 /* ------------------------------------------------------------------ */
 /* tipi e dati                                                         */
@@ -16,7 +17,8 @@ export type Person = {
   gusti: string | null;
   non_piace: string | null;
   taglie: string | null;
-  idee: { testo: string; data: string }[];
+  idee: IdeaNota[];
+  scheda?: SchedaData;
   note: string | null;
   pensierino_ogni: number | null;
   ultimo_pensierino: string | null;
@@ -65,6 +67,46 @@ function TasteList({ dettagli, onChange }: { dettagli: Record<string, string>; o
         })}
       </div>
     </>
+  );
+}
+
+/** Un'idea annotata: testo, oppure link o foto analizzati dall'AI. */
+export type IdeaNota = {
+  testo: string;
+  data: string;
+  link?: string | null;
+  foto?: string | null;
+  immagine?: string | null;
+  analisi?: { titolo?: string; cosa?: string; marca?: string | null; prezzo?: string | null; colore?: string | null; dove?: string | null; categoria?: string; nota?: string } | null;
+};
+
+function IdeaRow({ x, onRemove }: { x: IdeaNota; onRemove: () => void }) {
+  const foto = useSignedUrl("persone", x.foto || null);
+  const img = foto || x.immagine;
+  const sub = [x.analisi?.marca, x.analisi?.prezzo, x.analisi?.dove].filter(Boolean).join(" · ");
+  return (
+    <div className="flex items-center gap-2.5 rounded-[12px] bg-card px-2.5 py-2 text-[14px]">
+      {img ? (
+        <img src={img} alt="" className="h-12 w-12 rounded-[10px] object-cover shrink-0 bg-surface" onError={(e) => ((e.target as HTMLImageElement).style.display = "none")} />
+      ) : (
+        <span className="h-8 w-8 grid place-items-center shrink-0">
+          <Lightbulb size={15} className="text-gold" />
+        </span>
+      )}
+      <span className="flex-1 min-w-0">
+        <span className="block leading-snug">{x.testo}</span>
+        {sub && <span className="block text-[12px] text-muted truncate">{sub}</span>}
+        {x.analisi?.nota && <span className="block text-[12px] text-muted leading-snug mt-0.5">{x.analisi.nota}</span>}
+      </span>
+      {x.link && (
+        <a href={x.link} target="_blank" rel="noreferrer" className="h-8 w-8 grid place-items-center text-muted shrink-0" aria-label="Apri il link">
+          <ExternalLink size={14} />
+        </a>
+      )}
+      <button onClick={onRemove} className="h-8 w-8 grid place-items-center text-muted shrink-0" aria-label="Togli">
+        <X size={14} />
+      </button>
+    </div>
   );
 }
 
@@ -200,13 +242,63 @@ function PersonSheet({ person, onClose, onSaved }: { person: Partial<Person> | n
   const setD = (k: string, v: string) => setP((x) => ({ ...x, dettagli: { ...(x.dettagli || {}), [k]: v } }));
   if (!person) return <Sheet open={false} onClose={onClose}>{null}</Sheet>;
   const set = (x: Partial<Person>) => setP((v) => ({ ...v, ...x }));
+  const row = () => ({ nome: (p.nome || "").trim(), relazione: p.relazione || "Partner", date: (p.date || []).filter((d) => d.data), gusti: p.gusti || null, non_piace: p.non_piace || null, taglie: p.taglie || null, dettagli: p.dettagli || {}, idee: p.idee || [], note: p.note || null, pensierino_ogni: p.pensierino_ogni || null, ultimo_pensierino: p.ultimo_pensierino || null, serata_ogni: p.serata_ogni || null, ultima_serata: p.ultima_serata || null });
+  /** Salva quello che c'è adesso senza chiudere; ritorna l'id (crea la persona se è nuova). */
+  const persist = async () => {
+    if (p.id) {
+      await supabase.from("people").update(row()).eq("id", p.id);
+      return p.id;
+    }
+    const { data, error } = await supabase.from("people").insert(row()).select("id").single();
+    if (error) throw error;
+    set({ id: data.id });
+    return data.id as string;
+  };
   const save = async () => {
     if (!p.nome?.trim()) return app.toast("Scrivi il nome");
-    const row = { nome: p.nome.trim(), relazione: p.relazione || "Partner", date: (p.date || []).filter((d) => d.data), gusti: p.gusti || null, non_piace: p.non_piace || null, taglie: p.taglie || null, dettagli: p.dettagli || {}, idee: p.idee || [], note: p.note || null, pensierino_ogni: p.pensierino_ogni || null, ultimo_pensierino: p.ultimo_pensierino || null, serata_ogni: p.serata_ogni || null, ultima_serata: p.ultima_serata || null };
-    if (p.id) await supabase.from("people").update(row).eq("id", p.id);
-    else await supabase.from("people").insert(row);
+    const id = await persist();
+    // se sono cambiati gusti o idee, la scheda interna si aggiorna da sola
+    const before = JSON.stringify([person?.dettagli, person?.idee, person?.non_piace, person?.note, person?.gusti]);
+    const after = JSON.stringify([p.dettagli, p.idee, p.non_piace, p.note, p.gusti]);
+    if (before !== after && (p.idee?.length || Object.values(p.dettagli || {}).some((v) => v?.trim()))) fn("conoscenza", "", { action: "persona", person_id: id }).catch(() => {});
     onSaved();
     onClose();
+  };
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [foto, setFoto] = useState<File | null>(null);
+  const [busyIdea, setBusyIdea] = useState(false);
+  const addIdea = async () => {
+    const txt = idea.trim();
+    const link = txt.match(/https?:\/\/\S+/)?.[0] || null;
+    if (!txt && !foto) return;
+    if (!link && !foto) {
+      set({ idee: [...(p.idee || []), { testo: txt, data: todayISO() }] });
+      setIdea("");
+      return;
+    }
+    if (!p.nome?.trim()) return app.toast("Scrivi prima il nome");
+    setBusyIdea(true);
+    try {
+      const id = await persist();
+      let path: string | null = null;
+      if (foto) {
+        const { data: u } = await supabase.auth.getUser();
+        path = await uploadImage("persone", u.user!.id, foto, `${id}/idea`);
+      }
+      const r = await fn<{ idee: IdeaNota[]; scheda: SchedaData; idea: IdeaNota }>("conoscenza", "", { action: "idea", person_id: id, testo: txt, link, foto: path });
+      set({ id, idee: r.idee, scheda: r.scheda });
+      setIdea("");
+      setFoto(null);
+      app.toast(`Annotato: ${r.idea.testo}`);
+      onSaved();
+    } catch (e) {
+      app.toast((e as Error).message);
+    }
+    setBusyIdea(false);
+  };
+  const saveScheda = async (s2: SchedaData) => {
+    set({ scheda: s2 });
+    if (p.id) await supabase.from("people").update({ scheda: s2 }).eq("id", p.id);
   };
   const del = async () => {
     if (!p.id) return;
@@ -220,6 +312,23 @@ function PersonSheet({ person, onClose, onSaved }: { person: Partial<Person> | n
         <input placeholder="Nome" value={p.nome || ""} onChange={(e) => set({ nome: e.target.value })} autoComplete="off" className={inputCls} />
         <Label>Chi è per te</Label>
         <Chips small opts={RELAZIONI} value={p.relazione} onChange={(v) => set({ relazione: v })} />
+
+        {p.id && (
+          <div className="mt-5">
+            <SchedaCard
+              title={`La scheda di ${p.nome || "questa persona"}`}
+              scheda={p.scheda || {}}
+              onChange={saveScheda}
+              onRefresh={async () => {
+                await persist();
+                const r = await fn<{ scheda: SchedaData }>("conoscenza", "", { action: "persona", person_id: p.id });
+                set({ scheda: r.scheda });
+              }}
+              empty="Qui si costruisce, da sola, la scheda di questa persona: i suoi gusti, cosa la emoziona, cosa evitare. Si arricchisce con le idee, i link e le foto che annoti e con i regali che scegli."
+              catHint="Aggiungi tu un dettaglio"
+            />
+          </div>
+        )}
 
         <Label>Date importanti</Label>
         <div className="space-y-2">
@@ -265,31 +374,40 @@ function PersonSheet({ person, onClose, onSaved }: { person: Partial<Person> | n
         {p.taglie && <div className="text-[12px] text-muted mt-1.5">Annotato prima: {p.taglie}</div>}
 
         <Label>Idee annotate</Label>
-        <div className="text-[12.5px] text-muted -mt-1 mb-2">Quando dice "che bello…", annotalo qui: il consigliere dei regali ne terrà conto.</div>
+        <div className="text-[12.5px] text-muted -mt-1 mb-2">Scrivi un'idea, incolla un link o fai una foto (una vetrina, un piatto, un posto): capisco cos'è e aggiorno la sua scheda.</div>
         <div className="space-y-1.5">
           {(p.idee || []).map((x, i) => (
-            <div key={i} className="flex items-center gap-2 rounded-[12px] bg-card px-3 py-2 text-[14px]">
-              <Lightbulb size={14} className="text-gold shrink-0" />
-              <span className="flex-1">{x.testo}</span>
-              <button onClick={() => set({ idee: p.idee!.filter((_, j) => j !== i) })} className="text-muted" aria-label="Togli">
+            <IdeaRow key={i} x={x} onRemove={() => set({ idee: p.idee!.filter((_, j) => j !== i) })} />
+          ))}
+          {foto && (
+            <div className="flex items-center gap-2 rounded-[12px] bg-card px-2.5 py-2 text-[13px]">
+              <img src={URL.createObjectURL(foto)} alt="" className="h-10 w-10 rounded-[8px] object-cover" />
+              <span className="flex-1 text-muted">Foto pronta: aggiungi una nota se vuoi e premi +</span>
+              <button onClick={() => setFoto(null)} className="h-8 w-8 grid place-items-center text-muted" aria-label="Togli la foto">
                 <X size={14} />
               </button>
             </div>
-          ))}
+          )}
           <div className="flex gap-2">
-            <input value={idea} onChange={(e) => setIdea(e.target.value)} placeholder="Es. la borsa vista in vetrina da…" autoComplete="off" className={inputCls} />
-            <button
-              onClick={() => {
-                if (!idea.trim()) return;
-                set({ idee: [...(p.idee || []), { testo: idea.trim(), data: todayISO() }] });
-                setIdea("");
-              }}
-              className="h-12 w-12 rounded-[14px] bg-card grid place-items-center shrink-0"
-              aria-label="Aggiungi idea"
-            >
-              <Plus size={18} />
+            <input
+              value={idea}
+              onChange={(e) => setIdea(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && addIdea()}
+              placeholder="Un'idea o un link…"
+              autoComplete="off"
+              inputMode="url"
+              className={inputCls}
+              disabled={busyIdea}
+            />
+            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => setFoto(e.target.files?.[0] || null)} />
+            <button onClick={() => fileRef.current?.click()} disabled={busyIdea} className="h-12 w-12 rounded-[14px] bg-card grid place-items-center shrink-0" aria-label="Aggiungi una foto">
+              <Camera size={18} />
+            </button>
+            <button onClick={addIdea} disabled={busyIdea} className="h-12 w-12 rounded-[14px] bg-brand text-brand-fg grid place-items-center shrink-0" aria-label="Aggiungi idea">
+              {busyIdea ? <Loader2 size={18} className="animate-spin" /> : <Plus size={18} />}
             </button>
           </div>
+          {busyIdea && <div className="text-[12.5px] text-muted">Guardo il link o la foto e aggiorno la scheda…</div>}
         </div>
 
         <Label>Un pensierino senza motivo</Label>

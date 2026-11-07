@@ -107,6 +107,9 @@ const cleanUrl = (u: unknown) => {
   return /^https?:\/\/[^\s]+\.[a-z]{2,}/i.test(s) && !/example\.com|vertexaisearch/i.test(s) ? s : null;
 };
 
+// deno-lint-ignore no-explicit-any
+const schedaText = (s: any) => (s?.ritratto || s?.fatti?.length ? `${s.ritratto || ""} ${(s.fatti || []).map((f: { testo: string; cat: string }) => `[${f.cat}] ${f.testo}`).join("; ")}`.slice(0, 3500) : "ancora vuota");
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   try {
@@ -115,20 +118,23 @@ Deno.serve(async (req) => {
     const { data: { user } } = await sb.auth.getUser(auth.replace("Bearer ", ""));
     if (!user) return json({ error: "Non autenticato" }, 401);
     const b = await req.json();
-    const { data: prof } = await sb.from("profiles").select("nome, citta").eq("id", user.id).maybeSingle();
+    const { data: prof } = await sb.from("profiles").select("nome, citta, scheda").eq("id", user.id).maybeSingle();
     const oggi = new Date().toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
     const person = b.person_id ? (await sb.from("people").select("*").eq("id", b.person_id).maybeSingle()).data : null;
     const LAB: Record<string, string> = { moda: "Moda e borse", gioielli: "Gioielli e orologi", profumi: "Profumi e cura di sé", fiori: "Fiori", cibo: "Cibo, vino e ristoranti", luoghi: "Luoghi e viaggi", passioni: "Passioni e tempo libero", esperienze: "Esperienze che ama", taglia_abiti: "Taglia abiti", taglia_scarpe: "Numero scarpe", taglia_anello: "Misura anello", taglia_altro: "Altre misure" };
     const det = person ? Object.entries((person.dettagli || {}) as Record<string, string>).filter(([, v]) => v && String(v).trim()).map(([k, v]) => `${LAB[k] || k}: ${String(v).trim()}`).join(". ") : "";
     const chi = person
-      ? `Persona: ${person.nome} (${person.relazione}). ${det ? det + ". " : ""}${person.gusti ? "Altri gusti: " + person.gusti + ". " : ""}Cose che non le piacciono: ${person.non_piace || "—"}. ${person.taglie ? "Taglie: " + person.taglie + ". " : ""}Idee annotate nel tempo: ${(person.idee || []).map((i: { testo: string }) => i.testo).join("; ") || "—"}. Note: ${person.note || "—"}.`
+      ? `Persona: ${person.nome} (${person.relazione}). ${det ? det + ". " : ""}${person.gusti ? "Altri gusti: " + person.gusti + ". " : ""}Cose che non le piacciono: ${person.non_piace || "—"}. ${person.taglie ? "Taglie: " + person.taglie + ". " : ""}Idee annotate nel tempo: ${(person.idee || []).map((i: { testo: string; analisi?: { prezzo?: string; marca?: string; nota?: string } }) => `${i.testo}${i.analisi?.nota ? " (" + i.analisi.nota + ")" : ""}`).join("; ") || "—"}. Note: ${person.note || "—"}. Scheda interna su di lei/lui: ${schedaText(person.scheda)}.`
       : "";
+
+    const lui = `Chi è lui (scheda interna, per scegliere cose nel suo stile e nelle sue possibilità): ${schedaText(prof?.scheda)}`;
 
     if (b.action === "regali") {
       if (!person) return json({ error: "Scegli la persona" }, 400);
       const { data: past } = await sb.from("gifts").select("titolo, occasione, data").eq("person_id", person.id).in("stato", ["scelto", "regalato"]).limit(40);
       const prompt = `Sei il consigliere di un gentleman (stile classico inglese, adattato all'Italia di oggi). Oggi è ${oggi}. ${prof?.nome || "Lui"} vive a ${prof?.citta || "Napoli"} e deve fare un regalo.
 ${chi}
+${lui}
 Ricorrenza: ${b.occasione || "un pensiero senza motivo"}. Budget: ${b.budget || "libero"}. ${b.note ? `Indicazioni: ${b.note}.` : ""}
 Regali già fatti (da NON ripetere): ${(past || []).map((g) => `${g.titolo} (${g.occasione || ""})`).join("; ") || "nessuno"}.
 
@@ -147,6 +153,7 @@ Da 6 a 8 idee. Non inventare link: se non sei sicuro metti null.`;
       const tipo = String(b.tipo || "Cena romantica");
       const viaggio = /viaggio|weekend/i.test(tipo);
       const prompt = `Sei il concierge di un gentleman (stile classico, gusto per i posti autentici e ben fatti, niente trappole per turisti). Oggi è ${oggi}. ${prof?.nome || "Lui"} vive a ${prof?.citta || "Napoli"}.
+${lui}
 Cosa vuole organizzare: ${tipo}. Dove: ${b.dove || prof?.citta || "Napoli e dintorni"}. Quando: ${b.quando || "da definire"}. Budget: ${b.budget || "medio-alto"}. Preferenze: ${b.preferenze || "—"}.
 ${chi ? `Con chi: ${chi}` : ""}
 
@@ -163,6 +170,7 @@ Da 3 a 5 proposte, la migliore per prima. Non inventare indirizzi, voti o link: 
 
     if (b.action === "lettera") {
       const prompt = `Sei il Maestro di Habitus e aiuti ${prof?.nome || "un uomo"} a scrivere come un gentleman: italiano curato e naturale, niente frasi fatte, niente retorica, niente emoji salvo richiesta, sincerità prima dell'effetto. Il testo deve sembrare scritto da lui, non da un poeta.
+${lui}
 Cosa deve scrivere: ${b.tipo || "un biglietto"}.
 ${chi ? `Destinatario: ${chi}` : b.destinatario ? `Destinatario: ${b.destinatario}` : ""}
 Tono: ${b.tono || "elegante e affettuoso"}. Lunghezza: ${b.lunghezza || "breve"}.
@@ -177,6 +185,7 @@ Rispondi SOLO con JSON: {"versioni":[{"titolo":"es. Sobria, Più calda, Con un t
     if (b.action === "serata") {
       const prompt = `Sei il Maestro di Habitus. ${prof?.nome || "Lui"} vuole preparare una serata a casa per due, fatta con cura, ${b.contesto || "con un bambino piccolo in casa: quindi dopo la nanna, durata di circa due ore, niente di stancante, preparazione semplice e veloce"}.
 ${chi ? `Per: ${chi}` : ""}
+${lui}
 Stagione e giorno: ${oggi}. Indicazioni: ${b.preferenze || "—"}. Tempo di preparazione disponibile: ${b.tempo || "circa 30 minuti"}.
 
 Proponi 3 serate diverse (es. una cena a tema, un aperitivo lungo, un dolce e un film), ognuna completa e realistica.

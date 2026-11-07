@@ -73,6 +73,7 @@ export type Profile = {
   budget?: Budget | null;
   promemoria?: Reminders | null;
   citta?: string | null;
+  scheda?: unknown;
 };
 export type OutfitItem = { garment_id: string; slot: Slot; layer: number };
 export type Outfit = {
@@ -279,3 +280,20 @@ export async function uploadBlob(bucket: string, uid: string, blob: Blob, prefix
 
 export type Budget = { mensile: number; approccio?: "qualita" | "quantita" | "mix"; inizio_mese?: number };
 export type Reminders = { attivi: boolean; tz: string; mattina: string; sera: string; revisione: string; mattina_on?: boolean; sera_on?: boolean; revisione_on?: boolean; ricorrenze_on?: boolean };
+
+/**
+ * Habitus impara a conoscerti: riscrive in background la tua scheda interna
+ * (dopo qualche messaggio al Maestro, dopo un controllo settimanale, o se è vecchia di qualche giorno).
+ */
+export function learnMe(onDone?: (scheda: unknown) => void) {
+  try {
+    const last = Number(localStorage.getItem("habitus-learn") || 0);
+    if (Date.now() - last < 10 * 60000) return;
+    localStorage.setItem("habitus-learn", String(Date.now()));
+  } catch {
+    /* niente */
+  }
+  fn<{ scheda: unknown }>("conoscenza", "", { action: "me" })
+    .then((r) => onDone?.(r.scheda))
+    .catch(() => {});
+}

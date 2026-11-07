@@ -4,7 +4,7 @@ import { Sheet } from "../components/ui";
 import { allLessons, lessonKey } from "../academy/content";
 import { currentWeek, Path, PillarId, PILLARS, Trial } from "../gentleman/types";
 import { useApp } from "../lib/store";
-import { fn, supabase, uploadImage, useSignedUrl } from "../lib/supabase";
+import { fn, supabase, uploadImage, useSignedUrl, learnMe } from "../lib/supabase";
 
 /* ------------------------------------------------------------------ */
 /* dati                                                                */
@@ -286,6 +286,7 @@ export function ReviewSheet({ open, week, onClose, onDone }: { open: boolean; we
     try {
       await saveMeasuresAndPhotos(app.uid, m, files);
       await supabase.from("path_reviews").upsert({ week, data: d });
+      learnMe((sc) => app.setProfile({ scheda: sc }));
       setBusy("adatto");
       const catalog = allLessons.map(({ course, lesson }) => ({ id: lessonKey(course, lesson), titolo: `${course.titolo} – ${lesson.titolo}` }));
       const r = await fn<{ nota: string }>("percorso", "", { mode: "adatta", catalog });

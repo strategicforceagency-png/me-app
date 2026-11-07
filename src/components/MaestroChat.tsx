@@ -2,7 +2,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Eraser, Loader2, MessageCircle, Mic, SendHorizontal, Volume2, VolumeX, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useApp } from "../lib/store";
-import { fn, supabase } from "../lib/supabase";
+import { fn, supabase, learnMe } from "../lib/supabase";
 import { RichText } from "../screens/Academy";
 
 type Msg = { id?: string; role: "user" | "model"; text: string };
@@ -98,6 +98,8 @@ export function MaestroChat() {
       setMsgs((m) => [...(m || []), { role: "model", text: r.answer }]);
       await supabase.from("maestro_messages").insert({ role: "model", text: r.answer });
       if (voice) speak(r.answer);
+      // ogni 6 domande Habitus aggiorna quello che sa di te
+      if (((msgs || []).filter((x) => x.role === "user").length + 1) % 6 === 0) learnMe((sc) => app.setProfile({ scheda: sc }));
     } catch (e) {
       setMsgs((m) => [...(m || []), { role: "model", text: `Non sono riuscito a rispondere: ${(e as Error).message}` }]);
     }

@@ -122,6 +122,9 @@ const weekOf = (start: string | null) => {
   return Math.min(12, Math.max(1, Math.floor(d / 7) + 1));
 };
 
+// deno-lint-ignore no-explicit-any
+const schedaText = (s: any) => (s?.ritratto || s?.fatti?.length ? `${s.ritratto || ""} ${(s.fatti || []).map((f: { testo: string; cat: string }) => `[${f.cat}] ${f.testo}`).join("; ")}`.slice(0, 3500) : "ancora vuota");
+
 /** Adatta il percorso dopo il controllo settimanale: riscrive le settimane future e le abitudini. */
 // deno-lint-ignore no-explicit-any
 async function adapt(sb: any, uid: string, key: string, prof: any, catalog: { id: string; titolo: string }[]) {
@@ -146,6 +149,7 @@ async function adapt(sb: any, uid: string, key: string, prof: any, catalog: { id
   const prompt = `Sei il direttore dell'Accademia di Habitus (gentiluomo inglese anni '60-'70 adattato all'Italia di oggi). Lo studente ${prof?.nome || ""} è alla settimana ${week} di 12 e ha appena fatto il controllo settimanale. Il tuo compito è ADATTARE il percorso come farebbe un sarto con un abito: tenere ciò che funziona, correggere ciò che non calza.
 
 Questionario d'ingresso: ${JSON.stringify(prof?.gentleman || {}).slice(0, 4000)}
+Cosa sappiamo di lui finora (scheda interna, aggiornata da chat, controlli e abitudini): ${schedaText(prof?.scheda)}
 Archetipo: ${path.archetipo?.nome}. Pilastri iniziali: ${JSON.stringify(path.pilastri)}
 Controlli settimanali (settimana 0 = punto di partenza): ${JSON.stringify(reviews || []).slice(0, 5000)}
 Abitudini attuali e costanza nelle ultime 2 settimane (14 = perfetto): ${JSON.stringify(habitStats)}
@@ -204,7 +208,7 @@ Deno.serve(async (req) => {
     if (!key) return json({ error: "Chiave AI non configurata" }, 503);
 
     const b = await req.json();
-    const { data: prof } = await sb.from("profiles").select("nome, gentleman, taglia_top, taglia_pantaloni, taglia_scarpe").eq("id", user.id).single();
+    const { data: prof } = await sb.from("profiles").select("nome, gentleman, taglia_top, taglia_pantaloni, taglia_scarpe, scheda").eq("id", user.id).single();
     const answers = prof?.gentleman;
     if (!answers) return json({ error: "Completa prima il questionario" }, 400);
     const catalog: { id: string; titolo: string }[] = Array.isArray(b.catalog) ? b.catalog.slice(0, 80) : [];
@@ -219,6 +223,7 @@ Deno.serve(async (req) => {
 
 Lo studente si chiama ${prof?.nome || "—"}. Ecco le sue risposte al questionario d'ingresso:
 ${JSON.stringify(answers, null, 1)}
+Cosa sappiamo già di lui (scheda interna, se presente): ${schedaText(prof?.scheda)}
 
 Il suo armadio attuale (${wardrobe?.length || 0} capi): ${(wardrobe || []).map((g) => `${g.nome} (${g.categoria})`).join("; ").slice(0, 2500) || "non ancora catalogato"}.
 Dati salute recenti (Whoop/Apple, se presenti): ${JSON.stringify(health || []).slice(0, 1500)}.

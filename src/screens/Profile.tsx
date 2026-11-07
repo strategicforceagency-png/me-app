@@ -1,12 +1,13 @@
 import { Camera, Download, Heart, Loader2, LogOut, Moon, Plus, Settings, Shirt, SlidersHorizontal, Sun, Trash2 } from "lucide-react";
 import { RemindersCard } from "../components/Reminders";
 import { PasskeysCard } from "../components/Passkeys";
+import { SchedaCard, type SchedaData } from "../components/Scheda";
 import { useTheme } from "../lib/theme";
 import { useRef, useState } from "react";
 import { DEFAULT_MEASURES, DressedMannequin, MannequinSvg, Measures } from "../components/Mannequin";
 import { Field, inputCls, PrimaryButton, Sheet } from "../components/ui";
 import { useApp } from "../lib/store";
-import { Outfit, supabase, uploadImage, useSignedUrl } from "../lib/supabase";
+import { fn, Outfit, supabase, uploadImage, useSignedUrl } from "../lib/supabase";
 
 export function Profile() {
   const app = useApp();
@@ -137,6 +138,19 @@ export function Profile() {
         </PrimaryButton>
         <div className="h-4" />
       </Sheet>
+      <div className="mt-8 max-w-[720px]">
+        <SchedaCard
+          title="Cosa Habitus sa di te"
+          scheda={(app.profile?.scheda as SchedaData) || {}}
+          onChange={(sc) => app.setProfile({ scheda: sc })}
+          onRefresh={async () => {
+            const r = await fn<{ scheda: SchedaData }>("conoscenza", "", { action: "me" });
+            await app.setProfile({ scheda: r.scheda });
+          }}
+          empty="Habitus impara a conoscerti da quello che scrivi al Maestro, dai controlli settimanali, dall'armadio, dagli acquisti e dalle scelte che fai. Più lo usi, più i consigli diventano tuoi. Premi Aggiorna per costruire la prima versione."
+          catHint="Aggiungi tu un dettaglio su di te"
+        />
+      </div>
       <AccountTools />
       <MeasuresSheet open={measOpen} onClose={() => setMeasOpen(false)} />
       <SettingsSheet open={setOpen} onClose={() => setSetOpen(false)} />

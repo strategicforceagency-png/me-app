@@ -25,6 +25,9 @@ async function models(key: string) {
   return textModels;
 }
 
+// deno-lint-ignore no-explicit-any
+const schedaText = (s: any) => (s?.ritratto || s?.fatti?.length ? `${s.ritratto || ""} ${(s.fatti || []).map((f: { testo: string; cat: string }) => `[${f.cat}] ${f.testo}`).join("; ")}`.slice(0, 3500) : "ancora vuota");
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   try {
@@ -41,7 +44,7 @@ Deno.serve(async (req) => {
     const history = Array.isArray(b.history) ? b.history.slice(-12) : [];
 
     const [{ data: prof }, { data: wardrobe }, { data: notes }] = await Promise.all([
-      sb.from("profiles").select("nome, altezza, peso, taglia_top, taglia_pantaloni, taglia_scarpe, style_guide, path, path_started_at, budget").eq("id", user.id).maybeSingle(),
+      sb.from("profiles").select("nome, altezza, peso, taglia_top, taglia_pantaloni, taglia_scarpe, style_guide, path, path_started_at, budget, scheda").eq("id", user.id).maybeSingle(),
       sb.from("garments").select("nome, categoria, colore").limit(150),
       sb.from("knowledge").select("tema, titolo, affermazione, versione_corretta, verdetto").eq("stato", "approvata").limit(80),
     ]);
@@ -63,6 +66,7 @@ Lezione aperta: ${b.lesson ? JSON.stringify(b.lesson).slice(0, 2500) : "nessuna"
 Dove si trova ora nell'app: ${String(b.context || "—").slice(0, 300)}
 Il suo percorso: ${pathInfo}
 Budget mensile per il guardaroba: ${prof?.budget?.mensile ? prof.budget.mensile + " €" : "non indicato"}.
+Cosa sai di lui (scheda interna che Habitus aggiorna nel tempo: usala per personalizzare senza citarla esplicitamente): ${schedaText(prof?.scheda)}
 Utente: ${prof?.nome || "—"}, ${prof?.altezza ?? "?"} cm, ${prof?.peso ?? "?"} kg, taglie ${prof?.taglia_top || "?"}/${prof?.taglia_pantaloni || "?"}/${prof?.taglia_scarpe || "?"}.
 Il suo stile: ${guide?.nome_stile ? `${guide.nome_stile} — ${(guide.parole_chiave || []).join(", ")}` : "non ancora definito"}.
 Il suo armadio (${wardrobe?.length || 0} capi): ${(wardrobe || []).map((g) => `${g.nome} (${g.categoria}${g.colore ? ", " + g.colore : ""})`).join("; ").slice(0, 3000) || "vuoto"}.
