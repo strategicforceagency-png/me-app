@@ -10,6 +10,24 @@ export function PullToRefresh() {
   const start = useRef<number | null>(null);
   const pulled = useRef(0);
 
+  // dopo l'aggiornamento torna dove eri (i dati arrivano dopo: si riprova per qualche istante)
+  useEffect(() => {
+    let y = 0;
+    try {
+      y = Number(sessionStorage.getItem("habitus-scroll") || 0);
+      sessionStorage.removeItem("habitus-scroll");
+    } catch {
+      return;
+    }
+    if (!y) return;
+    let n = 0;
+    const t = setInterval(() => {
+      window.scrollTo(0, y);
+      if (Math.abs(window.scrollY - y) < 4 || ++n > 20) clearInterval(t);
+    }, 100);
+    return () => clearInterval(t);
+  }, []);
+
   useEffect(() => {
     // dentro finestre, chat e menu fissi il gesto non vale; vale solo sulla pagina
     const blocked = (el: EventTarget | null) => {
@@ -50,6 +68,11 @@ export function PullToRefresh() {
         setPull(SOGLIA);
         navigator.vibrate?.(10);
         // ricarica: prende la versione più recente dell'app e i dati aggiornati
+        try {
+          sessionStorage.setItem("habitus-scroll", String(window.scrollY));
+        } catch {
+          /* niente */
+        }
         setTimeout(() => window.location.reload(), 250);
       } else setPull(0);
       pulled.current = 0;

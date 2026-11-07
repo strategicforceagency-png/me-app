@@ -48,7 +48,22 @@ export function AppProvider({ uid, email, children }: { uid: string; email: stri
   const [pending, setPending] = useState<Pending[]>([]);
   const [loading, setLoading] = useState(true);
   const [toastMsg, setToast] = useState<string | null>(null);
-  const [tab, setTab] = useState<Tab>("percorso");
+  // la sezione aperta sopravvive all'aggiornamento della pagina (non a una nuova apertura dell'app)
+  const [tab, setTabState] = useState<Tab>(() => {
+    try {
+      return (sessionStorage.getItem("habitus-tab") as Tab) || "percorso";
+    } catch {
+      return "percorso";
+    }
+  });
+  const setTab = useCallback((t: Tab) => {
+    setTabState(t);
+    try {
+      sessionStorage.setItem("habitus-tab", t);
+    } catch {
+      /* niente */
+    }
+  }, []);
   const [lessonTarget, setLessonTarget] = useState<string | null>(null);
   const [sessionTarget, setSessionTarget] = useState<string | null>(null);
   const [quizOpen, setQuizOpen] = useState(false);
