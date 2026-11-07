@@ -8,6 +8,7 @@ import { RemindersCard } from "../components/Reminders";
 import { InstallCard } from "../components/InstallCard";
 import { PasskeyInvite } from "../components/Passkeys";
 import { ProposalsBadge } from "./Contents";
+import { NextDateBadge } from "./Life";
 import { BaselineSheet, dueReview, dueTrials, ReviewSheet, TrialSheet, useProgressData } from "./Progress";
 import { wordOfDay } from "../gentleman/words";
 import { useApp } from "../lib/store";
@@ -241,6 +242,7 @@ function PathView({ path }: { path: Path }) {
         </button>
       ))}
 
+      <NextDateBadge />
       <ProposalsBadge />
 
       <div className="mt-4 grid gap-3 lg:grid-cols-2">

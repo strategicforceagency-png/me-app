@@ -105,6 +105,15 @@ export function RemindersCard({ compact }: { compact?: boolean }) {
         {row("Mattina", "mattina", "Il piano della giornata")}
         {row("Sera", "sera", "Le abitudini che mancano")}
         {row("Domenica", "revisione", "Il controllo della settimana")}
+        <div className="flex items-center gap-3 py-3">
+          <button onClick={() => save({ ricorrenze_on: r.ricorrenze_on === false })} className={`h-6 w-10 rounded-full relative transition shrink-0 ${r.ricorrenze_on !== false ? "bg-brand" : "bg-line"}`} aria-label="Ricorrenze">
+            <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-surface shadow transition-all ${r.ricorrenze_on !== false ? "left-[18px]" : "left-0.5"}`} />
+          </button>
+          <div className="flex-1 min-w-0">
+            <div className="text-[14.5px] font-medium">Ricorrenze e pensierini</div>
+            <div className="text-[12px] text-muted">Compleanni, anniversari, uscite in programma (all'ora della mattina)</div>
+          </div>
+        </div>
       </div>
       {active && (
         <button onClick={test} disabled={busy} className="mt-2 text-[13px] text-gold font-medium">

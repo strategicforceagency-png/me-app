@@ -1,6 +1,6 @@
 import { Session } from "@supabase/supabase-js";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronDown, Compass, Fingerprint, Dumbbell, Feather, GraduationCap, HeartPulse, Loader2, LogOut, Moon, Plus, Shirt, Sparkles, Sun, TrendingUp, User, Wallet, Inbox } from "lucide-react";
+import { ChevronDown, Compass, Fingerprint, Dumbbell, Feather, GraduationCap, HeartPulse, Loader2, LogOut, Moon, Plus, Shirt, Sparkles, Sun, TrendingUp, User, Wallet, Inbox, Heart, Gift, UtensilsCrossed } from "lucide-react";
 import { FormEvent, ReactNode, useEffect, useState } from "react";
 import { Field, inputCls, PrimaryButton, Toast } from "./components/ui";
 import { AppProvider, Tab, useApp } from "./lib/store";
@@ -10,6 +10,7 @@ import { BudgetScreen } from "./screens/Budget";
 import { ProgressScreen } from "./screens/Progress";
 import { ContentsScreen } from "./screens/Contents";
 import { MaestroChat } from "./components/MaestroChat";
+import { GiftsScreen, OutingsScreen, PeopleScreen } from "./screens/Life";
 import { supabase, useSignedUrl } from "./lib/supabase";
 import { OutfitBuilder } from "./screens/OutfitBuilder";
 import { Profile } from "./screens/Profile";
@@ -88,6 +89,9 @@ const ITEMS: Record<Tab, NavItem> = {
   budget: { id: "budget", label: "Budget e acquisti", short: "Budget", icon: I(Wallet) },
   progressi: { id: "progressi", label: "Progressi", icon: I(TrendingUp) },
   contenuti: { id: "contenuti", label: "Contenuti", icon: I(Inbox) },
+  persone: { id: "persone", label: "Persone e ricorrenze", short: "Persone", icon: I(Heart) },
+  regali: { id: "regali", label: "Regali", icon: I(Gift) },
+  uscite: { id: "uscite", label: "Uscite e viaggi", short: "Uscite", icon: I(UtensilsCrossed) },
   accademia: { id: "accademia", label: "Accademia", short: "Impara", icon: I(GraduationCap) },
   salute: { id: "salute", label: "Salute", icon: I(HeartPulse) },
   fisico: { id: "fisico", label: "Fisico", icon: I(Dumbbell) },
@@ -99,6 +103,7 @@ const GROUPS: { id: string; label: string; short: string; icon: NavItem["icon"];
   { id: "impara", label: "Accademia", short: "Impara", icon: I(GraduationCap), items: ["accademia", "contenuti", "linguaggio"] },
   { id: "stile", label: "Stile", short: "Stile", icon: (p) => <Hanger size={p.size ?? 18} className={p.className} />, items: ["armadio", "outfit", "stile", "budget"] },
   { id: "corpo", label: "Corpo", short: "Corpo", icon: I(Dumbbell), items: ["fisico", "salute"] },
+  { id: "vita", label: "Vita", short: "Vita", icon: I(Heart), items: ["persone", "regali", "uscite"] },
   { id: "tu", label: "Tu", short: "Tu", icon: I(User), items: ["profilo"] },
 ];
 const groupOf = (t: Tab) => GROUPS.find((g) => g.items.includes(t)) || GROUPS[0];
@@ -257,7 +262,7 @@ function Shell() {
     if (vai === "revisione") {
       app.setTab("percorso");
       setTimeout(() => window.dispatchEvent(new CustomEvent("habitus:revisione")), 600);
-    } else if (vai && ["percorso", "linguaggio", "budget", "accademia", "fisico", "progressi", "armadio", "contenuti"].includes(vai)) app.setTab(vai as Tab);
+    } else if (vai && ["percorso", "linguaggio", "budget", "accademia", "fisico", "progressi", "armadio", "contenuti", "persone", "regali", "uscite"].includes(vai)) app.setTab(vai as Tab);
     if (q.size) history.replaceState(null, "", window.location.pathname);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -319,6 +324,9 @@ function Shell() {
           {app.tab === "budget" && <BudgetScreen />}
           {app.tab === "progressi" && <ProgressScreen />}
           {app.tab === "contenuti" && <ContentsScreen />}
+          {app.tab === "persone" && <PeopleScreen />}
+          {app.tab === "regali" && <GiftsScreen />}
+          {app.tab === "uscite" && <OutingsScreen />}
           {app.tab === "percorso" && <PathScreen />}
           {app.tab === "linguaggio" && <LanguageScreen />}
           {app.tab === "armadio" && <Wardrobe />}
@@ -337,7 +345,7 @@ function Shell() {
       {/* Dock sul telefono: le cinque aree; dentro ogni area le sotto-sezioni sono in alto */}
       <nav
         aria-label="Navigazione rapida"
-        className="fixed inset-x-3 bottom-[calc(8px+env(safe-area-inset-bottom))] z-40 mx-auto grid max-w-[480px] grid-cols-5 gap-0.5 rounded-[26px] border border-line bg-surface/90 p-1.5 shadow-dock backdrop-blur-md lg:hidden"
+        className="fixed inset-x-3 bottom-[calc(8px+env(safe-area-inset-bottom))] z-40 mx-auto grid max-w-[520px] grid-cols-6 gap-0.5 rounded-[26px] border border-line bg-surface/90 p-1.5 shadow-dock backdrop-blur-md lg:hidden"
       >
         {GROUPS.map((g) => {
           const on = groupOf(app.tab).id === g.id;

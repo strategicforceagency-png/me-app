@@ -72,6 +72,7 @@ export type Profile = {
   path_started_at: string | null;
   budget?: Budget | null;
   promemoria?: Reminders | null;
+  citta?: string | null;
 };
 export type OutfitItem = { garment_id: string; slot: Slot; layer: number };
 export type Outfit = {
@@ -277,4 +278,4 @@ export async function uploadBlob(bucket: string, uid: string, blob: Blob, prefix
 }
 
 export type Budget = { mensile: number; approccio?: "qualita" | "quantita" | "mix"; inizio_mese?: number };
-export type Reminders = { attivi: boolean; tz: string; mattina: string; sera: string; revisione: string; mattina_on?: boolean; sera_on?: boolean; revisione_on?: boolean };
+export type Reminders = { attivi: boolean; tz: string; mattina: string; sera: string; revisione: string; mattina_on?: boolean; sera_on?: boolean; revisione_on?: boolean; ricorrenze_on?: boolean };

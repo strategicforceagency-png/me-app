@@ -75,6 +75,31 @@ const weekOf = (start: string | null, today: string) => {
 // deno-lint-ignore no-explicit-any
 async function compose(sb: ReturnType<typeof admin>, p: any, kind: string, day: string, wd: number) {
   const nome = (p.nome || "").split(" ")[0];
+  if (kind === "ricorrenze") {
+    const { data: people } = await sb.from("people").select("id, nome, relazione, date, pensierino_ogni, ultimo_pensierino, created_at").eq("user_id", p.id);
+    const today = Date.parse(day + "T00:00:00Z");
+    const lines: string[] = [];
+    for (const x of people || []) {
+      for (const d of (x.date || []) as { tipo: string; data: string }[]) {
+        const mmdd = String(d.data || "").slice(-5);
+        if (!/^\d{2}-\d{2}$/.test(mmdd)) continue;
+        let next = Date.parse(`${day.slice(0, 4)}-${mmdd}T00:00:00Z`);
+        if (next < today) next = Date.parse(`${+day.slice(0, 4) + 1}-${mmdd}T00:00:00Z`);
+        const n = Math.round((next - today) / 86400000);
+        if ([14, 7, 3, 1, 0].includes(n)) lines.push(n === 0 ? `Oggi: ${d.tipo} di ${x.nome}` : n === 1 ? `Domani: ${d.tipo} di ${x.nome}` : `Tra ${n} giorni: ${d.tipo} di ${x.nome}`);
+      }
+      if (x.pensierino_ogni) {
+        const last = Date.parse((x.ultimo_pensierino || String(x.created_at).slice(0, 10)) + "T00:00:00Z");
+        const since = Math.round((today - last) / 86400000);
+        if (since >= x.pensierino_ogni && since % 3 === 0) lines.push(`Un pensierino per ${x.nome}? Sono ${since} giorni dall'ultimo`);
+      }
+    }
+    const tomorrow = new Date(today + 86400000).toISOString().slice(0, 10);
+    const { data: outs } = await sb.from("outings").select("titolo, ora, data").eq("user_id", p.id).in("data", [day, tomorrow]).neq("stato", "fatto");
+    for (const o of outs || []) lines.push(`${o.data === day ? "Stasera" : "Domani"}: ${o.titolo}${o.ora ? " alle " + o.ora : ""}`);
+    if (!lines.length) return null;
+    return { title: lines.length === 1 ? "Da gentleman" : `Da gentleman · ${lines.length} promemoria`, body: lines.join(" · "), url: "./?vai=persone", tag: "ricorrenze" };
+  }
   const path = p.path;
   if (!path) return kind === "mattina" ? { title: `Buongiorno${nome ? ", " + nome : ""}`, body: "Il tuo percorso ti aspetta: completa il questionario d'ingresso.", url: "./" } : null;
   const week = weekOf(p.path_started_at, day);
@@ -136,6 +161,7 @@ Deno.serve(async (req) => {
           ["mattina", s.mattina, s.mattina_on !== false],
           ["sera", s.sera, s.sera_on !== false],
           ["revisione", s.revisione || "19:00", s.revisione_on !== false && now.wd === 0],
+          ["ricorrenze", s.ricorrenze || s.mattina || "08:30", s.ricorrenze_on !== false],
         ];
         for (const [kind, at, on] of slots) {
           if (!on || !at) continue;
