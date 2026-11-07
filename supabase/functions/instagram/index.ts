@@ -112,11 +112,11 @@ Deno.serve(async (req) => {
         const b = await req.json().catch(() => ({}));
         const handle = String(b.username || "").trim().replace(/^@/, "").replace(/^https?:\/\/(www\.)?instagram\.com\//, "").replace(/[/?].*$/, "").toLowerCase();
         if (!/^[a-z0-9._]{1,30}$/.test(handle)) return json({ error: "Nome profilo non valido" }, 400);
-        const limit = Math.min(Math.max(Number(b.limit) || 12, 3), 14);
+        const limit = Math.min(Math.max(Number(b.limit) || 12, 3), 18);
         let bd;
         try {
           bd = await graph(`/${c.ig_user_id}`, {
-            fields: `business_discovery.username(${handle}){username,name,biography,followers_count,media_count,media.limit(${limit * 2}){id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,children{media_type,media_url,thumbnail_url}}}`,
+            fields: `business_discovery.username(${handle}){username,name,biography,followers_count,media_count,media.limit(${limit}){id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,children{media_type,media_url,thumbnail_url}}}`,
             access_token: c.access_token,
           });
         } catch (e) {
@@ -127,40 +127,59 @@ Deno.serve(async (req) => {
           throw err;
         }
         const prof = bd.business_discovery;
-        // un'immagine per post (prima del carosello, copertina per i video)
-        const urls: { url: string; caption: string }[] = [];
-        for (const m of prof.media?.data || []) {
-          let u: string | undefined;
-          if (m.media_type === "IMAGE") u = m.media_url;
-          else if (m.media_type === "VIDEO") u = m.thumbnail_url;
-          else if (m.media_type === "CAROUSEL_ALBUM") {
-            const first = m.children?.data?.[0];
-            u = first?.media_type === "VIDEO" ? first?.thumbnail_url : first?.media_url || m.media_url;
+        // tutte le foto (anche dei caroselli), i video interi e le didascalie
+        const MAX_IMG = 24, MAX_VID = 4, MAX_VID_BYTES = 45 * 1024 * 1024;
+        const imgs: string[] = [];
+        const vids: { url: string; poster?: string; caption: string; permalink?: string }[] = [];
+        const captions: { caption: string; permalink?: string; tipo: string; data?: string }[] = [];
+        // deno-lint-ignore no-explicit-any
+        for (const m of (prof.media?.data || []).slice(0, limit) as any[]) {
+          const caption = (m.caption || "").slice(0, 400);
+          captions.push({ caption, permalink: m.permalink, tipo: m.media_type, data: m.timestamp });
+          // deno-lint-ignore no-explicit-any
+          const items: any[] = m.media_type === "CAROUSEL_ALBUM" ? (m.children?.data || []).slice(0, 5) : [m];
+          for (const it of items) {
+            if (it.media_type === "VIDEO") {
+              if (it.thumbnail_url && imgs.length < MAX_IMG) imgs.push(it.thumbnail_url);
+              if (it.media_url && vids.length < MAX_VID) vids.push({ url: it.media_url, caption, permalink: m.permalink });
+            } else if (it.media_url && imgs.length < MAX_IMG) imgs.push(it.media_url);
           }
-          if (u) urls.push({ url: u, caption: (m.caption || "").slice(0, 200) });
-          if (urls.length >= limit) break;
         }
-        if (!urls.length) return json({ error: `Nessun post leggibile per @${handle}` }, 400);
+        if (!imgs.length && !vids.length) return json({ error: `Nessun post leggibile per @${handle}` }, 400);
+        const save = async (url: string, name: string, maxBytes = MAX_VID_BYTES) => {
+          const r = await fetch(url);
+          if (!r.ok) return null;
+          const len = Number(r.headers.get("content-length") || 0);
+          if (len > maxBytes) {
+            await r.body?.cancel();
+            return null;
+          }
+          const type = (r.headers.get("content-type") || "application/octet-stream").split(";")[0];
+          const buf = await r.arrayBuffer();
+          if (buf.byteLength > maxBytes) return null;
+          const path = `${user.id}/ig-${handle}-${name}-${crypto.randomUUID().slice(0, 8)}.${type.includes("mp4") ? "mp4" : type.includes("png") ? "png" : "jpg"}`;
+          const { error } = await db.storage.from("inspirations").upload(path, buf, { contentType: type });
+          return error ? null : { path, type };
+        };
         const paths: string[] = [];
-        await Promise.all(
-          urls.map(async ({ url }, i) => {
-            const r = await fetch(url);
-            if (!r.ok) return;
-            const type = (r.headers.get("content-type") || "image/jpeg").split(";")[0];
-            const path = `${user.id}/ig-${handle}-${i}-${crypto.randomUUID().slice(0, 8)}.jpg`;
-            const { error } = await db.storage.from("inspirations").upload(path, await r.arrayBuffer(), { contentType: type });
-            if (!error) paths[i] = path;
-          }),
-        );
+        await Promise.all(imgs.map(async (u, i) => {
+          const r = await save(u, `f${i}`, 15 * 1024 * 1024);
+          if (r) paths[i] = r.path;
+        }));
+        const videos: { path: string; mime: string; caption: string; permalink?: string }[] = [];
+        for (const [i, v] of vids.entries()) {
+          const r = await save(v.url, `v${i}`).catch(() => null);
+          if (r) videos.push({ path: r.path, mime: r.type || "video/mp4", caption: v.caption, permalink: v.permalink });
+        }
         const clean = paths.filter(Boolean);
-        if (!clean.length) return json({ error: "Download delle immagini non riuscito, riprova" }, 500);
+        if (!clean.length && !videos.length) return json({ error: "Download dei contenuti non riuscito, riprova" }, 500);
         const { data: insp, error } = await db
           .from("inspirations")
-          .insert({ user_id: user.id, kind: "instagram", handle: prof.username || handle, title: prof.name || null, image_paths: clean, status: "analisi" })
+          .insert({ user_id: user.id, kind: "instagram", handle: prof.username || handle, title: prof.name || null, image_paths: clean, videos, captions, status: "analisi" })
           .select()
           .single();
         if (error) throw new Error(error.message);
-        return json({ id: insp.id, username: prof.username, name: prof.name, followers: prof.followers_count, images: clean.length });
+        return json({ id: insp.id, username: prof.username, name: prof.name, followers: prof.followers_count, images: clean.length, videos: videos.length });
       }
 
       case "disconnect": {

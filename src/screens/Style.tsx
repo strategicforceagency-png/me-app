@@ -24,7 +24,9 @@ type Inspiration = {
   handle: string | null;
   title: string | null;
   image_paths: string[];
-  analysis: Analysis | null;
+  videos?: { path: string; mime: string; caption?: string; permalink?: string }[];
+  captions?: { caption?: string; permalink?: string }[];
+  analysis: (Analysis & { fonti?: { immagini: number; video: number; didascalie: number } }) | null;
   status: "nuovo" | "analisi" | "pronto" | "errore";
   error: string | null;
   created_at: string;
@@ -418,8 +420,8 @@ function AddInspirationSheet({ open, onClose, onCreated, reload }: { open: boole
     if (!cleanHandle) return;
     setBusy(`Importo i post di @${cleanHandle}…`);
     try {
-      const r = await fn<{ id: string; username: string; images: number }>("instagram", "discover", { username: cleanHandle, limit: 12 });
-      app.toast(`${r.images} post importati da @${r.username}`);
+      const r = await fn<{ id: string; username: string; images: number; videos: number }>("instagram", "discover", { username: cleanHandle, limit: 15 });
+      app.toast(`Da @${r.username}: ${r.images} foto${r.videos ? ` e ${r.videos} video` : ""}. Li sto guardando…`);
       analyze(r.id, r.username);
       reset();
       onClose();
@@ -446,12 +448,22 @@ function AddInspirationSheet({ open, onClose, onCreated, reload }: { open: boole
           }
         }
       }
+      const videos: { path: string; mime: string }[] = [];
       for (let k = 0; k < files.length; k++) {
         const f = files[k];
         if (f.type.startsWith("video/")) {
-          setBusy(`Estraggo i fotogrammi dal video ${k + 1}/${files.length}…`);
-          const frames = await videoFrames(f, 10);
+          // il video intero va a Gemini (movimento e audio); pochi fotogrammi servono come anteprime dei look
+          const whole = f.size <= 45 * 1024 * 1024 && videos.length < 4;
+          setBusy(`Preparo il video ${k + 1}/${files.length}…`);
+          const frames = await videoFrames(f, whole ? 4 : 10);
           for (const fr of frames) paths.push(await uploadBlob("inspirations", app.uid, fr, "frame"));
+          if (whole) {
+            setBusy(`Carico il video ${k + 1}/${files.length}…`);
+            const ext = f.type.includes("quicktime") ? "mov" : "mp4";
+            const vp = `${app.uid}/vid-${crypto.randomUUID()}.${ext}`;
+            const { error } = await supabase.storage.from("inspirations").upload(vp, f, { contentType: f.type || "video/mp4" });
+            if (!error) videos.push({ path: vp, mime: f.type || "video/mp4" });
+          }
         } else {
           setBusy(`Carico le immagini ${k + 1}/${files.length}…`);
           paths.push(await uploadImage("inspirations", app.uid, f, "shot"));
@@ -461,7 +473,7 @@ function AddInspirationSheet({ open, onClose, onCreated, reload }: { open: boole
       setBusy("Creo l'ispirazione…");
       const { data, error } = await supabase
         .from("inspirations")
-        .insert({ user_id: app.uid, kind: mode, handle: user, title: user ? null : "Ispirazione", image_paths: paths, status: "analisi" })
+        .insert({ user_id: app.uid, kind: mode, handle: user, title: user ? null : "Ispirazione", image_paths: paths, videos, status: "analisi" })
         .select()
         .single();
       if (error) throw error;
@@ -635,7 +647,8 @@ function InspirationSheet({
   const del = async () => {
     if (!insp) return;
     await supabase.from("inspirations").delete().eq("id", insp.id);
-    if (insp.image_paths.length) await supabase.storage.from("inspirations").remove(insp.image_paths);
+    const all = [...insp.image_paths, ...(insp.videos || []).map((v) => v.path)];
+    if (all.length) await supabase.storage.from("inspirations").remove(all);
     app.toast("Ispirazione eliminata");
     onDeleted();
   };
@@ -777,6 +790,23 @@ function InspirationSheet({
             </>
           )}
 
+          {(insp.videos || []).length > 0 && (
+            <div>
+              <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted mb-2">Video analizzati</div>
+              <div className="flex gap-2 overflow-x-auto no-scrollbar">
+                {(insp.videos || []).map((v) => (
+                  <VideoThumb key={v.path} path={v.path} />
+                ))}
+              </div>
+            </div>
+          )}
+          {a?.fonti && (
+            <div className="text-[12px] text-muted">
+              Analisi basata su {a.fonti.immagini} foto{a.fonti.video ? `, ${a.fonti.video} video guardati per intero` : ""}
+              {a.fonti.didascalie ? ` e ${a.fonti.didascalie} didascalie` : ""}.
+            </div>
+          )}
+
           {!a && insp.image_paths.length > 0 && (
             <div className="grid grid-cols-3 gap-2">
               {insp.image_paths.map((p) => (
@@ -816,3 +846,8 @@ function Group({ title, hint, children }: { title: string; hint?: string; childr
   );
 }
 
+
+function VideoThumb({ path }: { path: string }) {
+  const url = useSignedUrl("inspirations", path);
+  return url ? <video src={url} controls playsInline preload="metadata" className="h-56 aspect-[9/16] rounded-[12px] bg-card shrink-0 object-cover" /> : <div className="h-56 aspect-[9/16] rounded-[12px] bg-card shrink-0" />;
+}

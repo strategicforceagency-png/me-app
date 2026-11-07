@@ -57,14 +57,25 @@ export type Analysis = {
   dettagli: string[];
 };
 
-export async function analyzeInspiration(gemini: GeminiFn, images: Img[], handle: string | null): Promise<Analysis> {
+export async function analyzeInspiration(
+  gemini: GeminiFn,
+  images: Img[],
+  handle: string | null,
+  videos: { uri: string; mime: string; caption?: string }[] = [],
+  captions: { caption?: string; tipo?: string }[] = [],
+): Promise<Analysis> {
   const parts: unknown[] = [];
   images.forEach((im, i) => {
     parts.push({ text: `IMMAGINE ${i}` });
     parts.push(imgPart(im));
   });
+  videos.forEach((v, i) => {
+    parts.push({ text: `VIDEO ${i}${v.caption ? ` — didascalia: ${v.caption.slice(0, 300)}` : ""}` });
+    parts.push({ file_data: { mime_type: v.mime, file_uri: v.uri } });
+  });
+  const caps = captions.map((c) => c.caption).filter(Boolean).slice(0, 18);
   parts.push({
-    text: `Sei un personal shopper e stylist maschile di alto livello. ${handle ? `Queste immagini vengono dal profilo Instagram @${handle}` : "Queste sono immagini di ispirazione"} (possono essere screenshot della griglia, post singoli, foto o fotogrammi di un video). Analizza SOLO l'abbigliamento e lo stile, non la persona.
+    text: `Sei un personal shopper e stylist maschile di alto livello. ${handle ? `Questi contenuti vengono dal profilo Instagram @${handle}` : "Questi sono contenuti di ispirazione"}: ${images.length} immagini (screenshot, post, foto dei caroselli, copertine o fotogrammi di video)${videos.length ? ` e ${videos.length} video completi` : ""}. ${videos.length ? "Guarda i video per intero: capi che compaiono solo in alcuni momenti, come cadono e si muovono i tessuti, vestibilità in movimento, dettagli (polsini, risvolti, calze, accessori), e ascolta l'audio se nomina capi, marchi o consigli di stile. Usa anche i video nei campi dell'analisi. " : ""}${caps.length ? `Didascalie dei post (possono nominare capi, marchi, tessuti): ${JSON.stringify(caps).slice(0, 4000)}. ` : ""}Analizza SOLO l'abbigliamento e lo stile, non la persona.
 Rispondi SOLO con JSON valido, in italiano, con questa struttura:
 {
  "riassunto": "2-3 frasi sullo stile complessivo",
@@ -72,7 +83,7 @@ Rispondi SOLO con JSON valido, in italiano, con questa struttura:
  "palette": [{"nome": "es. Cammello", "hex": "#C19A6B"}],
  "capi_chiave": [{"nome": "es. Cardigan in cashmere", "categoria": una tra ["Felpe e Maglioni","Maglie","Camicie","Canotte","Pantaloni","Giacche e Cappotti","Scarpe","Accessori"], "colore": "…", "perche": "perché è distintivo di questo stile"}],
  "formule": [{"nome": "nome breve dell'outfit tipo", "pezzi": ["capo 1","capo 2","scarpe","accessorio"], "occasione": "es. Weekend, Lavoro, Serata"}],
- "look": [{"immagine": indice dell'immagine, "titolo": "nome del look", "pezzi": ["descrizione di ogni capo visibile con colore e materiale"], "stile": "stile principale", "occasione": "…"}],
+ "look": [{"immagine": indice di una IMMAGINE (non dei video), "titolo": "nome del look", "pezzi": ["descrizione di ogni capo visibile con colore e materiale"], "stile": "stile principale", "occasione": "…"}],
  "brand": ["brand riconoscibili o di riferimento per questo stile"],
  "vestibilita": "come vestono i capi (slim, regular, oversize, cropped…)",
  "dettagli": ["dettagli ricorrenti: es. maniche risvoltate, orologio in acciaio, calzino a vista…"]

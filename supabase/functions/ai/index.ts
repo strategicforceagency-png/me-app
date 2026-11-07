@@ -105,6 +105,38 @@ async function gemini(kind: "text" | "image", parts: unknown[], config: Record<s
 
 const imgPart = (i: Img) => ({ inline_data: { mime_type: i.mime, data: i.data } });
 
+/** Carica un video nell'archivio file di Gemini (fino a 2 GB) e aspetta che sia pronto. */
+async function geminiUpload(bytes: ArrayBuffer, mime: string, name: string): Promise<{ uri: string; name: string; mime: string }> {
+  const key = geminiKey();
+  const start = await fetch(`https://generativelanguage.googleapis.com/upload/v1beta/files?key=${key}`, {
+    method: "POST",
+    headers: {
+      "X-Goog-Upload-Protocol": "resumable",
+      "X-Goog-Upload-Command": "start",
+      "X-Goog-Upload-Header-Content-Length": String(bytes.byteLength),
+      "X-Goog-Upload-Header-Content-Type": mime,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ file: { display_name: name } }),
+  });
+  const up = start.headers.get("x-goog-upload-url");
+  await start.body?.cancel();
+  if (!up) throw new Error(`Caricamento video non avviato (${start.status})`);
+  const r = await fetch(up, { method: "POST", headers: { "X-Goog-Upload-Offset": "0", "X-Goog-Upload-Command": "upload, finalize" }, body: bytes });
+  const j = await r.json();
+  let f = j.file;
+  if (!f?.uri) throw new Error(j?.error?.message || "Caricamento video non riuscito");
+  for (let i = 0; i < 40 && f.state === "PROCESSING"; i++) {
+    await new Promise((res) => setTimeout(res, 2000));
+    f = await (await fetch(`https://generativelanguage.googleapis.com/v1beta/${f.name}?key=${key}`)).json();
+  }
+  if (f.state !== "ACTIVE") throw new Error("Gemini non è riuscito a leggere il video");
+  return { uri: f.uri, name: f.name, mime: f.mimeType || mime };
+}
+async function geminiDelete(name: string) {
+  await fetch(`https://generativelanguage.googleapis.com/v1beta/${name}?key=${geminiKey()}`, { method: "DELETE" }).then((r) => r.body?.cancel()).catch(() => {});
+}
+
 async function geminiImage(parts: unknown[]): Promise<Img> {
   const out = await gemini("image", parts, { responseModalities: ["IMAGE", "TEXT"] });
   // deno-lint-ignore no-explicit-any
@@ -325,10 +357,32 @@ Deno.serve(async (req) => {
         if (!insp) throw new Error("Ispirazione non trovata");
         await sb.from("inspirations").update({ status: "analisi", error: null }).eq("id", insp.id);
         try {
-          const paths: string[] = (insp.image_paths || []).slice(0, 14);
-          if (!paths.length) throw new Error("Nessuna immagine da analizzare");
+          const paths: string[] = (insp.image_paths || []).slice(0, 24);
+          const vids: { path: string; mime: string; caption?: string }[] = (insp.videos || []).slice(0, 4);
+          if (!paths.length && !vids.length) throw new Error("Nessuna immagine o video da analizzare");
           const imgs = await Promise.all(paths.map((p) => download("inspirations", p)));
-          const analysis = await analyzeInspiration(gemini, imgs, insp.handle);
+          // i video vanno a Gemini interi (immagini in movimento e audio)
+          const uploaded: { uri: string; name: string; mime: string; caption?: string }[] = [];
+          await Promise.all(
+            vids.map(async (v, i) => {
+              try {
+                const { data, error } = await sb.storage.from("inspirations").download(v.path);
+                if (error || !data) return;
+                const f = await geminiUpload(await data.arrayBuffer(), v.mime || "video/mp4", `habitus-${insp.id}-${i}`);
+                uploaded[i] = { ...f, caption: v.caption };
+              } catch (e) {
+                console.log("video", String(e));
+              }
+            }),
+          );
+          const videos = uploaded.filter(Boolean);
+          let analysis;
+          try {
+            analysis = await analyzeInspiration(gemini, imgs, insp.handle, videos, insp.captions || []);
+          } finally {
+            videos.forEach((v) => geminiDelete(v.name));
+          }
+          (analysis as Record<string, unknown>).fonti = { immagini: imgs.length, video: videos.length, didascalie: (insp.captions || []).filter((c: { caption?: string }) => c.caption).length };
           await sb.from("inspirations").update({ analysis, status: "pronto" }).eq("id", insp.id);
           return json({ analysis });
         } catch (e) {
