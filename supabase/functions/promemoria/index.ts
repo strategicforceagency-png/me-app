@@ -76,7 +76,7 @@ const weekOf = (start: string | null, today: string) => {
 async function compose(sb: ReturnType<typeof admin>, p: any, kind: string, day: string, wd: number) {
   const nome = (p.nome || "").split(" ")[0];
   if (kind === "ricorrenze") {
-    const { data: people } = await sb.from("people").select("id, nome, relazione, date, pensierino_ogni, ultimo_pensierino, created_at").eq("user_id", p.id);
+    const { data: people } = await sb.from("people").select("id, nome, relazione, date, pensierino_ogni, ultimo_pensierino, serata_ogni, ultima_serata, created_at").eq("user_id", p.id);
     const today = Date.parse(day + "T00:00:00Z");
     const lines: string[] = [];
     for (const x of people || []) {
@@ -92,6 +92,11 @@ async function compose(sb: ReturnType<typeof admin>, p: any, kind: string, day: 
         const last = Date.parse((x.ultimo_pensierino || String(x.created_at).slice(0, 10)) + "T00:00:00Z");
         const since = Math.round((today - last) / 86400000);
         if (since >= x.pensierino_ogni && since % 3 === 0) lines.push(`Un pensierino per ${x.nome}? Sono ${since} giorni dall'ultimo`);
+      }
+      if (x.serata_ogni) {
+        const last = Date.parse((x.ultima_serata || String(x.created_at).slice(0, 10)) + "T00:00:00Z");
+        const since = Math.round((today - last) / 86400000);
+        if (since >= x.serata_ogni && since % 2 === 0) lines.push(`Stasera una serata a casa per te e ${x.nome}? Ho tre idee pronte`);
       }
     }
     const tomorrow = new Date(today + 86400000).toISOString().slice(0, 10);

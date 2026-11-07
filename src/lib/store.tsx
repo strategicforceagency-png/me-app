@@ -35,7 +35,7 @@ type Ctx = {
   setQuizOpen: (b: boolean) => void;
 };
 export type Draft = { top: string[]; bottom: string | null; scarpe: string | null; preview?: string | null };
-export type Tab = "percorso" | "armadio" | "outfit" | "stile" | "accademia" | "linguaggio" | "salute" | "fisico" | "profilo" | "budget" | "progressi" | "contenuti" | "persone" | "regali" | "uscite";
+export type Tab = "percorso" | "armadio" | "outfit" | "stile" | "accademia" | "linguaggio" | "salute" | "fisico" | "profilo" | "budget" | "progressi" | "contenuti" | "persone" | "regali" | "uscite" | "lettere";
 
 export const AppCtx = createContext<Ctx>(null as unknown as Ctx);
 const C = AppCtx;

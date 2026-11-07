@@ -4,6 +4,8 @@ import { createClient } from "npm:@supabase/supabase-js@2.45.4";
  * Habitus – Vita: idee regalo e uscite (cene, weekend, viaggi) con ricerca sul web e analisi delle recensioni.
  * POST { action: "regali", person_id, occasione, budget, note }
  * POST { action: "uscite", tipo, dove, quando, budget, preferenze, person_id? }
+ * POST { action: "lettera", tipo, tono, lunghezza, contenuto, person_id? }
+ * POST { action: "serata", preferenze, tempo, contesto, person_id? }
  */
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -76,6 +78,29 @@ async function searchAsk(prompt: string) {
   }
   throw new Error(/quota|demand|overloaded/i.test(last) ? "L'AI è occupata, riprova tra un minuto" : last);
 }
+/** Gemini senza ricerca, risposta JSON. */
+async function ask(prompt: string, temperature = 0.8) {
+  let last = "Nessun modello AI disponibile";
+  for (const m of await models()) {
+    const r = await fetch(`${GEM}/models/${m}:generateContent?key=${key()}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { temperature, responseMimeType: "application/json", maxOutputTokens: 8000 } }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      last = j?.error?.message || `Errore ${r.status}`;
+      if ([429, 404, 500, 503].includes(r.status) || /demand|overloaded|unavailable/i.test(last)) continue;
+      throw new Error(last);
+    }
+    // deno-lint-ignore no-explicit-any
+    const out = parseJson((j.candidates?.[0]?.content?.parts || []).map((p: any) => p.text || "").join(""));
+    if (out) return out;
+    last = "Risposta non valida, riprova";
+  }
+  throw new Error(/quota|demand|overloaded/i.test(last) ? "L'AI è occupata, riprova tra un minuto" : last);
+}
+
 // i link inventati sono il rischio maggiore: si tengono solo URL plausibili
 const cleanUrl = (u: unknown) => {
   const s = String(u || "").trim();
@@ -132,6 +157,31 @@ Da 3 a 5 proposte, la migliore per prima. Non inventare indirizzi, voti o link: 
       // deno-lint-ignore no-explicit-any
       const proposte = (out.proposte || []).slice(0, 5).map((p: any) => ({ ...p, link: cleanUrl(p.link), ricerca: p.ricerca || `${p.nome} ${p.zona || ""}` }));
       return json({ proposte, nota: out.nota || "", fonti });
+    }
+
+    if (b.action === "lettera") {
+      const prompt = `Sei il Maestro di Habitus e aiuti ${prof?.nome || "un uomo"} a scrivere come un gentleman: italiano curato e naturale, niente frasi fatte, niente retorica, niente emoji salvo richiesta, sincerità prima dell'effetto. Il testo deve sembrare scritto da lui, non da un poeta.
+Cosa deve scrivere: ${b.tipo || "un biglietto"}.
+${chi ? `Destinatario: ${chi}` : b.destinatario ? `Destinatario: ${b.destinatario}` : ""}
+Tono: ${b.tono || "elegante e affettuoso"}. Lunghezza: ${b.lunghezza || "breve"}.
+Cosa vuole dire, con parole sue: ${b.contenuto || "—"}.
+
+Scrivi 3 versioni diverse per approccio (non solo per parole), poi un consiglio di galateo su come e quando consegnarlo o inviarlo (a mano o messaggio, carta, penna, momento giusto).
+Rispondi SOLO con JSON: {"versioni":[{"titolo":"es. Sobria, Più calda, Con un tocco di ironia","testo":"il testo pronto, con a capo dove servono"}],"consiglio":"…"}`;
+      const out = await ask(prompt, 0.85);
+      return json({ versioni: (out.versioni || []).slice(0, 3), consiglio: out.consiglio || "" });
+    }
+
+    if (b.action === "serata") {
+      const prompt = `Sei il Maestro di Habitus. ${prof?.nome || "Lui"} vuole preparare una serata a casa per due, fatta con cura, ${b.contesto || "con un bambino piccolo in casa: quindi dopo la nanna, durata di circa due ore, niente di stancante, preparazione semplice e veloce"}.
+${chi ? `Per: ${chi}` : ""}
+Stagione e giorno: ${oggi}. Indicazioni: ${b.preferenze || "—"}. Tempo di preparazione disponibile: ${b.tempo || "circa 30 minuti"}.
+
+Proponi 3 serate diverse (es. una cena a tema, un aperitivo lungo, un dolce e un film), ognuna completa e realistica.
+Rispondi SOLO con JSON in italiano:
+{"serate":[{"titolo":"","idea":"1-2 frasi","menu":[{"piatto":"","come":"preparazione rapida in 2-3 frasi","tempo":"es. 15 min"}],"spesa":["cosa comprare"],"atmosfera":"luci, tavola, dettagli","musica":"genere o 3 artisti/album adatti","dopo":"cosa fare dopo cena (film consigliato con titolo, gioco, passeggiata in terrazzo…)","conversazione":["2-3 spunti di conversazione non banali"],"tocco":"il gesto da gentleman che fa la differenza","tempi":"scaletta: cosa preparare prima e cosa durante"}]}`;
+      const out = await ask(prompt, 0.9);
+      return json({ serate: (out.serate || []).slice(0, 3) });
     }
 
     return json({ error: "Azione sconosciuta" }, 400);

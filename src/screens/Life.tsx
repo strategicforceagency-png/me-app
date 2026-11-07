@@ -20,6 +20,8 @@ export type Person = {
   note: string | null;
   pensierino_ogni: number | null;
   ultimo_pensierino: string | null;
+  serata_ogni: number | null;
+  ultima_serata: string | null;
   created_at: string;
 };
 type GiftRow = { id: string; person_id: string | null; occasione: string | null; titolo: string; descrizione: string | null; prezzo: string | null; link: string | null; stato: "idea" | "scelto" | "regalato"; data: string | null; created_at: string };
@@ -32,7 +34,7 @@ const RELAZIONI = ["Partner", "Moglie", "Fidanzata", "Mamma", "Papà", "Sorella"
 const TIPI_DATA = ["Compleanno", "Anniversario", "Onomastico", "Primo appuntamento", "Altro"];
 const OCCASIONI = ["Compleanno", "Anniversario", "San Valentino", "Natale", "Onomastico", "Festa della mamma", "Un traguardo", "Per farmi perdonare", "Senza motivo"];
 const BUDGET_REGALO = ["Fino a 30 €", "30-80 €", "80-150 €", "150-300 €", "Oltre 300 €"];
-const TIPI_USCITA = ["Cena romantica", "Aperitivo", "Pranzo", "Brunch", "Esperienza", "Weekend fuori", "Viaggio"];
+const TIPI_USCITA = ["Serata a casa", "Cena romantica", "Aperitivo", "Pranzo", "Brunch", "Esperienza", "Weekend fuori", "Viaggio"];
 const BUDGET_USCITA = ["Contenuto", "Medio", "Alto", "Senza limiti"];
 
 const google = (q: string) => `https://www.google.com/search?q=${encodeURIComponent(q)}`;
@@ -60,7 +62,7 @@ export function upcoming(people: Person[], within = 400) {
 const when = (days: number) => (days === 0 ? "oggi" : days === 1 ? "domani" : `tra ${days} giorni`);
 
 /* piccolo canale per passare la persona/occasione tra le schermate */
-let preset: { person?: string; occasione?: string } = {};
+let preset: { person?: string; occasione?: string; tipo?: string } = {};
 
 export function usePeople() {
   const [people, setPeople] = useState<Person[] | null>(null);
@@ -136,7 +138,7 @@ function PersonSheet({ person, onClose, onSaved }: { person: Partial<Person> | n
   const set = (x: Partial<Person>) => setP((v) => ({ ...v, ...x }));
   const save = async () => {
     if (!p.nome?.trim()) return app.toast("Scrivi il nome");
-    const row = { nome: p.nome.trim(), relazione: p.relazione || "Partner", date: (p.date || []).filter((d) => d.data), gusti: p.gusti || null, non_piace: p.non_piace || null, taglie: p.taglie || null, idee: p.idee || [], note: p.note || null, pensierino_ogni: p.pensierino_ogni || null, ultimo_pensierino: p.ultimo_pensierino || null };
+    const row = { nome: p.nome.trim(), relazione: p.relazione || "Partner", date: (p.date || []).filter((d) => d.data), gusti: p.gusti || null, non_piace: p.non_piace || null, taglie: p.taglie || null, idee: p.idee || [], note: p.note || null, pensierino_ogni: p.pensierino_ogni || null, ultimo_pensierino: p.ultimo_pensierino || null, serata_ogni: p.serata_ogni || null, ultima_serata: p.ultima_serata || null };
     if (p.id) await supabase.from("people").update(row).eq("id", p.id);
     else await supabase.from("people").insert(row);
     onSaved();
@@ -213,6 +215,10 @@ function PersonSheet({ person, onClose, onSaved }: { person: Partial<Person> | n
         <Label>Un pensierino senza motivo</Label>
         <Chips small opts={["Mai", "Ogni 2 settimane", "Ogni 3 settimane", "Ogni mese", "Ogni 6 settimane"]} value={{ 14: "Ogni 2 settimane", 21: "Ogni 3 settimane", 30: "Ogni mese", 45: "Ogni 6 settimane" }[p.pensierino_ogni || 0] || "Mai"} onChange={(v) => set({ pensierino_ogni: ({ "Ogni 2 settimane": 14, "Ogni 3 settimane": 21, "Ogni mese": 30, "Ogni 6 settimane": 45 } as Record<string, number>)[v] || null })} />
         <div className="text-[12px] text-muted mt-1.5">Ti arriva un promemoria quando è passato questo tempo dall'ultimo pensierino.</div>
+
+        <Label>Una serata a casa, solo voi due</Label>
+        <Chips small opts={["Mai", "Ogni settimana", "Ogni 2 settimane", "Ogni mese"]} value={{ 7: "Ogni settimana", 14: "Ogni 2 settimane", 30: "Ogni mese" }[p.serata_ogni || 0] || "Mai"} onChange={(v) => set({ serata_ogni: ({ "Ogni settimana": 7, "Ogni 2 settimane": 14, "Ogni mese": 30 } as Record<string, number>)[v] || null })} />
+        <div className="text-[12px] text-muted mt-1.5">Un promemoria con tre idee per una serata semplice e fatta con cura, anche con un bimbo piccolo in casa.</div>
 
         <Label>Note</Label>
         <textarea value={p.note || ""} onChange={(e) => set({ note: e.target.value })} className="w-full min-h-[70px] p-3 rounded-[14px] bg-card text-[15px] outline-none" />
@@ -331,6 +337,15 @@ export function PeopleScreen() {
                   className="h-8 px-3 rounded-full bg-card text-[12.5px] font-medium flex items-center gap-1"
                 >
                   <UtensilsCrossed size={13} /> Uscita
+                </button>
+                <button
+                  onClick={() => {
+                    preset = { person: p.id, tipo: "Serata a casa" };
+                    app.setTab("uscite");
+                  }}
+                  className="h-8 px-3 rounded-full bg-card text-[12.5px] font-medium flex items-center gap-1"
+                >
+                  <Sparkles size={13} /> Serata a casa
                 </button>
                 <button onClick={() => pensierino(p)} className={`h-8 px-3 rounded-full text-[12.5px] font-medium flex items-center gap-1 ${due ? "bg-gold text-ongold" : "bg-card"}`}>
                   <Heart size={13} /> {due ? "Tempo di un pensierino" : "Pensierino fatto"}
@@ -712,10 +727,85 @@ function OutingSheet({ o, onClose, onSaved }: { o: Outing | null; onClose: () =>
   );
 }
 
+type Serata = { titolo: string; idea?: string; menu?: { piatto: string; come: string; tempo?: string }[]; spesa?: string[]; atmosfera?: string; musica?: string; dopo?: string; conversazione?: string[]; tocco?: string; tempi?: string };
+
+function SerataCard({ s, onDone, onSave }: { s: Serata; onDone: () => void; onSave: () => void }) {
+  return (
+    <div className="rounded-[22px] bg-surface shadow-soft p-5">
+      <div className="text-[18px] font-semibold leading-snug">{s.titolo}</div>
+      {s.idea && <p className="text-[14px] leading-relaxed mt-1.5">{s.idea}</p>}
+      {!!s.menu?.length && (
+        <div className="mt-3 space-y-2">
+          {s.menu.map((m) => (
+            <div key={m.piatto} className="rounded-[12px] bg-card p-3">
+              <div className="text-[14px] font-semibold flex justify-between gap-2">
+                <span>{m.piatto}</span>
+                {m.tempo && <span className="text-[12px] text-muted font-normal">{m.tempo}</span>}
+              </div>
+              <div className="text-[13px] leading-relaxed mt-0.5">{m.come}</div>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="mt-3 space-y-1.5 text-[13.5px] leading-relaxed">
+        {!!s.spesa?.length && (
+          <div>
+            <b>Spesa:</b> {s.spesa.join(", ")}
+          </div>
+        )}
+        {s.tempi && (
+          <div>
+            <b>Tempi:</b> {s.tempi}
+          </div>
+        )}
+        {s.atmosfera && (
+          <div>
+            <b>Atmosfera:</b> {s.atmosfera}
+          </div>
+        )}
+        {s.musica && (
+          <div>
+            <b>Musica:</b> {s.musica}
+          </div>
+        )}
+        {s.dopo && (
+          <div>
+            <b>Dopo cena:</b> {s.dopo}
+          </div>
+        )}
+      </div>
+      {!!s.conversazione?.length && (
+        <div className="mt-3 rounded-[12px] bg-card p-3 text-[13px]">
+          <div className="text-[10.5px] uppercase tracking-[0.12em] text-muted mb-1">Spunti di conversazione</div>
+          {s.conversazione.map((c) => (
+            <div key={c}>· {c}</div>
+          ))}
+        </div>
+      )}
+      {s.tocco && (
+        <div className="mt-3 rounded-[12px] bg-gold-tint p-3 text-[13.5px] flex gap-2">
+          <Sparkles size={15} className="text-gold shrink-0 mt-0.5" /> {s.tocco}
+        </div>
+      )}
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        <button onClick={onSave} className="h-9 px-3.5 rounded-full bg-card text-[13px] font-medium inline-flex items-center gap-1.5">
+          <Star size={13} /> Salva
+        </button>
+        <button onClick={onDone} className="h-9 px-3.5 rounded-full bg-brand text-brand-fg text-[13px] font-semibold inline-flex items-center gap-1.5">
+          <Heart size={13} /> L'abbiamo fatta
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function OutingsScreen() {
   const app = useApp();
   const { people } = usePeople();
-  const [tipo, setTipo] = useState("Cena romantica");
+  const [tipo, setTipo] = useState(preset.tipo || "Cena romantica");
+  const [bimbo, setBimbo] = useState(true);
+  const [prep, setPrep] = useState("30 minuti");
+  const [serate, setSerate] = useState<Serata[] | null>(null);
   const [who, setWho] = useState<string | undefined>(preset.person);
   const [dove, setDove] = useState(app.profile?.citta || "Napoli");
   const [quando, setQuando] = useState("");
@@ -736,7 +826,31 @@ export function OutingsScreen() {
     load();
   }, [load]);
 
+  const isSerata = tipo === "Serata a casa";
+  const askSerata = async () => {
+    setBusy(true);
+    setSerate(null);
+    try {
+      const r = await fn<{ serate: Serata[] }>("lifestyle", "", { action: "serata", person_id: who, preferenze: pref, tempo: prep, contesto: bimbo ? undefined : "senza vincoli di orario particolari, si può fare con calma" });
+      setSerate(r.serate);
+    } catch (e) {
+      app.toast((e as Error).message);
+    }
+    setBusy(false);
+  };
+  const serataFatta = async (s: Serata) => {
+    if (who) await supabase.from("people").update({ ultima_serata: todayISO() }).eq("id", who);
+    await supabase.from("outings").insert({ tipo, titolo: `Serata a casa: ${s.titolo}`, luogo: { nome: s.titolo, perche: s.idea, tocco: s.tocco }, person_id: who || null, stato: "fatto", data: todayISO() });
+    app.toast("Bravo. Annotata.");
+    load();
+  };
+  const salvaSerata = async (s: Serata) => {
+    await supabase.from("outings").insert({ tipo, titolo: `Serata a casa: ${s.titolo}`, luogo: { nome: s.titolo, perche: s.idea, atmosfera: s.atmosfera, tocco: s.tocco, itinerario: (s.menu || []).map((m) => ({ giorno: m.piatto, piano: m.come })) }, person_id: who || null, stato: "idea" });
+    app.toast("Salvata tra le tue idee");
+    load();
+  };
   const ask = async () => {
+    if (isSerata) return askSerata();
     setBusy(true);
     setRes(null);
     if (dove && !app.profile?.citta) app.setProfile({ citta: dove });
@@ -758,7 +872,7 @@ export function OutingsScreen() {
 
   return (
     <div className="px-5 lg:px-10 pb-28 lg:pb-12 max-w-[860px]">
-      <Title t="Uscite e viaggi" sub="Una cena, un aperitivo, un weekend: cerco i posti, leggo le recensioni al posto tuo e ti presento solo i migliori." />
+      <Title t="Uscite e serate" sub="Una serata a casa fatta bene, una cena, un weekend: cerco i posti, leggo le recensioni al posto tuo e ti presento solo i migliori." />
 
       <div className="mt-5 rounded-[24px] bg-surface shadow-soft p-5">
         <Label>Cosa vuoi organizzare</Label>
@@ -775,20 +889,45 @@ export function OutingsScreen() {
             </div>
           </>
         )}
+        {isSerata ? (
+          <>
+            <Label>Tempo per prepararla</Label>
+            <Chips small opts={["15 minuti", "30 minuti", "1 ora"]} value={prep} onChange={setPrep} />
+            <button onClick={() => setBimbo(!bimbo)} className="mt-4 flex items-center gap-3 text-left">
+              <span className={`h-6 w-10 rounded-full relative transition shrink-0 ${bimbo ? "bg-brand" : "bg-line"}`}>
+                <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-surface shadow transition-all ${bimbo ? "left-[18px]" : "left-0.5"}`} />
+              </span>
+              <span className="text-[14px]">Bimbo piccolo in casa: dopo la nanna, niente di stancante</span>
+            </button>
+          </>
+        ) : (
+          <>
         <Label>Dove</Label>
         <input value={dove} onChange={(e) => setDove(e.target.value)} placeholder={/viaggio|weekend/i.test(tipo) ? "Es. Costiera amalfitana, Toscana, Parigi, entro 3 ore da Napoli" : "Città o quartiere, es. Chiaia, Posillipo"} className={inputCls} />
         <Label>Quando</Label>
         <input value={quando} onChange={(e) => setQuando(e.target.value)} placeholder="Es. sabato sera, il 14 febbraio, un weekend di marzo" className={inputCls} />
         <Label>Budget</Label>
         <Chips small opts={BUDGET_USCITA} value={budget} onChange={setBudget} />
+          </>
+        )}
         <Label>Preferenze</Label>
         <input value={pref} onChange={(e) => setPref(e.target.value)} placeholder="Es. pesce, vista mare, tranquillo, niente locali rumorosi" className={inputCls} />
         <button onClick={ask} disabled={busy} className="mt-5 w-full h-12 rounded-full bg-brand text-brand-fg font-semibold flex items-center justify-center gap-2 disabled:opacity-60">
-          {busy ? <Loader2 size={17} className="animate-spin" /> : <Search size={17} />} {busy ? "Cerco e leggo le recensioni…" : "Trova i posti migliori"}
+          {busy ? <Loader2 size={17} className="animate-spin" /> : <Search size={17} />} {busy ? (isSerata ? "Preparo tre idee…" : "Cerco e leggo le recensioni…") : isSerata ? "Tre idee per la serata" : "Trova i posti migliori"}
         </button>
       </div>
 
-      {res && (
+      {isSerata && serate && (
+        <>
+          <H>Tre idee per voi</H>
+          <div className="space-y-3">
+            {serate.map((x) => (
+              <SerataCard key={x.titolo} s={x} onDone={() => serataFatta(x)} onSave={() => salvaSerata(x)} />
+            ))}
+          </div>
+        </>
+      )}
+      {!isSerata && res && (
         <>
           <H>Le mie proposte</H>
           <div className="space-y-3">
@@ -871,5 +1010,153 @@ export function NextDateBadge() {
       </div>
       <ChevronRight size={18} className="text-muted" />
     </button>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* LETTERE E MESSAGGI                                                  */
+/* ------------------------------------------------------------------ */
+const TIPI_LETTERA = ["Biglietto per un regalo", "Lettera d'amore", "Auguri", "Ringraziamento", "Scuse", "Messaggio dopo un primo appuntamento", "Invito a uscire", "Condoglianze", "Messaggio importante"];
+const TONI = ["Elegante", "Affettuoso", "Romantico", "Sobrio", "Con un tocco di ironia"];
+const LUNGHEZZE = ["Due righe", "Breve", "Una lettera vera"];
+type Letter = { id: string; person_id: string | null; tipo: string; testo: string; created_at: string };
+
+export function LettersScreen() {
+  const app = useApp();
+  const { people } = usePeople();
+  const [tipo, setTipo] = useState(TIPI_LETTERA[0]);
+  const [who, setWho] = useState<string | undefined>();
+  const [altro, setAltro] = useState("");
+  const [tono, setTono] = useState("Elegante");
+  const [len, setLen] = useState("Breve");
+  const [testo, setTesto] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [res, setRes] = useState<{ versioni: { titolo: string; testo: string }[]; consiglio: string } | null>(null);
+  const [saved, setSaved] = useState<Letter[]>([]);
+  const load = useCallback(async () => {
+    const { data } = await supabase.from("letters").select("*").order("created_at", { ascending: false }).limit(30);
+    setSaved((data as Letter[]) || []);
+  }, []);
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const ask = async () => {
+    if (!testo.trim()) return app.toast("Scrivi, anche in modo grezzo, cosa vuoi dire");
+    setBusy(true);
+    setRes(null);
+    try {
+      setRes(await fn("lifestyle", "", { action: "lettera", tipo, tono, lunghezza: len, contenuto: testo, person_id: who, destinatario: who ? undefined : altro }));
+    } catch (e) {
+      app.toast((e as Error).message);
+    }
+    setBusy(false);
+  };
+  const keep = async (t: string) => {
+    await supabase.from("letters").insert({ tipo, testo: t, person_id: who || null });
+    app.toast("Salvata");
+    load();
+  };
+  const share = async (t: string) => {
+    if (navigator.share) {
+      try {
+        await navigator.share({ text: t });
+      } catch {
+        /* annullato */
+      }
+    } else {
+      await navigator.clipboard?.writeText(t);
+      app.toast("Copiato");
+    }
+  };
+
+  return (
+    <div className="px-5 lg:px-10 pb-28 lg:pb-12 max-w-[860px]">
+      <Title t="Lettere e messaggi" sub="Le parole giuste, nel tuo modo di dirle. Scrivi cosa vuoi dire anche in modo grezzo: il Maestro ti propone tre versioni da gentleman." />
+
+      <div className="mt-5 rounded-[24px] bg-surface shadow-soft p-5">
+        <Label>Cosa devi scrivere</Label>
+        <Chips small opts={TIPI_LETTERA} value={tipo} onChange={setTipo} />
+        <Label>Per chi</Label>
+        <div className="flex flex-wrap gap-1.5">
+          {(people || []).map((p) => (
+            <button key={p.id} onClick={() => setWho(who === p.id ? undefined : p.id)} className={`h-8 px-3 rounded-full text-[12.5px] font-medium ${who === p.id ? "bg-brand text-brand-fg" : "bg-card"}`}>
+              {p.nome}
+            </button>
+          ))}
+        </div>
+        {!who && <input value={altro} onChange={(e) => setAltro(e.target.value)} placeholder="Oppure scrivi chi è (es. la ragazza conosciuta sabato, il suocero)" className={`${inputCls} mt-2`} />}
+        <Label>Tono</Label>
+        <Chips small opts={TONI} value={tono} onChange={setTono} />
+        <Label>Lunghezza</Label>
+        <Chips small opts={LUNGHEZZE} value={len} onChange={setLen} />
+        <Label>Cosa vuoi dire</Label>
+        <textarea value={testo} onChange={(e) => setTesto(e.target.value)} placeholder="Es. grazie per la serata, mi sono divertito, vorrei rivederla ma senza sembrare insistente" className="w-full min-h-[110px] p-3.5 rounded-[16px] bg-card text-[15.5px] outline-none focus:ring-1 focus:ring-gold" />
+        <button onClick={ask} disabled={busy} className="mt-4 w-full h-12 rounded-full bg-brand text-brand-fg font-semibold flex items-center justify-center gap-2 disabled:opacity-60">
+          {busy ? <Loader2 size={17} className="animate-spin" /> : <Sparkles size={17} />} {busy ? "Scrivo…" : "Proponi tre versioni"}
+        </button>
+      </div>
+
+      {res && (
+        <>
+          <H>Tre versioni</H>
+          <div className="space-y-3">
+            {res.versioni.map((v) => (
+              <div key={v.titolo} className="rounded-[22px] bg-surface shadow-soft p-5">
+                <div className="text-[10.5px] uppercase tracking-[0.14em] text-gold font-bold">{v.titolo}</div>
+                <p className="font-display text-[19px] leading-relaxed mt-2 whitespace-pre-wrap">{v.testo}</p>
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  <button
+                    onClick={() => {
+                      navigator.clipboard?.writeText(v.testo);
+                      app.toast("Copiato");
+                    }}
+                    className="h-9 px-3.5 rounded-full bg-card text-[13px] font-medium inline-flex items-center gap-1.5"
+                  >
+                    <Copy size={13} /> Copia
+                  </button>
+                  <button onClick={() => share(v.testo)} className="h-9 px-3.5 rounded-full bg-card text-[13px] font-medium inline-flex items-center gap-1.5">
+                    <ExternalLink size={13} /> Invia
+                  </button>
+                  <button onClick={() => keep(v.testo)} className="h-9 px-3.5 rounded-full bg-brand text-brand-fg text-[13px] font-semibold inline-flex items-center gap-1.5">
+                    <Star size={13} /> Salva
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+          {res.consiglio && (
+            <div className="mt-3 rounded-[16px] bg-card p-4 text-[14px]">
+              <b>Galateo:</b> {res.consiglio}
+            </div>
+          )}
+        </>
+      )}
+
+      {saved.length > 0 && (
+        <>
+          <H>Salvate</H>
+          <div className="space-y-2.5">
+            {saved.map((l) => (
+              <div key={l.id} className="rounded-[18px] bg-surface shadow-soft p-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10.5px] uppercase tracking-[0.12em] text-gold font-bold flex-1">
+                    {l.tipo}
+                    {l.person_id && people?.find((p) => p.id === l.person_id) ? ` · ${people.find((p) => p.id === l.person_id)!.nome}` : ""}
+                  </span>
+                  <button onClick={() => share(l.testo)} className="h-8 w-8 grid place-items-center text-muted" aria-label="Invia">
+                    <ExternalLink size={14} />
+                  </button>
+                  <button onClick={() => supabase.from("letters").delete().eq("id", l.id).then(load)} className="h-8 w-8 grid place-items-center text-muted" aria-label="Elimina">
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+                <p className="text-[14.5px] leading-relaxed mt-1 whitespace-pre-wrap">{l.testo}</p>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
   );
 }
