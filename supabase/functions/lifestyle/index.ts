@@ -118,8 +118,10 @@ Deno.serve(async (req) => {
     const { data: prof } = await sb.from("profiles").select("nome, citta").eq("id", user.id).maybeSingle();
     const oggi = new Date().toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
     const person = b.person_id ? (await sb.from("people").select("*").eq("id", b.person_id).maybeSingle()).data : null;
+    const LAB: Record<string, string> = { moda: "Moda e borse", gioielli: "Gioielli e orologi", profumi: "Profumi e cura di sé", fiori: "Fiori", cibo: "Cibo, vino e ristoranti", luoghi: "Luoghi e viaggi", passioni: "Passioni e tempo libero", esperienze: "Esperienze che ama", taglia_abiti: "Taglia abiti", taglia_scarpe: "Numero scarpe", taglia_anello: "Misura anello", taglia_altro: "Altre misure" };
+    const det = person ? Object.entries((person.dettagli || {}) as Record<string, string>).filter(([, v]) => v && String(v).trim()).map(([k, v]) => `${LAB[k] || k}: ${String(v).trim()}`).join(". ") : "";
     const chi = person
-      ? `Persona: ${person.nome} (${person.relazione}). Gusti e passioni: ${person.gusti || "—"}. Cose che non le piacciono: ${person.non_piace || "—"}. Taglie: ${person.taglie || "—"}. Idee annotate nel tempo: ${(person.idee || []).map((i: { testo: string }) => i.testo).join("; ") || "—"}. Note: ${person.note || "—"}.`
+      ? `Persona: ${person.nome} (${person.relazione}). ${det ? det + ". " : ""}${person.gusti ? "Altri gusti: " + person.gusti + ". " : ""}Cose che non le piacciono: ${person.non_piace || "—"}. ${person.taglie ? "Taglie: " + person.taglie + ". " : ""}Idee annotate nel tempo: ${(person.idee || []).map((i: { testo: string }) => i.testo).join("; ") || "—"}. Note: ${person.note || "—"}.`
       : "";
 
     if (b.action === "regali") {

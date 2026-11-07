@@ -22,8 +22,27 @@ export type Person = {
   ultimo_pensierino: string | null;
   serata_ogni: number | null;
   ultima_serata: string | null;
+  dettagli: Record<string, string>;
   created_at: string;
 };
+
+/** Gusti divisi per categoria: chiari per te e per il consigliere dei regali. */
+export const GUSTI: { id: string; label: string; icon: string; hint: string }[] = [
+  { id: "moda", label: "Moda e borse", icon: "👜", hint: "Stile, marchi, colori, borse che porta (es. minimal, tinte neutre, ama le borse a mano piccole)" },
+  { id: "gioielli", label: "Gioielli e orologi", icon: "💍", hint: "Oro giallo, bianco o rosa? Argento? Pezzi delicati o importanti?" },
+  { id: "profumi", label: "Profumi e cura di sé", icon: "🌸", hint: "Profumo che usa, note che ama (agrumi, vaniglia…), creme, spa" },
+  { id: "fiori", label: "Fiori", icon: "💐", hint: "Fiori preferiti e colori (es. peonie bianche, niente gigli)" },
+  { id: "cibo", label: "Cibo, vino e ristoranti", icon: "🍷", hint: "Cucine preferite, vini, dolci, cosa non mangia, locali che ama" },
+  { id: "luoghi", label: "Luoghi e viaggi", icon: "🗺️", hint: "Città, mare o montagna, posti dove vorrebbe tornare o andare" },
+  { id: "passioni", label: "Passioni e tempo libero", icon: "📚", hint: "Libri, autori, musica, film e serie, sport, hobby" },
+  { id: "esperienze", label: "Esperienze che ama", icon: "🎟️", hint: "Concerti, teatro, mostre, corsi, cene speciali, giornate in spa" },
+];
+export const TAGLIE: { id: string; label: string; hint: string }[] = [
+  { id: "taglia_abiti", label: "Abiti", hint: "es. S / 40" },
+  { id: "taglia_scarpe", label: "Scarpe", hint: "es. 38" },
+  { id: "taglia_anello", label: "Anello", hint: "es. 13" },
+  { id: "taglia_altro", label: "Altro", hint: "es. guanti, intimo" },
+];
 type GiftRow = { id: string; person_id: string | null; occasione: string | null; titolo: string; descrizione: string | null; prezzo: string | null; link: string | null; stato: "idea" | "scelto" | "regalato"; data: string | null; created_at: string };
 type Outing = { id: string; person_id: string | null; tipo: string; titolo: string; luogo: Place; data: string | null; ora: string | null; stato: "idea" | "prenotato" | "fatto"; note: string | null; created_at: string };
 type Idea = { titolo: string; categoria?: string; perche?: string; prezzo?: string; dove?: string; link?: string | null; ricerca?: string; tocco?: string };
@@ -133,12 +152,13 @@ function PersonSheet({ person, onClose, onSaved }: { person: Partial<Person> | n
   const app = useApp();
   const [p, setP] = useState<Partial<Person>>({});
   const [idea, setIdea] = useState("");
-  useEffect(() => setP(person ? { date: [], idee: [], relazione: "Partner", ...person } : {}), [person]);
+  useEffect(() => setP(person ? { date: [], idee: [], relazione: "Partner", ...person, dettagli: person.dettagli || {} } : {}), [person]);
+  const setD = (k: string, v: string) => setP((x) => ({ ...x, dettagli: { ...(x.dettagli || {}), [k]: v } }));
   if (!person) return <Sheet open={false} onClose={onClose}>{null}</Sheet>;
   const set = (x: Partial<Person>) => setP((v) => ({ ...v, ...x }));
   const save = async () => {
     if (!p.nome?.trim()) return app.toast("Scrivi il nome");
-    const row = { nome: p.nome.trim(), relazione: p.relazione || "Partner", date: (p.date || []).filter((d) => d.data), gusti: p.gusti || null, non_piace: p.non_piace || null, taglie: p.taglie || null, idee: p.idee || [], note: p.note || null, pensierino_ogni: p.pensierino_ogni || null, ultimo_pensierino: p.ultimo_pensierino || null, serata_ogni: p.serata_ogni || null, ultima_serata: p.ultima_serata || null };
+    const row = { nome: p.nome.trim(), relazione: p.relazione || "Partner", date: (p.date || []).filter((d) => d.data), gusti: p.gusti || null, non_piace: p.non_piace || null, taglie: p.taglie || null, dettagli: p.dettagli || {}, idee: p.idee || [], note: p.note || null, pensierino_ogni: p.pensierino_ogni || null, ultimo_pensierino: p.ultimo_pensierino || null, serata_ogni: p.serata_ogni || null, ultima_serata: p.ultima_serata || null };
     if (p.id) await supabase.from("people").update(row).eq("id", p.id);
     else await supabase.from("people").insert(row);
     onSaved();
@@ -153,7 +173,7 @@ function PersonSheet({ person, onClose, onSaved }: { person: Partial<Person> | n
   return (
     <Sheet open onClose={onClose} title={p.id ? p.nome : "Nuova persona"} full>
       <div className="pb-8">
-        <input placeholder="Nome" value={p.nome || ""} onChange={(e) => set({ nome: e.target.value })} className={inputCls} />
+        <input placeholder="Nome" value={p.nome || ""} onChange={(e) => set({ nome: e.target.value })} autoComplete="off" className={inputCls} />
         <Label>Chi è per te</Label>
         <Chips small opts={RELAZIONI} value={p.relazione} onChange={(v) => set({ relazione: v })} />
 
@@ -177,12 +197,50 @@ function PersonSheet({ person, onClose, onSaved }: { person: Partial<Person> | n
           </button>
         </div>
 
-        <Label>Gusti e passioni</Label>
-        <textarea value={p.gusti || ""} onChange={(e) => set({ gusti: e.target.value })} placeholder="Es. ama la cucina giapponese, i profumi agrumati, legge gialli, adora il mare d'inverno…" className="w-full min-h-[80px] p-3 rounded-[14px] bg-card text-[15px] outline-none" />
+        <Label>Cosa le piace</Label>
+        <div className="text-[12.5px] text-muted -mt-1 mb-2">Compila solo quello che sai: anche una parola aiuta.</div>
+        <div className="space-y-2">
+          {GUSTI.map((g) => (
+            <div key={g.id} className="rounded-[14px] bg-card px-3.5 pt-2.5 pb-1">
+              <div className="text-[12px] font-semibold text-muted flex items-center gap-1.5">
+                <span aria-hidden>{g.icon}</span> {g.label}
+              </div>
+              <textarea
+                rows={1}
+                value={p.dettagli?.[g.id] || ""}
+                onChange={(e) => {
+                  setD(g.id, e.target.value);
+                  e.target.style.height = "auto";
+                  e.target.style.height = e.target.scrollHeight + "px";
+                }}
+                placeholder={g.hint}
+                autoComplete="off"
+                autoCorrect="on"
+                className="w-full resize-none bg-transparent py-1.5 text-[15px] leading-snug outline-none placeholder:text-muted/70"
+              />
+            </div>
+          ))}
+          {p.gusti && (
+            <div className="rounded-[14px] bg-card px-3.5 pt-2.5 pb-1">
+              <div className="text-[12px] font-semibold text-muted">Altro</div>
+              <textarea rows={2} value={p.gusti || ""} onChange={(e) => set({ gusti: e.target.value })} autoComplete="off" className="w-full resize-none bg-transparent py-1.5 text-[15px] leading-snug outline-none" />
+            </div>
+          )}
+        </div>
+
         <Label>Cosa non le piace</Label>
-        <input value={p.non_piace || ""} onChange={(e) => set({ non_piace: e.target.value })} placeholder="Es. fiori recisi, oro giallo, sorprese in pubblico" className={inputCls} />
+        <textarea rows={2} value={p.non_piace || ""} onChange={(e) => set({ non_piace: e.target.value })} placeholder="Es. fiori recisi, oro giallo, sorprese in pubblico, profumi dolci" autoComplete="off" className="w-full resize-none rounded-[14px] bg-card p-3.5 text-[15px] outline-none" />
+
         <Label>Taglie e misure</Label>
-        <input value={p.taglie || ""} onChange={(e) => set({ taglie: e.target.value })} placeholder="Es. S, scarpe 38, anello 13" className={inputCls} />
+        <div className="grid grid-cols-2 gap-2">
+          {TAGLIE.map((t) => (
+            <label key={t.id} className="rounded-[14px] bg-card px-3.5 pt-2 pb-1 block">
+              <span className="text-[12px] font-semibold text-muted">{t.label}</span>
+              <input value={p.dettagli?.[t.id] || ""} onChange={(e) => setD(t.id, e.target.value)} placeholder={t.hint} autoComplete="off" className="w-full bg-transparent py-1 text-[15px] outline-none placeholder:text-muted/70" />
+            </label>
+          ))}
+        </div>
+        {p.taglie && <div className="text-[12px] text-muted mt-1.5">Annotato prima: {p.taglie}</div>}
 
         <Label>Idee annotate</Label>
         <div className="text-[12.5px] text-muted -mt-1 mb-2">Quando dice "che bello…", annotalo qui: il consigliere dei regali ne terrà conto.</div>
@@ -197,7 +255,7 @@ function PersonSheet({ person, onClose, onSaved }: { person: Partial<Person> | n
             </div>
           ))}
           <div className="flex gap-2">
-            <input value={idea} onChange={(e) => setIdea(e.target.value)} placeholder="Nuova idea" className={inputCls} />
+            <input value={idea} onChange={(e) => setIdea(e.target.value)} placeholder="Es. la borsa vista in vetrina da…" autoComplete="off" className={inputCls} />
             <button
               onClick={() => {
                 if (!idea.trim()) return;
