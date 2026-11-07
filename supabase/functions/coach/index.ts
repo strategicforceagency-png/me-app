@@ -38,22 +38,31 @@ Deno.serve(async (req) => {
     const b = await req.json();
     const question = String(b.question || "").slice(0, 1200).trim();
     if (!question) return json({ error: "Scrivi una domanda" }, 400);
-    const history = Array.isArray(b.history) ? b.history.slice(-6) : [];
+    const history = Array.isArray(b.history) ? b.history.slice(-12) : [];
 
     const [{ data: prof }, { data: wardrobe }, { data: notes }] = await Promise.all([
-      sb.from("profiles").select("nome, altezza, peso, taglia_top, taglia_pantaloni, taglia_scarpe, style_guide").eq("id", user.id).maybeSingle(),
+      sb.from("profiles").select("nome, altezza, peso, taglia_top, taglia_pantaloni, taglia_scarpe, style_guide, path, path_started_at, budget").eq("id", user.id).maybeSingle(),
       sb.from("garments").select("nome, categoria, colore").limit(150),
       sb.from("knowledge").select("tema, titolo, affermazione, versione_corretta, verdetto").eq("stato", "approvata").limit(80),
     ]);
     // deno-lint-ignore no-explicit-any
     const guide = prof?.style_guide as any;
+    // deno-lint-ignore no-explicit-any
+    const path = prof?.path as any;
+    const week = prof?.path_started_at ? Math.min(12, Math.max(1, Math.floor((Date.now() - Date.parse(prof.path_started_at + "T00:00:00")) / 604800000) + 1)) : null;
+    const pathInfo = path
+      ? `Archetipo "${path.archetipo?.nome}". Settimana ${week} di 12, tema: ${path.settimane?.find((w: { n: number }) => w.n === week)?.tema || "—"}. Missioni della settimana: ${(path.settimane?.find((w: { n: number }) => w.n === week)?.missioni || []).map((m: { titolo: string }) => m.titolo).join("; ")}. Abitudini: ${(path.abitudini || []).filter((h: { dalla_settimana?: number }) => (h.dalla_settimana || 1) <= (week || 1)).map((h: { titolo: string }) => h.titolo).join("; ")}. Pilastri (punteggio 1-5, priorità): ${(path.pilastri || []).map((p: { id: string; punteggio: number; priorita: number }) => `${p.id} ${p.punteggio}/5 p${p.priorita}`).join(", ")}. Allenamento: ${(path.allenamento?.sessioni || []).map((x: { giorno: string; nome: string }) => `${x.giorno} ${x.nome}`).join(", ")}.`
+      : "non ancora generato (deve fare il questionario d'ingresso)";
 
-    const system = `Sei "il Maestro" dell'Accademia di Habitus: un mentore italiano esperto di stile maschile classico e contemporaneo, galateo, galanteria, grooming e accessori. Parli in italiano, dai del tu, tono elegante ma pratico e diretto, mai pedante.
+    const system = `Sei "il Maestro" dell'Accademia di Habitus: il mentore personale di un uomo che vuole diventare un gentleman nello spirito del gentiluomo inglese degli anni '60-'70, adattato all'Italia di oggi. Sei esperto di stile maschile classico e contemporaneo, sartoria, galateo, galanteria, appuntamenti, grooming, accessori, linguaggio e conversazione, e dai indicazioni di buon senso su allenamento, abitudini e mentalità (per questioni mediche rimandi a un professionista). Parli in italiano, dai del tu, tono elegante ma pratico e diretto, mai pedante, con un filo di ironia britannica quando ci sta.
 Rispondi in modo concreto e operativo: passaggi numerati quando serve, regole chiare, motivazione breve ("perché"). Massimo ~220 parole salvo richieste di approfondimento. Usa **grassetto** per le parole chiave ed elenchi con "-" o "1.". Niente titoli con #.
 Se la domanda riguarda cosa indossare, usa quando possibile i capi che l'utente possiede già e il suo stile.
 Se una regola è tradizionale ma oggi flessibile, dillo. Su salute della pelle o reazioni cutanee importanti suggerisci un dermatologo.
 
 Lezione aperta: ${b.lesson ? JSON.stringify(b.lesson).slice(0, 2500) : "nessuna"}
+Dove si trova ora nell'app: ${String(b.context || "—").slice(0, 300)}
+Il suo percorso: ${pathInfo}
+Budget mensile per il guardaroba: ${prof?.budget?.mensile ? prof.budget.mensile + " €" : "non indicato"}.
 Utente: ${prof?.nome || "—"}, ${prof?.altezza ?? "?"} cm, ${prof?.peso ?? "?"} kg, taglie ${prof?.taglia_top || "?"}/${prof?.taglia_pantaloni || "?"}/${prof?.taglia_scarpe || "?"}.
 Il suo stile: ${guide?.nome_stile ? `${guide.nome_stile} — ${(guide.parole_chiave || []).join(", ")}` : "non ancora definito"}.
 Il suo armadio (${wardrobe?.length || 0} capi): ${(wardrobe || []).map((g) => `${g.nome} (${g.categoria}${g.colore ? ", " + g.colore : ""})`).join("; ").slice(0, 3000) || "vuoto"}.
@@ -65,13 +74,14 @@ Il suo quaderno (insegnamenti che ha raccolto da contenuti esterni, verificati e
         .map((h: { role: string; text: string }) => ({ role: h.role, parts: [{ text: String(h.text).slice(0, 2000) }] })),
       { role: "user", parts: [{ text: question }] },
     ];
+    while (contents.length > 1 && contents[0].role !== "user") contents.shift();
 
     let last = "Nessun modello AI disponibile";
     for (const m of await models(key)) {
       const r = await fetch(`${GEMINI}/${m}:generateContent?key=${key}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ systemInstruction: { parts: [{ text: system }] }, contents, generationConfig: { temperature: 0.6, maxOutputTokens: 900 } }),
+        body: JSON.stringify({ systemInstruction: { parts: [{ text: system }] }, contents, generationConfig: { temperature: 0.6, maxOutputTokens: 1400 } }),
       });
       const j = await r.json().catch(() => ({}));
       if (r.ok) {
