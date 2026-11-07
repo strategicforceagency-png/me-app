@@ -8,5 +8,6 @@ export type Block =
   | { t: "table"; head: string[]; rows: string[][] }
   | { t: "tip"; text: string }
   | { t: "fig"; fig: Fig };
-export type Lesson = { id: string; titolo: string; minuti: number; intro: string; blocks: Block[] };
+export type Fonte = { titolo: string; url: string };
+export type Lesson = { id: string; titolo: string; minuti: number; intro: string; blocks: Block[]; fonti?: Fonte[] };
 export type Course = { id: string; titolo: string; sottotitolo: string; icona: string; lezioni: Lesson[] };

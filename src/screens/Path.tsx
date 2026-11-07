@@ -1,9 +1,11 @@
 import { motion } from "framer-motion";
-import { ArrowRight, BookOpen, Check, ChevronRight, Dumbbell, Feather, Loader2, MessageSquareQuote, RefreshCw, Sparkles } from "lucide-react";
+import { ArrowRight, BookOpen, Check, ChevronRight, ClipboardCheck, Dumbbell, Feather, GraduationCap, Loader2, MessageSquareQuote, Mic, RefreshCw, Ruler, Sparkles, Trophy } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { allLessons, lessonKey } from "../academy/content";
 import { Sheet } from "../components/ui";
-import { currentWeek, GIORNI, Path, PillarId, PILLARS, todayISO } from "../gentleman/types";
+import { activeHabits, currentWeek, GIORNI, Path, PillarId, PILLARS, todayISO, Trial } from "../gentleman/types";
+import { RemindersCard } from "../components/Reminders";
+import { BaselineSheet, dueReview, dueTrials, ReviewSheet, TrialSheet, useProgressData } from "./Progress";
 import { wordOfDay } from "../gentleman/words";
 import { useApp } from "../lib/store";
 import { fn, supabase } from "../lib/supabase";
@@ -70,7 +72,7 @@ export function PathScreen() {
             <button onClick={() => app.setQuizOpen(true)} className="mt-7 h-12 px-6 rounded-full bg-gold text-ongold font-semibold flex items-center gap-2">
               {hasDraft ? "Riprendi il questionario" : "Inizia il questionario"} <ArrowRight size={18} />
             </button>
-            <p className="text-[12px] opacity-60 mt-3">Circa 6 minuti · puoi interrompere e riprendere</p>
+            <p className="text-[12px] opacity-60 mt-3">Circa 8 minuti · puoi interrompere e riprendere</p>
           </div>
         </div>
         <div className="mt-6 grid gap-3 sm:grid-cols-3">
@@ -104,7 +106,38 @@ function PathView({ path }: { path: Path }) {
   const session = path.allenamento.sessioni.find((s) => s.giorno.slice(0, 3).toLowerCase() === giorno.toLowerCase());
   const fase = path.fasi.find((f) => week >= f.da && week <= f.a);
   const w = path.settimane.find((s) => s.n === viewWeek) || path.settimane[0];
-  const habitsDone = path.abitudini.filter((h) => has(`h:${h.id}`, true)).length;
+  const habits = activeHabits(path, week);
+  const habitsDone = habits.filter((h) => has(`h:${h.id}`, true)).length;
+  const prog = useProgressData();
+  const due = prog.loaded ? dueReview(path, app.profile?.path_started_at, prog.reviews) : null;
+  const trialsDue = prog.loaded ? dueTrials(path, app.profile?.path_started_at, prog.trials) : [];
+  const [baseOpen, setBaseOpen] = useState(false);
+  const [revWeek, setRevWeek] = useState<number | null>(null);
+  const [trial, setTrial] = useState<Trial | null>(null);
+  const [lessonsDone, setLessonsDone] = useState<Set<string> | null>(null);
+  useEffect(() => {
+    supabase
+      .from("academy_progress")
+      .select("lesson_id")
+      .then(({ data }) => setLessonsDone(new Set((data || []).map((d) => d.lesson_id as string))));
+    const open = () => setRevWeek(currentWeek(app.profile?.path_started_at));
+    window.addEventListener("habitus:revisione", open);
+    return () => window.removeEventListener("habitus:revisione", open);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const todayLesson = useMemo(() => {
+    if (!lessonsDone) return null;
+    const fromMissions = path.settimane
+      .filter((s) => s.n <= week)
+      .reverse()
+      .flatMap((s) => s.missioni)
+      .map((m) => m.lezione)
+      .find((k) => k && !lessonsDone.has(k) && lessonTitle(k));
+    const key = fromMissions || allLessons.map(({ course, lesson }) => lessonKey(course, lesson)).find((k) => !lessonsDone.has(k));
+    if (!key) return null;
+    const x = allLessons.find(({ course, lesson }) => lessonKey(course, lesson) === key)!;
+    return { key, titolo: x.lesson.titolo, corso: x.course.titolo, minuti: x.lesson.minuti };
+  }, [lessonsDone, path, week]);
   const weekDone = w ? w.missioni.filter((m) => has(`m:${m.id}`, false)).length : 0;
   const allMissions = path.settimane.flatMap((s) => s.missioni);
   const totalDone = allMissions.filter((m) => has(`m:${m.id}`, false)).length;
@@ -170,6 +203,32 @@ function PathView({ path }: { path: Path }) {
         </div>
       </button>
 
+      <RemindersCard compact />
+
+      {due && (
+        <button onClick={() => (due.kind === "partenza" ? setBaseOpen(true) : setRevWeek(due.week))} className="mt-4 w-full text-left rounded-[22px] border border-gold/50 bg-gold-tint p-5 flex items-center gap-4">
+          {due.kind === "partenza" ? <Ruler size={24} className="text-gold shrink-0" /> : <ClipboardCheck size={24} className="text-gold shrink-0" />}
+          <div className="flex-1">
+            <div className="font-semibold text-[15.5px]">{due.kind === "partenza" ? "Prendi le misure di partenza" : `Il controllo della settimana ${due.week}`}</div>
+            <div className="text-[13px] text-muted mt-0.5">
+              {due.kind === "partenza" ? "Misure, foto, autovalutazione e un minuto di voce: il riferimento per tutto il percorso." : "Cinque minuti: in base alle risposte il percorso si adatta alle prossime settimane."}
+            </div>
+          </div>
+          <ChevronRight size={18} className="text-muted" />
+        </button>
+      )}
+
+      {trialsDue.map((t) => (
+        <button key={t.id} onClick={() => setTrial(t)} className="mt-3 w-full text-left rounded-[22px] bg-surface shadow-soft p-5 flex items-center gap-4">
+          <Trophy size={24} className="text-gold shrink-0" />
+          <div className="flex-1">
+            <div className="text-[10.5px] uppercase tracking-[0.12em] text-gold font-bold">Prova sul campo</div>
+            <div className="font-semibold text-[15.5px] leading-snug">{t.titolo}</div>
+          </div>
+          <ChevronRight size={18} className="text-muted" />
+        </button>
+      ))}
+
       <div className="mt-4 grid gap-3 lg:grid-cols-2">
         {/* Abitudini */}
         <section className="rounded-[22px] bg-surface shadow-soft p-5">
@@ -178,20 +237,24 @@ function PathView({ path }: { path: Path }) {
               <span className="h-1.5 w-1.5 rounded-full bg-gold" /> Le abitudini di oggi
             </h2>
             <span className="text-[12px] text-muted">
-              {habitsDone}/{path.abitudini.length}
+              {habitsDone}/{habits.length}
             </span>
           </div>
           <div className="mt-3 space-y-1.5">
-            {path.abitudini.map((h) => {
+            {habits.map((h) => {
               const on = has(`h:${h.id}`, true);
               return (
                 <button key={h.id} onClick={() => toggle(`h:${h.id}`, true)} className="w-full flex items-center gap-3 py-2 text-left">
                   <span className={`h-6 w-6 rounded-full border grid place-items-center shrink-0 transition ${on ? "bg-gold border-gold text-ongold" : "border-line"}`}>{on && <Check size={14} strokeWidth={3} />}</span>
-                  <span className={`flex-1 text-[14.5px] ${on ? "line-through text-muted" : ""}`}>{h.titolo}</span>
+                  <span className="flex-1 min-w-0">
+                    <span className={`block text-[14.5px] ${on ? "line-through text-muted" : ""}`}>{h.titolo}</span>
+                    {h.minimo && !on && <span className="block text-[11.5px] text-muted">Giornata storta? Anche solo: {h.minimo}</span>}
+                  </span>
                   <span className="text-[10.5px] uppercase tracking-[0.1em] text-muted">{h.quando}</span>
                 </button>
               );
             })}
+            {path.abitudini.length > habits.length && <div className="text-[11.5px] text-muted pt-1">Altre {path.abitudini.length - habits.length} abitudini arriveranno nelle prossime settimane, una alla volta.</div>}
           </div>
         </section>
 
@@ -226,6 +289,17 @@ function PathView({ path }: { path: Path }) {
             )}
           </section>
 
+          {/* Lezione di oggi */}
+          {todayLesson && (
+            <button onClick={() => app.openLesson(todayLesson.key)} className="text-left rounded-[22px] bg-surface shadow-soft p-5">
+              <h2 className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted flex items-center gap-2">
+                <GraduationCap size={13} className="text-gold" /> La lezione di oggi · {todayLesson.minuti} min
+              </h2>
+              <div className="text-[18px] font-semibold mt-2 leading-snug">{todayLesson.titolo}</div>
+              <div className="text-[12.5px] text-muted">{todayLesson.corso}</div>
+            </button>
+          )}
+
           {/* Parola del giorno */}
           <button onClick={() => app.setTab("linguaggio")} className="text-left rounded-[22px] bg-surface shadow-soft p-5">
             <h2 className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted flex items-center gap-2">
@@ -238,8 +312,16 @@ function PathView({ path }: { path: Path }) {
             <div className="text-[13.5px] text-muted">{word.significato}</div>
             <div className="text-[13.5px] italic mt-1.5">"{word.esempio}"</div>
             <div className="mt-3 text-[12.5px] text-gold font-medium flex items-center gap-1">
-              <MessageSquareQuote size={14} /> Usala oggi in una conversazione · Laboratorio del linguaggio
+              <MessageSquareQuote size={14} /> Usala oggi in una conversazione
             </div>
+            <div className="mt-1.5 text-[12.5px] text-muted flex items-center gap-1">
+              <Mic size={13} /> Esercizio: registra 60 secondi in cui la usi, poi analizzali nel Laboratorio
+            </div>
+            {word.fonte && (
+              <a href={word.fonte} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="mt-1.5 inline-block text-[11.5px] text-muted underline underline-offset-2">
+                Fonte: vocabolario Treccani
+              </a>
+            )}
           </button>
         </div>
       </div>
@@ -339,6 +421,10 @@ function PathView({ path }: { path: Path }) {
         </button>
       </div>
 
+      <BaselineSheet open={baseOpen} onClose={() => setBaseOpen(false)} onDone={prog.reload} />
+      <ReviewSheet open={revWeek != null} week={revWeek || week} onClose={() => setRevWeek(null)} onDone={prog.reload} />
+      <TrialSheet trial={trial} onClose={() => setTrial(null)} onDone={prog.reload} />
+
       <Sheet open={archOpen} onClose={() => setArchOpen(false)} eyebrow="Il tuo archetipo" title={path.archetipo.nome}>
         <div className="space-y-5 pb-6">
           <p className="text-[15px] leading-relaxed">{path.archetipo.descrizione}</p>
@@ -377,6 +463,7 @@ function PathView({ path }: { path: Path }) {
             <div>
               <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted mb-2">Direzione di stile</div>
               <p className="text-[14px] leading-relaxed">{path.guardaroba.direzione}</p>
+              {path.guardaroba.strategia && <p className="text-[13.5px] leading-relaxed text-muted mt-2">{path.guardaroba.strategia}</p>}
               {path.guardaroba.essenziali.length > 0 && (
                 <ul className="mt-3 space-y-1.5">
                   {path.guardaroba.essenziali.map((e) => (

@@ -1,9 +1,12 @@
 import { Session } from "@supabase/supabase-js";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronDown, Compass, Dumbbell, Feather, GraduationCap, HeartPulse, Loader2, LogOut, Menu, Moon, Plus, Shirt, Sparkles, Sun, User, X } from "lucide-react";
+import { ChevronDown, Compass, Dumbbell, Feather, GraduationCap, HeartPulse, Loader2, LogOut, Moon, Plus, Shirt, Sparkles, Sun, TrendingUp, User, Wallet } from "lucide-react";
 import { FormEvent, ReactNode, useEffect, useState } from "react";
 import { Field, inputCls, PrimaryButton, Toast } from "./components/ui";
 import { AppProvider, Tab, useApp } from "./lib/store";
+import { useTheme } from "./lib/theme";
+import { BudgetScreen } from "./screens/Budget";
+import { ProgressScreen } from "./screens/Progress";
 import { supabase, useSignedUrl } from "./lib/supabase";
 import { OutfitBuilder } from "./screens/OutfitBuilder";
 import { Profile } from "./screens/Profile";
@@ -16,35 +19,7 @@ import { FitnessScreen } from "./screens/Fitness";
 import { LanguageScreen } from "./screens/Language";
 import { Questionnaire } from "./gentleman/Questionnaire";
 
-/* ---------------- tema chiaro / scuro (come Navy OS) ---------------- */
-type Theme = "light" | "dark";
-function readTheme(): Theme {
-  try {
-    const t = localStorage.getItem("habitus-theme");
-    if (t === "light" || t === "dark") return t;
-  } catch {
-    /* storage non disponibile */
-  }
-  return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-}
-function applyTheme(t: Theme) {
-  document.documentElement.classList.toggle("dark", t === "dark");
-  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", t === "dark" ? "#0D1411" : "#F4EFE4");
-}
-applyTheme(readTheme());
-export function useTheme() {
-  const [t, setT] = useState<Theme>(readTheme);
-  const set = (n: Theme) => {
-    setT(n);
-    applyTheme(n);
-    try {
-      localStorage.setItem("habitus-theme", n);
-    } catch {
-      /* ok */
-    }
-  };
-  return { theme: t, toggle: () => set(t === "dark" ? "light" : "dark") };
-}
+export { useTheme } from "./lib/theme";
 
 export default function App() {
   const [session, setSession] = useState<Session | null | undefined>(undefined);
@@ -100,22 +75,42 @@ const ITEMS: Record<Tab, NavItem> = {
   linguaggio: { id: "linguaggio", label: "Linguaggio", icon: I(Feather) },
   armadio: { id: "armadio", label: "Armadio", icon: (p) => <Hanger size={p.size ?? 18} className={p.className} /> },
   outfit: { id: "outfit", label: "Outfit", icon: I(Shirt) },
-  stile: { id: "stile", label: "Stile", icon: I(Sparkles) },
+  stile: { id: "stile", label: "Ispirazioni", icon: I(Sparkles) },
+  budget: { id: "budget", label: "Budget e acquisti", short: "Budget", icon: I(Wallet) },
+  progressi: { id: "progressi", label: "Progressi", icon: I(TrendingUp) },
   accademia: { id: "accademia", label: "Accademia", short: "Impara", icon: I(GraduationCap) },
   salute: { id: "salute", label: "Salute", icon: I(HeartPulse) },
   fisico: { id: "fisico", label: "Fisico", icon: I(Dumbbell) },
   profilo: { id: "profilo", label: "Profilo", icon: I(User) },
 };
 /** Gruppi del menu, come i riquadri di Navy OS. */
-const GROUPS: { label: string; items: Tab[] }[] = [
-  { label: "Percorso", items: ["percorso"] },
-  { label: "Accademia", items: ["accademia", "linguaggio"] },
-  { label: "Stile", items: ["armadio", "outfit", "stile"] },
-  { label: "Corpo", items: ["fisico", "salute"] },
-  { label: "Tu", items: ["profilo"] },
+const GROUPS: { id: string; label: string; short: string; icon: NavItem["icon"]; items: Tab[] }[] = [
+  { id: "oggi", label: "Percorso", short: "Oggi", icon: I(Compass), items: ["percorso", "progressi"] },
+  { id: "impara", label: "Accademia", short: "Impara", icon: I(GraduationCap), items: ["accademia", "linguaggio"] },
+  { id: "stile", label: "Stile", short: "Stile", icon: (p) => <Hanger size={p.size ?? 18} className={p.className} />, items: ["armadio", "outfit", "stile", "budget"] },
+  { id: "corpo", label: "Corpo", short: "Corpo", icon: I(Dumbbell), items: ["fisico", "salute"] },
+  { id: "tu", label: "Tu", short: "Tu", icon: I(User), items: ["profilo"] },
 ];
-/** Dock sul telefono: 4 voci + Menu. */
-const DOCK: Tab[] = ["percorso", "accademia", "armadio", "fisico", "linguaggio"];
+const groupOf = (t: Tab) => GROUPS.find((g) => g.items.includes(t)) || GROUPS[0];
+
+/** Sotto-sezioni dell'area corrente, in alto sul telefono. */
+function SubTabs() {
+  const app = useApp();
+  const g = groupOf(app.tab);
+  if (g.items.length < 2) return null;
+  return (
+    <div className="lg:hidden px-5 mb-3 -mt-0.5 flex gap-1.5 overflow-x-auto no-scrollbar">
+      {g.items.map((id) => {
+        const on = app.tab === id;
+        return (
+          <button key={id} onClick={() => app.setTab(id)} className={`h-9 px-4 rounded-full text-[13.5px] font-semibold shrink-0 transition ${on ? "bg-brand text-brand-fg" : "bg-card text-muted"}`}>
+            {ITEMS[id].short && id !== "percorso" ? ITEMS[id].short : id === "percorso" ? "Oggi" : ITEMS[id].label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 /* ---------------- barra laterale (computer) e menu (telefono) ---------------- */
 function NavGroup({ label, children }: { label: string; children: ReactNode }) {
@@ -219,7 +214,20 @@ function SidebarBody({ onNav }: { onNav?: () => void }) {
 
 function Shell() {
   const app = useApp();
-  const [menu, setMenu] = useState(false);
+  const [last, setLast] = useState<Record<string, Tab>>({});
+  useEffect(() => {
+    setLast((l) => ({ ...l, [groupOf(app.tab).id]: app.tab }));
+    window.scrollTo({ top: 0 });
+  }, [app.tab]);
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    if (q.get("vai") === "revisione") {
+      app.setTab("percorso");
+      window.dispatchEvent(new CustomEvent("habitus:revisione"));
+      history.replaceState(null, "", window.location.pathname);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   // ritorno dal collegamento Whoop (?whoop=ok)
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
@@ -269,6 +277,9 @@ function Shell() {
 
       <main className="lg:pl-[248px]">
         <div className="mx-auto w-full max-w-[1180px] pt-3 lg:pt-8">
+          <SubTabs />
+          {app.tab === "budget" && <BudgetScreen />}
+          {app.tab === "progressi" && <ProgressScreen />}
           {app.tab === "percorso" && <PathScreen />}
           {app.tab === "linguaggio" && <LanguageScreen />}
           {app.tab === "armadio" && <Wardrobe />}
@@ -282,56 +293,29 @@ function Shell() {
       </main>
       {app.tab !== "armadio" && <AddGarmentSheet open={app.addOpen} onClose={() => app.setAddOpen(false)} />}
 
-      {/* Dock sospesa sul telefono (stile Navy OS): 4 voci + Menu, la voce attiva è una pillola piena */}
+      {/* Dock sul telefono: le cinque aree; dentro ogni area le sotto-sezioni sono in alto */}
       <nav
         aria-label="Navigazione rapida"
-        className="fixed inset-x-3 bottom-[calc(8px+env(safe-area-inset-bottom))] z-40 mx-auto grid max-w-[480px] grid-cols-6 gap-0.5 rounded-[26px] border border-line bg-surface/90 p-1.5 shadow-dock backdrop-blur-md lg:hidden"
+        className="fixed inset-x-3 bottom-[calc(8px+env(safe-area-inset-bottom))] z-40 mx-auto grid max-w-[480px] grid-cols-5 gap-0.5 rounded-[26px] border border-line bg-surface/90 p-1.5 shadow-dock backdrop-blur-md lg:hidden"
       >
-        {DOCK.map((id) => {
-          const it = ITEMS[id];
-          const on = app.tab === id;
+        {GROUPS.map((g) => {
+          const on = groupOf(app.tab).id === g.id;
           return (
             <button
-              key={id}
-              onClick={() => app.setTab(id)}
-              className={`relative flex min-h-[52px] flex-col items-center justify-center gap-0.5 rounded-[20px] text-[10.5px] font-semibold transition-colors ${
-                on ? "text-brand-fg" : "text-muted"
-              }`}
+              key={g.id}
+              onClick={() => app.setTab(on ? g.items[0] : last[g.id] || g.items[0])}
+              className={`relative flex min-h-[52px] flex-col items-center justify-center gap-0.5 rounded-[20px] text-[10.5px] font-semibold transition-colors ${on ? "text-brand-fg" : "text-muted"}`}
             >
               {on && <motion.span layoutId="dock" className="absolute inset-0 rounded-[20px] bg-brand shadow-pill" transition={{ type: "spring", damping: 30, stiffness: 380 }} />}
               <span className="relative">
-                <it.icon size={20} />
+                <g.icon size={20} />
               </span>
-              <span className="relative">{it.short || it.label}</span>
+              <span className="relative">{g.short}</span>
             </button>
           );
         })}
-        <button onClick={() => setMenu(true)} className="flex min-h-[52px] flex-col items-center justify-center gap-0.5 rounded-[20px] text-[10.5px] font-semibold text-muted active:bg-card">
-          <Menu size={20} strokeWidth={1.8} />
-          Menu
-        </button>
       </nav>
 
-      {/* Menu completo su telefono: la stessa barra laterale del computer */}
-      <AnimatePresence>
-        {menu && (
-          <div className="fixed inset-0 z-50 lg:hidden">
-            <motion.div className="absolute inset-0 bg-black/40" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setMenu(false)} />
-            <motion.aside
-              className="absolute inset-y-0 left-0 w-[86vw] max-w-[320px] bg-sidebar pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] shadow-2xl"
-              initial={{ x: "-100%" }}
-              animate={{ x: 0 }}
-              exit={{ x: "-100%" }}
-              transition={{ type: "spring", damping: 32, stiffness: 320 }}
-            >
-              <button onClick={() => setMenu(false)} className="absolute right-3 top-[calc(18px+env(safe-area-inset-top))] p-1.5 text-muted" aria-label="Chiudi menu">
-                <X size={20} />
-              </button>
-              <SidebarBody onNav={() => setMenu(false)} />
-            </motion.aside>
-          </div>
-        )}
-      </AnimatePresence>
       {app.quizOpen && (
         <Questionnaire
           onClose={() => app.setQuizOpen(false)}

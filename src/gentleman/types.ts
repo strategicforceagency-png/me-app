@@ -9,6 +9,11 @@ export const PILLARS: { id: PillarId; nome: string }[] = [
   { id: "mente", nome: "Mente e cultura" },
 ];
 
+export type Habit = { id: string; titolo: string; pilastro: PillarId; quando: string; dalla_settimana?: number; minimo?: string };
+export type Trial = { id: string; settimana: number; pilastro: PillarId; titolo: string; dettaglio: string; criteri: string[] };
+/** Abitudini attive nella settimana (si aggiungono gradualmente). */
+export const activeHabits = (p: Path, week: number) => p.abitudini.filter((h) => (h.dalla_settimana || 1) <= week);
+
 export type Exercise = { nome: string; serie: number; ripetizioni: string; recupero_s: number; note?: string };
 export type Session = { giorno: string; nome: string; durata_min: number; riscaldamento?: string; esercizi: Exercise[]; defaticamento?: string };
 
@@ -18,10 +23,12 @@ export type Path = {
   pilastri: { id: PillarId; punteggio: number; diagnosi: string; obiettivo: string; priorita: number }[];
   fasi: { nome: string; da: number; a: number; focus: string }[];
   settimane: { n: number; tema: string; missioni: { id: string; pilastro: PillarId; titolo: string; dettaglio: string; lezione?: string | null }[] }[];
-  abitudini: { id: string; titolo: string; pilastro: PillarId; quando: string }[];
+  abitudini: Habit[];
+  prove?: Trial[];
+  adattamenti?: { settimana: number; nota: string; data: string }[];
   allenamento: { obiettivo: string; sessioni: Session[]; progressione: string; note: string };
   alimentazione: { obiettivo: string; principi: string[]; giornata_tipo: { pasto: string; esempio: string }[]; da_limitare: string[]; idratazione: string };
-  guardaroba: { direzione: string; essenziali: { nome: string; priorita: "alta" | "media" | "bassa"; ricerca: string; budget: string }[]; regole: string[] };
+  guardaroba: { direzione: string; strategia?: string; essenziali: { nome: string; priorita: "alta" | "media" | "bassa"; ricerca: string; budget: string; costo_stimato?: number; dove?: string }[]; regole: string[] };
   generato_il?: string;
 };
 

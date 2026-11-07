@@ -1,4 +1,6 @@
-import { Camera, Heart, Loader2, LogOut, Plus, Settings, Shirt, SlidersHorizontal, Trash2 } from "lucide-react";
+import { Camera, Download, Heart, Loader2, LogOut, Moon, Plus, Settings, Shirt, SlidersHorizontal, Sun, Trash2 } from "lucide-react";
+import { RemindersCard } from "../components/Reminders";
+import { useTheme } from "../lib/theme";
 import { useRef, useState } from "react";
 import { DEFAULT_MEASURES, DressedMannequin, MannequinSvg, Measures } from "../components/Mannequin";
 import { Field, inputCls, PrimaryButton, Sheet } from "../components/ui";
@@ -134,6 +136,7 @@ export function Profile() {
         </PrimaryButton>
         <div className="h-4" />
       </Sheet>
+      <AccountTools />
       <MeasuresSheet open={measOpen} onClose={() => setMeasOpen(false)} />
       <SettingsSheet open={setOpen} onClose={() => setSetOpen(false)} />
     </div>
@@ -298,5 +301,58 @@ function SettingsSheet({ open, onClose }: { open: boolean; onClose: () => void }
       </div>
       <div className="h-4" />
     </Sheet>
+  );
+}
+
+const EXPORT_TABLES = ["profiles", "garments", "outfits", "outfit_items", "inspirations", "style_picks", "academy_progress", "path_checks", "path_reviews", "progress_entries", "progress_photos", "field_trials", "workout_logs", "language_logs", "health_metrics", "health_workouts", "purchases", "wishlist", "artisans"];
+
+/** Promemoria, tema e copia dei dati: in fondo al profilo (sul telefono non c'è più il menu laterale). */
+function AccountTools() {
+  const app = useApp();
+  const { theme, toggle } = useTheme();
+  const [busy, setBusy] = useState(false);
+  const exportData = async () => {
+    setBusy(true);
+    try {
+      const out: Record<string, unknown> = { esportato_il: new Date().toISOString(), email: app.email };
+      for (const t of EXPORT_TABLES) {
+        const { data, error } = await supabase.from(t).select("*");
+        out[t] = error ? { errore: error.message } : data;
+      }
+      const prof = (out.profiles as Record<string, unknown>[] | undefined)?.[0];
+      if (prof) delete prof.ingest_token;
+      const blob = new Blob([JSON.stringify(out, null, 2)], { type: "application/json" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `habitus-dati-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+      app.toast("Copia dei dati scaricata");
+    } catch (e) {
+      app.toast((e as Error).message);
+    }
+    setBusy(false);
+  };
+  return (
+    <div className="mt-8 max-w-[720px] space-y-3">
+      <RemindersCard />
+      <div className="rounded-[22px] bg-surface shadow-soft divide-y divide-line">
+        <button onClick={toggle} className="w-full flex items-center gap-3 px-5 py-4 text-left">
+          {theme === "dark" ? <Sun size={19} /> : <Moon size={19} />}
+          <span className="flex-1 text-[15px] font-medium">{theme === "dark" ? "Tema chiaro" : "Tema scuro"}</span>
+        </button>
+        <button onClick={exportData} disabled={busy} className="w-full flex items-center gap-3 px-5 py-4 text-left">
+          {busy ? <Loader2 size={19} className="animate-spin" /> : <Download size={19} />}
+          <span className="flex-1">
+            <span className="block text-[15px] font-medium">Scarica una copia dei tuoi dati</span>
+            <span className="block text-[12.5px] text-muted">Tutto il percorso, l'armadio, i progressi e i diari in un file. Le foto restano nell'archivio.</span>
+          </span>
+        </button>
+        <button onClick={() => supabase.auth.signOut()} className="w-full flex items-center gap-3 px-5 py-4 text-left text-muted">
+          <LogOut size={19} />
+          <span className="flex-1 text-[15px] font-medium">Esci</span>
+        </button>
+      </div>
+    </div>
   );
 }

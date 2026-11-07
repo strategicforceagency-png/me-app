@@ -174,7 +174,7 @@ export function Questionnaire({ onClose, onDone }: { onClose: () => void; onDone
                 <div className="text-[11px] uppercase tracking-[0.16em] text-gold font-bold mt-8">Accademia Habitus</div>
                 <h1 className="font-display text-[42px] font-semibold leading-[1.03] mt-2">Prima di cominciare, conosciamoci.</h1>
                 <p className="text-[16px] text-muted mt-4 leading-relaxed">
-                  {total} domande, circa 6 minuti. Servono a capire chi sei oggi per costruire il tuo percorso da gentleman: stile, portamento, linguaggio, fisico, salute, grooming e cultura.
+                  {total} domande, circa 8 minuti. Servono a capire chi sei oggi per costruire il tuo percorso da gentleman: stile, portamento, linguaggio, fisico, salute, grooming e cultura.
                 </p>
                 <ul className="mt-6 space-y-2 text-[14.5px]">
                   {SEZIONI.map((s) => (

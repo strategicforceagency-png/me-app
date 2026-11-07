@@ -22,7 +22,7 @@ export const vestirsi: Course = {
           items: [
             { titolo: "Spalle", text: "La cucitura finisce esattamente dove finisce la tua spalla. Se vedi un avvallamento sotto la spalla è grande, se tira è piccola. Le spalle non si sistemano dal sarto: sceglile bene in negozio." },
             { titolo: "Collo", text: "Il collo della giacca appoggia su quello della camicia, senza staccarsi quando ti muovi. Della camicia devono vedersi circa 1–1,5 cm sopra il bavero." },
-            { titolo: "Maniche", text: "Con le braccia lungo i fianchi deve uscire 1–1,5 cm di polsino della camicia. Si accorciano facilmente dal sarto." },
+            { titolo: "Maniche", text: "Con le braccia lungo i fianchi deve uscire circa 1 cm di polsino della camicia (tra 0,5 e 1,5 cm, a seconda dei gusti). Si accorciano facilmente dal sarto." },
             { titolo: "Bottone", text: "Chiuso, il bottone non deve formare una X di pieghe sul petto. Se tira, la giacca è stretta." },
             { titolo: "Lunghezza", text: "Deve coprire il sedere. Con le braccia rilassate, l'orlo arriva circa all'altezza delle nocche." },
           ],
@@ -48,6 +48,11 @@ export const vestirsi: Course = {
         },
         { t: "tip", text: "Il sarto è il tuo miglior alleato: orli, maniche e fianchi costano poco e cambiano tutto. Spalle e lunghezza della giacca invece vanno giuste in partenza." },
       ],
+      fonti: [
+        { titolo: "T.M. Lewin – How a suit should fit", url: "https://tmlewin.co.uk/blogs/the-fitting-room/how-a-suit-should-fit" },
+        { titolo: "Savile Row Co – How a dress shirt should fit", url: "https://savilerowco.com/blogs/news/how-a-mens-formal-shirt-should-fit" },
+        { titolo: "QuiFinanza – Il galateo dell'uomo elegante", url: "https://quifinanza.it/info-utili/galateo-uomo-elegante/137875/amp/" },
+      ],
     },
     {
       id: "dress-code",
@@ -60,7 +65,7 @@ export const vestirsi: Course = {
           head: ["Dress code", "Cosa indossare", "Scarpe"],
           rows: [
             ["White tie (Cravatta bianca)", "Frac nero, gilet e papillon bianchi. Rarissimo: gala di Stato, balli ufficiali", "Vernice nera"],
-            ["Black tie (Cravatta nera)", "Smoking nero o blu notte, camicia bianca, papillon nero annodato a mano, fascia o gilet", "Oxford nera lucida o vernice"],
+            ["Black tie (Cravatta nera)", "Smoking nero o blu notte, camicia bianca, papillon nero annodato a mano, fascia o gilet (mai entrambi)", "Oxford nera lucida o vernice"],
             ["Formale / Cerimonia", "Abito scuro (blu, grigio antracite), camicia bianca, cravatta", "Oxford nera o marrone scuro"],
             ["Business formal", "Abito blu o grigio, camicia bianca o azzurra, cravatta sobria", "Oxford o derby nera/marrone scuro"],
             ["Business casual", "Giacca senza cravatta, pantalone in lana o chino, camicia o maglia fine", "Derby, mocassino, monk"],
@@ -73,11 +78,17 @@ export const vestirsi: Course = {
         {
           t: "list",
           items: [
-            "Orario: dopo le 19 l'abito si scurisce (blu notte, antracite, nero per lo smoking).",
+            "Orario: la sera (tradizionalmente dopo le 18, o dal tramonto) l'abito si scurisce (blu notte, antracite); lo smoking è solo da sera.",
             "Luogo: in spiaggia o in campagna lino, cotone e colori chiari; in città e al chiuso lana e toni scuri.",
             "Matrimonio di giorno: abito chiaro o blu, mai il nero (in Italia è tradizionalmente da sera o da lutto).",
           ],
         },
+      ],
+      fonti: [
+        { titolo: "Wikipedia – Black tie", url: "https://en.wikipedia.org/wiki/Black_tie" },
+        { titolo: "Wikipedia – White tie", url: "https://en.wikipedia.org/wiki/White_tie" },
+        { titolo: "Gieves & Hawkes – A gentleman's guide to black tie", url: "https://www.gievesandhawkes.com/blogs/journal/a-gentlemans-guide-to-black-tie" },
+        { titolo: "VelvetStyle – Cosa non indossare a un matrimonio", url: "https://www.velvetstyle.it/2024/06/19/10-cose-da-non-indossare-mai-ad-un-matrimonio-non-commettere-mai-questi-errori" },
       ],
     },
     {
@@ -105,6 +116,10 @@ export const vestirsi: Course = {
           no: ["Giacca e pantalone di due grigi o due blu simili (sembra un abito sbagliato)", "Calzini bianchi con abito", "Camicia nera con cravatta nera di giorno"],
         },
       ],
+      fonti: [
+        { titolo: "Permanent Style – Density of pattern", url: "https://www.permanentstyle.com/2008/12/density-of-pattern.html" },
+        { titolo: "Gentleman's Gazette – Pairing belts, shoes and metals", url: "https://www.gentlemansgazette.com/pair-belts-shoes-metal/" },
+      ],
     },
     {
       id: "bottoni",
@@ -119,11 +134,17 @@ export const vestirsi: Course = {
             "Due bottoni: allacci quello in alto, mai quello in basso.",
             "Tre bottoni: quello centrale sempre, quello in alto a scelta, quello in basso mai (\"a volte, sempre, mai\").",
             "Un bottone: sempre allacciato quando sei in piedi.",
-            "Doppiopetto: sempre allacciato; il bottone in basso di solito resta aperto.",
-            "Gilet: tutti allacciati tranne l'ultimo.",
+            "Doppiopetto: allacciato quando sei in piedi (bottone di vita e bottone interno); il bottone in basso di solito resta aperto.",
+            "Gilet: tutti allacciati tranne l'ultimo (salvo i gilet tagliati per essere chiusi del tutto, come molti con il fondo dritto).",
           ],
         },
-        { t: "tip", text: "Quando ti siedi slaccia la giacca monopetto; riallacciala quando ti alzi. Il doppiopetto invece resta chiuso." },
+        { t: "tip", text: "Quando ti siedi slaccia la giacca monopetto; riallacciala quando ti alzi. Il doppiopetto per tradizione resta chiuso anche da seduti, ma non è una regola rigida: c'è chi lo slaccia per comodità." },
+      ],
+      fonti: [
+        { titolo: "Permanent Style – Button the waist button", url: "https://www.permanentstyle.com/?p=718" },
+        { titolo: "Art of Manliness – Sometimes, always, never", url: "https://www.artofmanliness.com/style/clothing/the-sometimes-always-never-3-button-rule/" },
+        { titolo: "Put This On – Double-breasted when seated?", url: "https://putthison.com/?p=12698" },
+        { titolo: "Mental Floss – Origine della regola dei bottoni", url: "https://www.mentalfloss.com/culture/fashion-beauty/whats-origin-sometimes-always-never-rule-buttoning-suit" },
       ],
     },
     {
@@ -146,6 +167,10 @@ export const vestirsi: Course = {
           ],
         },
         { t: "tip", text: "Prima di comprare chiediti: \"Con quanti capi che ho già lo posso abbinare?\". Se la risposta è meno di tre, lascialo in negozio. La sezione Stile di Habitus lo calcola per te." },
+      ],
+      fonti: [
+        { titolo: "Permanent Style – The staples of a good wardrobe", url: "https://www.permanentstyle.com/2014/08/the-staples-of-a-good-wardrobe.html" },
+        { titolo: "Gentleman's Gazette – 10 items every man should own", url: "https://www.gentlemansgazette.com/10-mens-clothing-must-haves/" },
       ],
     },
   ],
@@ -170,7 +195,7 @@ export const galateo: Course = {
           t: "list",
           items: [
             "Porta: aprila e tienila, lasciando passare prima lei (o chiunque arrivi dopo di te). Con le porte girevoli entri prima tu per avviarla.",
-            "Ristorante e locali pubblici: secondo il galateo italiano l'uomo entra per primo, per farsi strada e accogliere; poi si scosta.",
+            "Ristorante e locali pubblici: secondo il galateo italiano classico l'uomo entra per primo, per farsi strada e accogliere; poi si scosta. Per alcuni esperti oggi la regola è più semplice: entra prima chi invita.",
             "Cappotto: aiutala a toglierlo e a indossarlo, tenendolo aperto all'altezza giusta.",
             "Sedia: scostala e accompagnala mentre si siede. Il posto migliore (vista sulla sala o sul panorama) è il suo.",
             "Per strada: tradizionalmente l'uomo cammina sul lato della strada.",
@@ -186,6 +211,12 @@ export const galateo: Course = {
           no: ["Ostentare i gesti per farti notare", "Commentare l'aspetto fisico in modo pesante", "Guardare il telefono mentre ti parla"],
         },
       ],
+      fonti: [
+        { titolo: "Dissapore – ABC del galateo", url: "https://www.dissapore.com/grande-notizia/se-vuoi-sapere-tutto-di-una-persona-mangiaci-insieme-almeno-una-volta-abc-del-galateo/" },
+        { titolo: "L'Unione Sarda – Il galateo secondo S. Briatore", url: "https://www.unionesarda.it/cultura/il-galateo-in-salsa-sarda-conosci-le-regole-oqxdlab5" },
+        { titolo: "Gentleman's Gazette – How to walk like a gentleman", url: "https://www.gentlemansgazette.com/walk-like-a-gentleman/" },
+        { titolo: "Miss Manners – Le scale (Spokesman-Review)", url: "https://www.spokesman.com/stories/2006/dec/08/woman-worries-man-is-checking-out-the-scenery" },
+      ],
     },
     {
       id: "presentazioni",
@@ -200,7 +231,7 @@ export const galateo: Course = {
             "Si presenta l'uomo alla donna, il più giovane al più anziano, chi ha un ruolo minore a chi ha un ruolo maggiore.",
             "A porgere la mano per primo è la donna, la persona più anziana o quella di grado più alto.",
             "Ci si alza sempre quando si viene presentati (le eccezioni sono solo per età o salute).",
-            "Di' il tuo nome e cognome, chiaramente. Ripeti il nome dell'altro: \"Piacere, Giulia\" ti aiuta a ricordarlo.",
+            "Di' il tuo nome e cognome, chiaramente. Ripeti il nome dell'altro: \"Buonasera, Giulia\" o \"Molto lieto, Giulia\" ti aiuta a ricordarlo. Il galateo classico sconsiglia \"piacere\" (oggi è tollerato); si recupera al congedo: \"È stato un piacere\".",
           ],
         },
         { t: "h", text: "La stretta di mano" },
@@ -215,6 +246,11 @@ export const galateo: Course = {
         },
         { t: "tip", text: "Il \"lei\" si usa con chi non conosci, con le persone più grandi e nel lavoro finché non è l'altro a proporre il \"tu\"." },
       ],
+      fonti: [
+        { titolo: "Velvet Mag – Bon ton delle presentazioni", url: "https://velvetmag.it/2023/02/26/bon-ton-delle-presentazioni-non-si-dice-mai-piacere" },
+        { titolo: "Studenti.it – Perché dire \"piacere\" è un errore", url: "https://www.studenti.it/dire-piacere-errore-galateo-come-presentarsi-bon-ton.html" },
+        { titolo: "Emily Post – Etiquette for a great handshake", url: "https://emilypost.com/advice/etiquette-for-a-great-handshake" },
+      ],
     },
     {
       id: "tavola",
@@ -227,7 +263,7 @@ export const galateo: Course = {
           t: "list",
           items: [
             "Posate: forchette a sinistra, coltelli e cucchiaio a destra. Si usano dall'esterno verso il piatto, una coppia per portata. Quelle sopra il piatto sono per il dolce.",
-            "Bicchieri: a destra, in alto. Il più grande è per l'acqua.",
+            "Bicchieri: a destra, in alto, in ordine d'uso. Nell'apparecchiatura italiana il più grande è di solito quello dell'acqua.",
             "Pane: piattino in alto a sinistra. Il pane si spezza con le mani, un boccone alla volta, mai col coltello.",
             "Tovagliolo: appena seduto, piegato a metà sulle gambe. Si usa per tamponare le labbra prima di bere. A fine pasto lo lasci a sinistra del piatto, senza ripiegarlo.",
           ],
@@ -238,7 +274,13 @@ export const galateo: Course = {
           si: ["Aspettare che tutti siano serviti prima di iniziare", "Portare il cibo alla bocca, non la bocca al piatto", "Mani sul tavolo (polsi appoggiati), gomiti giù"],
           no: ["Il telefono sul tavolo", "Tagliare tutta la carne in anticipo", "Il coltello in bocca o usato per il pesce (c'è la sua posata)", "Parlare con la bocca piena"],
         },
-        { t: "tip", text: "Il brindisi: si alza il calice guardando negli occhi; nelle occasioni formali i bicchieri non si toccano. Mai brindare con l'acqua." },
+        { t: "tip", text: "Il brindisi: si alza il calice, tenuto per lo stelo, guardando negli occhi; per il galateo i bicchieri non si toccano (il tintinnio si tollera solo tra amici). Brindare con l'acqua si evita per tradizione, ma è una superstizione più che una regola di galateo." },
+      ],
+      fonti: [
+        { titolo: "Neff – Apparecchiare secondo il galateo", url: "https://www.neff-home.com/it/the-ingredient/tips-tricks/come-si-apparecchia-la-tavola-secondo-il-galateo" },
+        { titolo: "Vorwerk – Galateo a tavola", url: "https://www.vorwerk.com/it/it/c/home/idee-e-ricette/magazine/bimby/lifestyle/galateo-a-tavola-regole-di-bon-ton" },
+        { titolo: "Il Post – Come si brinda", url: "https://www.ilpost.it/2023/12/31/brindisi-capodanno-brindare/" },
+        { titolo: "Dissapore – ABC del galateo", url: "https://www.dissapore.com/grande-notizia/se-vuoi-sapere-tutto-di-una-persona-mangiaci-insieme-almeno-una-volta-abc-del-galateo/" },
       ],
     },
     {
@@ -268,6 +310,11 @@ export const galateo: Course = {
           ],
         },
       ],
+      fonti: [
+        { titolo: "Visit Italy – Mance in Italia", url: "https://www.visititaly.eu/it/magazine/cosa-fare-in-italia/mance-in-italia-quando-quanto" },
+        { titolo: "Emily Post – All about hosting gifts", url: "https://emilypost.substack.com/p/etiquette-today-all-about-hosting" },
+        { titolo: "greenMe – Crisantemo, il fiore dei morti", url: "https://www.greenme.it/?p=816803" },
+      ],
     },
     {
       id: "digitale",
@@ -290,6 +337,11 @@ export const galateo: Course = {
             "Pubblicare foto di altri senza chiedere",
           ],
         },
+      ],
+      fonti: [
+        { titolo: "Emily Post – Il cellulare in pubblico", url: "https://emilypost.com/advice/answering-your-cell-phone-in-public" },
+        { titolo: "Washington Post (via Boston.com) – Phone call etiquette", url: "https://www.boston.com/news/national-news/2023/09/25/the-new-phone-call-etiquette-text-first-and-never-leave-a-voice-mail/" },
+        { titolo: "AARP – Speakerphone etiquette", url: "https://www.aarp.org/family-relationships/modern-manners-speakerphone-etiquette/" },
       ],
     },
   ],
@@ -325,19 +377,25 @@ export const cravatte: Course = {
           t: "table",
           head: ["Colletto", "Nodo consigliato"],
           rows: [
-            ["Classico o stretto (punte vicine)", "Semplice (Four-in-hand) o Pratt"],
-            ["Francese o italiano (aperto)", "Mezzo Windsor"],
-            ["Molto aperto (cutaway)", "Windsor"],
+            ["Classico o stretto (punte vicine)", "Semplice (Four-in-hand)"],
+            ["Francese o italiano (aperto)", "Mezzo Windsor o Pratt"],
+            ["Molto aperto (cutaway)", "Windsor (per alcuni anche il Pratt)"],
             ["Button-down", "Semplice, con cravatta in maglia o lana"],
           ],
         },
+      ],
+      fonti: [
+        { titolo: "Effortless Gent – The perfect fit: ties", url: "https://effortlessgent.com/perfect-fit-ties/" },
+        { titolo: "Real Men Real Style – Tie width guide", url: "https://www.realmenrealstyle.com/tie-width-guide/" },
+        { titolo: "Wikipedia – Windsor knot", url: "https://en.wikipedia.org/wiki/Windsor_knot" },
+        { titolo: "Gentleman's Gazette – Pratt (Shelby) knot", url: "https://www.gentlemansgazette.com/pratt-knott-shelby-knot-how-to-tie/" },
       ],
     },
     {
       id: "nodo-semplice",
       titolo: "Nodo semplice (Four-in-hand)",
       minuti: 3,
-      intro: "Il più usato al mondo: stretto, leggermente asimmetrico, va bene quasi sempre.",
+      intro: "Probabilmente il nodo più usato al mondo: stretto, leggermente asimmetrico, va bene quasi sempre.",
       blocks: [
         {
           t: "steps",
@@ -351,6 +409,10 @@ export const cravatte: Course = {
           ],
         },
         { t: "tip", text: "Se la punta viene troppo lunga, rifai il nodo partendo con la parte larga più in alto di 2–3 cm. Al secondo tentativo sarà perfetta." },
+      ],
+      fonti: [
+        { titolo: "Wikipedia – Four-in-hand knot", url: "https://en.wikipedia.org/wiki/Four-in-hand_knot" },
+        { titolo: "Animated Knots – Four-in-hand", url: "https://www.animatedknots.com/tie-a-four-in-hand-necktie-knot" },
       ],
     },
     {
@@ -371,6 +433,11 @@ export const cravatte: Course = {
             { text: "Infilala giù nella fascia frontale e stringi con calma, modellando la fossetta.", fig: { k: "tie", p: { pose: "done-wide" } } },
           ],
         },
+      ],
+      fonti: [
+        { titolo: "Wikipedia – Half-Windsor knot", url: "https://en.wikipedia.org/wiki/Half-Windsor_knot" },
+        { titolo: "Eton – How to tie a half Windsor", url: "https://www.etonshirts.com/journal/guides/how-to-tie-a-half-windsor-knot" },
+        { titolo: "Mr Porter – How to tie a half-Windsor", url: "https://www.mrporter.com/en-pl/journal/fashion/how-to-tie-a-half-windsor-knot-681706" },
       ],
     },
     {
@@ -394,6 +461,10 @@ export const cravatte: Course = {
         },
         { t: "tip", text: "Il Windsor su un colletto stretto sembra schiacciato: in quel caso torna al nodo semplice." },
       ],
+      fonti: [
+        { titolo: "Wikipedia – Windsor knot", url: "https://en.wikipedia.org/wiki/Windsor_knot" },
+        { titolo: "The Knots Manual – Windsor knot", url: "https://theknotsmanual.com/necktie-knots/windsor/" },
+      ],
     },
     {
       id: "pratt",
@@ -413,6 +484,10 @@ export const cravatte: Course = {
           ],
         },
       ],
+      fonti: [
+        { titolo: "Wikipedia – Pratt knot", url: "https://en.wikipedia.org/wiki/Pratt_knot" },
+        { titolo: "Gentleman's Gazette – Pratt (Shelby) knot", url: "https://www.gentlemansgazette.com/pratt-knott-shelby-knot-how-to-tie/" },
+      ],
     },
     {
       id: "papillon",
@@ -424,7 +499,7 @@ export const cravatte: Course = {
         {
           t: "steps",
           items: [
-            { text: "Regola il papillon sulla misura del tuo collo. Mettilo con il lato sinistro più lungo di circa 4 cm." },
+            { text: "Regola il papillon sulla misura del tuo collo. Mettilo con il lato sinistro più lungo di qualche centimetro (in genere 3–5 cm)." },
             { text: "Incrocia il lato lungo sopra il corto e portalo su da sotto, attraverso il collo, come il primo passaggio di un nodo." },
             { text: "Piega il lato corto (quello in basso) a metà nella sua parte larga e mettilo orizzontale: è la parte frontale del fiocco." },
             { text: "Lascia cadere il lato lungo davanti, sopra il centro del fiocco." },
@@ -433,6 +508,11 @@ export const cravatte: Course = {
           ],
         },
         { t: "tip", text: "Esercitati attorno alla gamba (sulla coscia), con la stessa logica di un fiocco delle scarpe. Dopo tre volte ti viene da solo." },
+      ],
+      fonti: [
+        { titolo: "Art of Manliness – How to tie a bow tie", url: "https://www.artofmanliness.com/style/accessories/how-to-tie-a-bow/" },
+        { titolo: "The Tie Bar – How to tie a bow tie", url: "https://www.thetiebar.com/how-to-tie/bow-tie" },
+        { titolo: "Gieves & Hawkes – A gentleman's guide to black tie", url: "https://www.gievesandhawkes.com/blogs/journal/a-gentlemans-guide-to-black-tie" },
       ],
     },
     {
@@ -446,7 +526,7 @@ export const cravatte: Course = {
           t: "table",
           head: ["Piega", "Come si fa", "Quando"],
           rows: [
-            ["Dritta (TV)", "Piega in 4, poi a misura del taschino; sporge 1–1,5 cm, linea orizzontale", "Business, cerimonie, smoking (in lino bianco)"],
+            ["Dritta (TV)", "Piega in 4, poi a misura del taschino; sporge 1–1,5 cm, linea orizzontale", "Business, cerimonie, smoking (bianca, in lino o seta)"],
             ["Una punta", "Piega a triangolo, porta gli angoli laterali al centro e infila", "Classica e versatile"],
             ["Tre punte", "Triangolo, poi angoli laterali sollevati sfalsati ai lati della punta centrale", "Cerimonie, eventi formali"],
             ["A sbuffo", "Prendi il fazzoletto dal centro, chiudi la mano e infila le punte nel taschino", "Seta, informale-elegante, sera"],
@@ -458,6 +538,11 @@ export const cravatte: Course = {
           no: ["Pochette e cravatta identiche (set coordinato)", "Pochette troppo sporgente", "Pochette con giacche da lavoro molto tecniche o sportive"],
         },
       ],
+      fonti: [
+        { titolo: "Turnbull & Asser – How to fold a pocket square", url: "https://turnbullandasser.com/blogs/off-the-cuff/how-to-fold-a-pocket-square" },
+        { titolo: "Real Men Real Style – How to fold a pocket square", url: "https://www.realmenrealstyle.com/how-to-fold-a-pocket-square/" },
+        { titolo: "QuiFinanza – Il galateo dell'uomo elegante", url: "https://quifinanza.it/info-utili/galateo-uomo-elegante/137875/amp/" },
+      ],
     },
     {
       id: "gemelli",
@@ -465,7 +550,7 @@ export const cravatte: Course = {
       minuti: 4,
       intro: "Piccoli gioielli maschili: si portano con sobrietà.",
       blocks: [
-        { t: "p", text: "I gemelli si usano solo con il polsino doppio (\"alla francese\") o con camicie predisposte con due asole. Il polsino si piega su se stesso e i due lembi si uniscono affiancati, lato interno contro lato interno, non sovrapposti come un normale polsino." },
+        { t: "p", text: "I gemelli si usano solo con il polsino doppio (\"alla francese\") o con camicie predisposte con due asole. Il polsino si piega su se stesso e di solito i due lembi si uniscono affiancati \"a bacio\", lato interno contro lato interno; la chiusura sovrapposta, come un normale polsino, esiste ma è meno classica." },
         { t: "fig", fig: { k: "frenchCuff" } },
         { t: "fig", fig: { k: "cufflinks", caption: "I tipi di gemelli" } },
         {
@@ -488,6 +573,11 @@ export const cravatte: Course = {
             "Stesso metallo di gemelli e orologio.",
           ],
         },
+      ],
+      fonti: [
+        { titolo: "Real Men Real Style – Guide to cufflinks", url: "https://www.realmenrealstyle.com/ultimate-guide-cufflinks/" },
+        { titolo: "The Tie Bar – Tie bar placement rules", url: "https://www.thetiebar.com/blogs/faqs/tie-bar-placement-rules" },
+        { titolo: "Gentleman's Gazette – Pairing belts, shoes and metals", url: "https://www.gentlemansgazette.com/pair-belts-shoes-metal/" },
       ],
     },
   ],

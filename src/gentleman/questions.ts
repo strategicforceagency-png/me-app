@@ -32,6 +32,21 @@ export const SEZIONI: Section[] = [
     ],
   },
   {
+    id: "vita",
+    titolo: "La tua vita reale",
+    intro: "Un percorso funziona solo se entra nelle tue giornate vere. Qui conta l'onestà.",
+    domande: [
+      { id: "casa", tipo: "single", domanda: "In casa oggi…", opzioni: ["Vivo da solo", "In coppia, senza figli", "Con un neonato o un bimbo piccolo", "Con figli in età scolare", "Con figli grandi", "Con i miei genitori o coinquilini"] },
+      { id: "giornate_piene", tipo: "single", domanda: "Quante giornate a settimana sono piene dalla mattina alla sera?", opzioni: ["Nessuna o quasi", "1–2", "3–4", "Praticamente tutte"] },
+      { id: "momento_libero", tipo: "multi", domanda: "Quando hai davvero un po' di tempo per te?", aiuto: "Scegli tutto quello che vale.", opzioni: ["Presto la mattina", "In pausa pranzo", "Nel tardo pomeriggio", "La sera tardi", "Nel fine settimana", "Quasi mai"] },
+      { id: "sonno_prevedibile", tipo: "scale", domanda: "Quanto è regolare il tuo sonno in questo periodo?", aiuto: "Risvegli notturni, turni, bambini, viaggi…", min: "Imprevedibile", max: "Regolarissimo" },
+      { id: "energia", tipo: "scale", domanda: "Com'è la tua energia media durante la giornata?", min: "Sempre a terra", max: "Sempre carico" },
+      { id: "stress", tipo: "scale", domanda: "Quanto stress senti in questo periodo?", min: "Pochissimo", max: "Moltissimo" },
+      { id: "costanza", tipo: "single", domanda: "Quando inizi qualcosa di nuovo, di solito…", opzioni: ["Parto forte e mollo dopo poco", "Vado a periodi", "Sono costante se ho un piano chiaro", "Sono costante sempre"] },
+      { id: "impegni_fissi", tipo: "text", domanda: "Impegni fissi o vincoli che il percorso deve rispettare?", placeholder: "Es. call alle 9 ogni giorno, sabato con la famiglia, viaggio di lavoro ogni mese…", facoltativa: true },
+    ],
+  },
+  {
     id: "stile",
     titolo: "Il tuo stile oggi",
     intro: "Nessun giudizio: serve a capire da dove partiamo.",
@@ -44,7 +59,10 @@ export const SEZIONI: Section[] = [
         domanda: "Cosa ti mette più in difficoltà nel vestirti?",
         opzioni: ["Abbinare colori e capi", "Trovare la taglia e la vestibilità giuste", "Non ho i capi giusti", "Capire cosa mettere nelle occasioni", "Ho poco tempo la mattina", "Il budget"],
       },
-      { id: "budget", tipo: "single", domanda: "Quanto puoi investire nel guardaroba ogni mese?", opzioni: ["Meno di 100 €", "100–300 €", "300–600 €", "Più di 600 €"] },
+      { id: "budget", tipo: "single", domanda: "Quanto puoi investire nel guardaroba ogni mese?", aiuto: "Comprese le riparazioni dal sarto e dal calzolaio.", opzioni: ["Meno di 50 €", "50–100 €", "100–300 €", "300–600 €", "Più di 600 €"] },
+      { id: "approccio_acquisti", tipo: "single", domanda: "Preferisci…", opzioni: ["Pochi capi di qualità, anche se ci metto di più", "Più capi a prezzo contenuto", "Un mix: qualità dove conta, risparmio sul resto"] },
+      { id: "dove_compri", tipo: "multi", domanda: "Dove compri oggi?", opzioni: ["Catene di moda (Zara, H&M, Uniqlo…)", "Outlet e saldi", "Negozi di marca", "Online", "Usato e vintage", "Sartoria o su misura"] },
+      { id: "artigiani", tipo: "multi", domanda: "Hai già degli artigiani di fiducia?", opzioni: ["Un sarto", "Un camiciaio", "Un calzolaio", "Un barbiere", "Nessuno"] },
     ],
   },
   {

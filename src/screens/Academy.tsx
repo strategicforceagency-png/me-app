@@ -385,6 +385,21 @@ function LessonView({ course, lesson, done, onToggle, go, doneSet }: { course: C
         ))}
       </div>
 
+      {lesson.fonti && lesson.fonti.length > 0 && (
+        <div className="mt-8 rounded-[16px] border border-line bg-surface p-4">
+          <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-gold mb-2">Fonti verificate</div>
+          <ul className="space-y-1.5">
+            {lesson.fonti.map((f) => (
+              <li key={f.url} className="text-[14px] leading-snug">
+                <a href={f.url} target="_blank" rel="noreferrer" className="underline decoration-line underline-offset-2 hover:text-gold">
+                  {f.titolo}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <Maestro course={course} lesson={lesson} />
 
       <div className="mt-8 flex flex-col sm:flex-row gap-2">

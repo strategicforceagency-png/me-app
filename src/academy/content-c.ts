@@ -27,7 +27,11 @@ export const inglese: Course = {
             "**Cortesia verso tutti**: si tratta il cameriere come il direttore. È lì che si vede il vero gentleman.",
           ],
         },
-        { t: "tip", text: "\"Manners maketh man\": sono i modi a fare l'uomo. Un abito perfetto con modi sgarbati resta un costume." },
+        { t: "tip", text: "\"Manners makyth man\" (il motto di William of Wykeham, fondatore del New College di Oxford e del Winchester College): sono i modi a fare l'uomo. Un abito perfetto con modi sgarbati resta un costume." },
+      ],
+      fonti: [
+        { titolo: "New College, Oxford – Wikipedia", url: "https://en.wikipedia.org/wiki/New_College,_Oxford" },
+        { titolo: "“Manners Makyth Man” – New College Oxford", url: "https://www.new.ox.ac.uk/node/1671" },
       ],
     },
     {
@@ -51,6 +55,11 @@ export const inglese: Course = {
         { t: "p", text: "La vecchia regola \"no brown in town\" voleva le scarpe marroni solo in campagna. Oggi il marrone scuro in città è accettato; resta però vero che la scarpa nera liscia è la più formale e la più cittadina." },
         { t: "tip", text: "Il blazer blu è il ponte tra i due mondi: con flanella grigia va in città, con chino e mocassini va al mare o in campagna." },
       ],
+      fonti: [
+        { titolo: "The rules and how to break them – Permanent Style", url: "https://www.permanentstyle.com/2008/09/the-rules-and-how-to-break-them-no2.html" },
+        { titolo: "How to Wear Brown – The Rake", url: "https://therake.com/stories/how-to-wear-brown" },
+        { titolo: "The origins of the Oxford shoe – Country Life", url: "https://www.countrylife.co.uk/luxury/style/the-origins-of-the-oxford-shoe-and-why-it-will-never-go-out-of-style" },
+      ],
     },
     {
       id: "guardaroba-british",
@@ -66,7 +75,7 @@ export const inglese: Course = {
             "**Blazer blu**: con bottoni in metallo o in corno, da portare con flanella grigia o chino.",
             "**Giacca in tweed**: spina di pesce o Principe di Galles nei toni della terra, con toppe ai gomiti per il tempo libero.",
             "**Camicie di stile Jermyn Street**: bianche, azzurre, a righe sottili, collo francese di media apertura; polsino doppio per le occasioni.",
-            "**Cravatte regimental e in maglia**: righe diagonali in seta per il lavoro, maglia di seta o lana per il tempo libero.",
+            "**Cravatte regimental e in maglia**: righe diagonali in seta per il lavoro, maglia di seta o lana per il tempo libero. In Inghilterra i colori di un vero reggimento o club indicano un'appartenenza: meglio evitarli davanti a chi ne fa parte.",
             "**Maglieria**: girocollo in lana shetland, cardigan, dolcevita (molto anni '70) sotto la giacca.",
             "**Capispalla**: trench color sabbia, cappotto Chesterfield con collo in velluto, giacca cerata per la campagna.",
             "**Scarpe**: Oxford e brogue di tradizione inglese, chukka in camoscio, stivaletti Chelsea.",
@@ -81,7 +90,13 @@ export const inglese: Course = {
             "Oggi il compromesso migliore: vita alta con una pince, revers medi (8–9 cm), cravatta da 7–8 cm, giacca che copre il sedere.",
           ],
         },
-        { t: "tip", text: "Le bretelle sono un dettaglio molto britannico: con i pantaloni a vita alta fanno cadere meglio la stoffa. Si attaccano con bottoni interni, mai con le pinze, e non si portano insieme alla cintura." },
+        { t: "tip", text: "Le bretelle sono un dettaglio molto britannico: con i pantaloni a vita alta fanno cadere meglio la stoffa. Tradizionalmente si attaccano con bottoni interni, non con le pinze, e non si portano insieme alla cintura." },
+      ],
+      fonti: [
+        { titolo: "The Peacock Revolution: 1960s menswear – V&A", url: "https://www.vam.ac.uk/articles/the-peacock-revolution-1960s-menswear" },
+        { titolo: "Chesterfield coat – Wikipedia", url: "https://en.wikipedia.org/wiki/Chesterfield_coat" },
+        { titolo: "American rep ties vs. British regimental ties – Ivy Style", url: "https://www.ivy-style.com/american-rep-ties-vs-british-regimental-ties.html" },
+        { titolo: "Where the brace buttons should be – Permanent Style", url: "https://www.permanentstyle.com/2010/03/where-the-brace-buttons-should-be.html" },
       ],
     },
     {
@@ -102,10 +117,16 @@ export const inglese: Course = {
             ["Pied-de-poule", "Motivo a piccoli denti spezzati", "Giacche e cappotti"],
             ["Spina di pesce", "Righe a zig-zag come una lisca", "Tweed, cappotti, giacche"],
             ["Gessato", "Righe sottili e distanziate su fondo scuro", "Abiti da città, ambiente d'affari"],
-            ["Tattersall", "Quadretti di due colori su fondo chiaro", "Camicie da campagna"],
+            ["Tattersall", "Righe sottili di due colori alternati che formano quadretti su fondo chiaro", "Camicie da campagna"],
           ],
         },
         { t: "tip", text: "Se abbini una giacca a fantasia, scegli camicia e cravatta più semplici: una protagonista per volta." },
+      ],
+      fonti: [
+        { titolo: "Tattersall (cloth) – Wikipedia", url: "https://en.wikipedia.org/wiki/Tattersall_(cloth)" },
+        { titolo: "A Brief History of the Glen Check – Drake's", url: "https://www.drakes.com/blogs/news/a-brief-history-of-the-glen-check" },
+        { titolo: "Check mate: a guide to checked shirt patterns – Permanent Style", url: "https://www.permanentstyle.com/2021/01/check-mate-a-guide-to-checked-shirt-patterns.html" },
+        { titolo: "Heritage – Hunt & Winterbotham (Fresco)", url: "https://www.hfwltd.com/heritage" },
       ],
     },
     {
@@ -127,13 +148,18 @@ export const inglese: Course = {
         {
           t: "list",
           items: [
-            "Nero o blu notte, revers a lancia o a scialle in raso, pantalone con banda laterale.",
-            "Camicia bianca con pettorina, gemelli, papillon nero annodato a mano.",
-            "Fascia in vita o gilet, calze nere di seta, Oxford nera lucida o in vernice.",
+            "Nero o blu notte, revers a lancia o a scialle rivestiti di seta (raso o gros-grain), pantalone con banda laterale di seta, senza risvolto.",
+            "Camicia bianca con pettorina plissettata o in piqué, polsini doppi con gemelli, papillon nero annodato a mano.",
+            "Fascia in vita o gilet (mai entrambi), calze nere di seta o lana fine, Oxford nera lucida o scarpe in vernice.",
             "Niente orologio sportivo: uno sottile con cinturino nero, o nessuno.",
           ],
         },
-        { t: "tip", text: "Black tie sull'invito significa smoking. Se non ne hai uno, il ripiego più dignitoso è un abito blu notte con cravatta nera: mai un abito qualunque." },
+        { t: "tip", text: "Black tie sull'invito significa smoking. Se non ne hai uno, il ripiego più dignitoso è un abito scuro e liscio (blu notte o antracite) con cravatta scura: mai un abito qualunque." },
+      ],
+      fonti: [
+        { titolo: "Black tie – Wikipedia", url: "https://en.wikipedia.org/wiki/Black_tie" },
+        { titolo: "Dinner Jacket Black Tie Guide – Gentleman's Gazette", url: "https://www.gentlemansgazette.com/dinner-jacket-black-tie-guide/" },
+        { titolo: "Why do Wimbledon players wear all white? – Mental Floss", url: "https://www.mentalfloss.com/sports/why-do-wimbledon-players-wear-all-white" },
       ],
     },
   ],
@@ -175,6 +201,11 @@ export const vocabolario: Course = {
         },
         { t: "tip", text: "Il \"lei\" si mantiene finché l'altro non propone il \"tu\". Proporlo spetta alla persona più anziana o di ruolo più alto." },
       ],
+      fonti: [
+        { titolo: "Lei, uso del – La grammatica italiana, Treccani", url: "https://www.treccani.it/enciclopedia/uso-del-lei_(La-grammatica-italiana)/" },
+        { titolo: "Allocutivi, pronomi – Enciclopedia dell'Italiano, Treccani", url: "https://www.treccani.it/enciclopedia/pronomi-allocutivi_(Enciclopedia-dell'Italiano)/" },
+        { titolo: "Variazione diafasica – Enciclopedia dell'Italiano, Treccani", url: "https://www.treccani.it/enciclopedia/variazione-diafasica_(Enciclopedia-dell'Italiano)/" },
+      ],
     },
     {
       id: "parole-da-evitare",
@@ -206,8 +237,14 @@ export const vocabolario: Course = {
           ],
         },
         { t: "h", text: "Le parolacce" },
-        { t: "p", text: "Un gentleman le conosce ma le usa quasi mai, e mai davanti a chi non conosce bene, a clienti, a donne appena conosciute o a bambini. Quando la frustrazione sale, una frase pacata è molto più potente: \"Questo non è accettabile\" pesa più di qualsiasi imprecazione." },
+        { t: "p", text: "Un gentleman le conosce ma non le usa quasi mai, e mai davanti a chi non conosce bene, a clienti, a donne appena conosciute o a bambini. Quando la frustrazione sale, una frase pacata è molto più potente: \"Questo non è accettabile\" pesa più di qualsiasi imprecazione." },
         { t: "tip", text: "Gli anglicismi non sono vietati: alcuni sono entrati nella lingua (sport, computer). Il problema è usarli quando esiste una parola italiana più chiara: suona come voler sembrare importanti." },
+      ],
+      fonti: [
+        { titolo: "Intercalari – Enciclopedia dell'Italiano, Treccani", url: "https://www.treccani.it/enciclopedia/intercalari_(Enciclopedia-dell'Italiano)/" },
+        { titolo: "Sull'uso di assolutamente – Accademia della Crusca", url: "https://accademiadellacrusca.it/it/consulenza/sulluso-di-assolutamente/131" },
+        { titolo: "Perché è utile tradurre gli anglismi – Accademia della Crusca", url: "https://accademiadellacrusca.it/it/contenuti/perch--utile-tradurre-gli-anglismi/12305" },
+        { titolo: "Anglicismi – Enciclopedia dell'Italiano, Treccani", url: "https://www.treccani.it/enciclopedia/anglicismi_(Enciclopedia-dell'Italiano)/" },
       ],
     },
     {
@@ -237,6 +274,10 @@ export const vocabolario: Course = {
           ],
         },
       ],
+      fonti: [
+        { titolo: "Cortesia, linguaggio della – Enciclopedia dell'Italiano, Treccani", url: "https://www.treccani.it/enciclopedia/linguaggio-della-cortesia_(Enciclopedia-dell'Italiano)/" },
+        { titolo: "Condizionale – La grammatica italiana, Treccani", url: "https://www.treccani.it/enciclopedia/condizionale_(La-grammatica-italiana)/" },
+      ],
     },
     {
       id: "conversazione",
@@ -263,6 +304,10 @@ export const vocabolario: Course = {
         { t: "h", text: "Chiudere con eleganza" },
         { t: "p", text: "Non sparire nel nulla: \"È stato davvero un piacere parlare con te, ora vado a salutare i padroni di casa\". Una frase chiara, un sorriso, una stretta di mano." },
       ],
+      fonti: [
+        { titolo: "Harvard research reveals a conversation trick to make you more likable – CNBC", url: "https://www.cnbc.com/2017/06/15/harvard-research-reveals-a-conversation-trick-to-make-you-more-likable.html" },
+        { titolo: "Asking questions can get you a better job or a second date – Harvard Business School Working Knowledge", url: "https://www.library.hbs.edu/working-knowledge/asking-questions-can-get-you-a-better-job-or-a-second-date" },
+      ],
     },
     {
       id: "scrivere",
@@ -288,6 +333,11 @@ export const vocabolario: Course = {
         { t: "h", text: "Il biglietto scritto a mano" },
         { t: "p", text: "Dopo una cena, un regalo o un favore importante, un biglietto a mano è il gesto più raro e più apprezzato. Bastano tre frasi: ringrazia per la cosa precisa, aggiungi un dettaglio personale, chiudi con un augurio." },
         { t: "tip", text: "Esempio: \"Cara Giulia, grazie per la splendida cena di sabato. Il tuo risotto lo ricorderemo a lungo. A presto, Manuel.\"" },
+      ],
+      fonti: [
+        { titolo: "Posta elettronica, lingua della – Enciclopedia dell'Italiano, Treccani", url: "https://www.treccani.it/enciclopedia/posta-elettronica-lingua-della_(Enciclopedia-dell'Italiano)/" },
+        { titolo: "Lettere commerciali e ufficiali [prontuario] – Enciclopedia dell'Italiano, Treccani", url: "https://www.treccani.it/enciclopedia/lettere-commerciali-e-ufficiali-prontuario_(Enciclopedia-dell'Italiano)/" },
+        { titolo: "Norme di redazione per le lettere – Accademia della Crusca", url: "https://accademiadellacrusca.it/it/consulenza/norme-di-redazione-per-le-lettere/109" },
       ],
     },
   ],

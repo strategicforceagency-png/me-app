@@ -70,6 +70,8 @@ export type Profile = {
   gentleman: Record<string, unknown> | null;
   path: unknown | null;
   path_started_at: string | null;
+  budget?: Budget | null;
+  promemoria?: Reminders | null;
 };
 export type OutfitItem = { garment_id: string; slot: Slot; layer: number };
 export type Outfit = {
@@ -273,3 +275,6 @@ export async function uploadBlob(bucket: string, uid: string, blob: Blob, prefix
   if (error) throw error;
   return path;
 }
+
+export type Budget = { mensile: number; approccio?: "qualita" | "quantita" | "mix"; inizio_mese?: number };
+export type Reminders = { attivi: boolean; tz: string; mattina: string; sera: string; revisione: string; mattina_on?: boolean; sera_on?: boolean; revisione_on?: boolean };
