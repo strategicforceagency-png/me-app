@@ -14,6 +14,7 @@ const SCREEN: Record<string, string> = {
   accademia: "Accademia (lezioni)",
   contenuti: "Contenuti e quaderno",
   linguaggio: "Laboratorio del linguaggio",
+  fisionomia: "Fisionomia (analisi del viso: taglio di capelli, barba, montature)",
   armadio: "Armadio",
   outfit: "Crea outfit",
   stile: "Ispirazioni di stile",

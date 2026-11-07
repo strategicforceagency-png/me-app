@@ -1,3 +1,4 @@
+import { PaletteStrip } from "./Face";
 import { motion } from "framer-motion";
 import { AtSign, Check, Download, Film, Heart, ImagePlus, Instagram, Link2, Loader2, Plus, RefreshCw, Search, Shirt, Sparkles, Trash2, Unlink, Wand2, X } from "lucide-react";
 import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -120,8 +121,12 @@ export function StyleScreen() {
         </button>
       </header>
 
+      <div className="mt-5">
+        <PaletteStrip />
+      </div>
+
       {/* Guida */}
-      <section className="mt-6">
+      <section className="mt-4">
         {guide ? (
           <GuideView guide={guide} onShop={setShop} onRebuild={build} building={building} picks={picks.length} />
         ) : (

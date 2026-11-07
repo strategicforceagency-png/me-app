@@ -121,6 +121,12 @@ export type Guide = {
   generato_il?: string;
 };
 
+// deno-lint-ignore no-explicit-any
+const paletteText = (p: any) =>
+  p?.colori?.length
+    ? `PALETTE PERSONALE (dall'analisi del suo viso, armocromia: ${p.stagione || ""}, sottotono ${p.sottotono || "?"}, contrasto ${p.contrasto || "?"}). Neutri: ${(p.neutri || []).map((c: { nome: string; hex: string }) => `${c.nome} ${c.hex}`).join(", ")}. Colori: ${(p.colori || []).map((c: { nome: string; hex: string }) => `${c.nome} ${c.hex}`).join(", ")}. Da evitare vicino al viso: ${(p.evitare || []).map((c: { nome: string }) => c.nome).join(", ")}. Metalli: ${p.metalli || "—"}. La palette della guida, i colori dei capi essenziali, delle formule e dei prossimi acquisti DEVONO partire da questa palette personale, adattata allo stile scelto: usa i neutri per completi, pantaloni e capispalla e i colori per camicie, cravatte e maglieria; non proporre i colori da evitare vicino al viso.`
+    : "";
+
 export async function buildGuide(
   gemini: GeminiFn,
   picks: { kind: string; value: unknown; fonte: string | null }[],
@@ -134,6 +140,7 @@ Il suo armadio attuale (id, nome, categoria, colore, formalità):
 ${JSON.stringify(wardrobe.map((g) => [g.id, g.nome, g.categoria, g.colore, g.formalita]))}
 
 Misure: altezza ${profile?.altezza ?? "?"} cm, peso ${profile?.peso ?? "?"} kg; taglie: top ${profile?.taglia_top || "?"}, pantaloni ${profile?.taglia_pantaloni || "?"}, scarpe ${profile?.taglia_scarpe || "?"}.
+${paletteText(profile?.palette)}
 
 Crea la SUA guida di stile personale: sintetizza gli elementi scelti in uno stile coerente e indossabile, adatto a lui. Confronta con l'armadio: per ogni capo essenziale indica se ce l'ha già (ce_l_hai=true e capo_id = id del capo più simile) oppure no. Nelle formule usa i nomi dei suoi capi quando esistono. I "prossimi_acquisti" sono massimo 6, ordinati per impatto (quelli che sbloccano più outfit con ciò che ha già). "ricerca" è una query breve in italiano per cercare quel capo online (es. "mocassino scamosciato marrone uomo"). "budget" è una fascia indicativa in euro.
 Rispondi SOLO con JSON valido in italiano:

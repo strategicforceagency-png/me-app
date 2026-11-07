@@ -74,6 +74,7 @@ export type Profile = {
   promemoria?: Reminders | null;
   citta?: string | null;
   scheda?: unknown;
+  palette?: unknown;
 };
 export type OutfitItem = { garment_id: string; slot: Slot; layer: number };
 export type Outfit = {

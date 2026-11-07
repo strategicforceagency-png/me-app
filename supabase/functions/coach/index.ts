@@ -43,11 +43,22 @@ Deno.serve(async (req) => {
     if (!question) return json({ error: "Scrivi una domanda" }, 400);
     const history = Array.isArray(b.history) ? b.history.slice(-12) : [];
 
-    const [{ data: prof }, { data: wardrobe }, { data: notes }] = await Promise.all([
-      sb.from("profiles").select("nome, altezza, peso, taglia_top, taglia_pantaloni, taglia_scarpe, style_guide, path, path_started_at, budget, scheda").eq("id", user.id).maybeSingle(),
+    const [{ data: prof }, { data: wardrobe }, { data: notes }, { data: face }] = await Promise.all([
+      sb.from("profiles").select("nome, altezza, peso, taglia_top, taglia_pantaloni, taglia_scarpe, style_guide, path, path_started_at, budget, scheda, palette").eq("id", user.id).maybeSingle(),
       sb.from("garments").select("nome, categoria, colore").limit(150),
       sb.from("knowledge").select("tema, titolo, affermazione, versione_corretta, verdetto").eq("stato", "approvata").limit(80),
+      sb.from("fisionomia").select("analisi, scelto, scelto_barba").not("analisi", "is", null).order("created_at", { ascending: false }).limit(1).maybeSingle(),
     ]);
+    // deno-lint-ignore no-explicit-any
+    const fa = face?.analisi as any;
+    // deno-lint-ignore no-explicit-any
+    const pal = prof?.palette as any;
+    const faceInfo = fa
+      ? `Viso ${fa.forma?.tipo}. Taglio scelto: ${fa.tagli?.[face?.scelto ?? 0]?.nome || "—"} (${fa.tagli?.[face?.scelto ?? 0]?.per_il_barbiere || ""}). Barba scelta: ${fa.barba?.stili?.[face?.scelto_barba ?? 0]?.nome || fa.barba?.consiglio || "—"}. Montature adatte: ${(fa.montature?.forme || []).join(", ")}. Colletto: ${fa.colletti?.camicia || "—"}, nodo ${fa.colletti?.nodo || "—"}.`
+      : "non ancora fatta (può farla nella sezione Fisionomia)";
+    const palInfo = pal?.colori?.length
+      ? `${pal.stagione} (sottotono ${pal.sottotono}, contrasto ${pal.contrasto}). Neutri: ${(pal.neutri || []).map((c: { nome: string }) => c.nome).join(", ")}. Colori: ${(pal.colori || []).map((c: { nome: string }) => c.nome).join(", ")}. Da evitare vicino al viso: ${(pal.evitare || []).map((c: { nome: string }) => c.nome).join(", ")}. Metalli: ${pal.metalli || "—"}.`
+      : "non ancora definita (può scoprirla nella sezione Fisionomia)";
     // deno-lint-ignore no-explicit-any
     const guide = prof?.style_guide as any;
     // deno-lint-ignore no-explicit-any
@@ -78,6 +89,8 @@ Il suo percorso: ${pathInfo}
 Budget mensile per il guardaroba: ${prof?.budget?.mensile ? prof.budget.mensile + " €" : "non indicato"}.
 Cosa sai di lui (scheda interna che Habitus aggiorna nel tempo: usala per personalizzare senza citarla esplicitamente): ${schedaText(prof?.scheda)}
 Utente: ${prof?.nome || "—"}, ${prof?.altezza ?? "?"} cm, ${prof?.peso ?? "?"} kg, taglie ${prof?.taglia_top || "?"}/${prof?.taglia_pantaloni || "?"}/${prof?.taglia_scarpe || "?"}.
+La sua fisionomia: ${faceInfo}
+La sua palette di colori (usala SEMPRE quando consigli colori di abiti, camicie, cravatte e abbinamenti): ${palInfo}
 Il suo stile: ${guide?.nome_stile ? `${guide.nome_stile} — ${(guide.parole_chiave || []).join(", ")}` : "non ancora definito"}.
 Il suo armadio (${wardrobe?.length || 0} capi): ${(wardrobe || []).map((g) => `${g.nome} (${g.categoria}${g.colore ? ", " + g.colore : ""})`).join("; ").slice(0, 3000) || "vuoto"}.
 Il suo quaderno (insegnamenti che ha raccolto da contenuti esterni, verificati e approvati da lui; tienine conto e citali quando pertinenti, segnalando se un'opinione è solo gusto): ${(notes || []).map((n) => `[${n.tema}] ${n.titolo}: ${n.versione_corretta || n.affermazione}${n.verdetto === "opinione" ? " (opinione)" : ""}`).join(" | ").slice(0, 5000) || "vuoto"}.`;
@@ -108,7 +121,7 @@ Il suo quaderno (insegnamenti che ha raccolto da contenuti esterni, verificati e
       last = j?.error?.message || `Errore ${r.status}`;
       if (![429, 404, 500, 503].includes(r.status)) break;
     }
-    return json({ error: /quota|demand|overloaded/i.test(last) ? "Il maestro è occupato, riprova tra poco" : last }, 502);
+    return json({ error: /quota|demand|overloaded/i.test(last) ? "Alfred è momentaneamente occupato, riprovi tra poco" : last }, 502);
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : String(e) }, 500);
   }

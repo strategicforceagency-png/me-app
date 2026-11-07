@@ -11,7 +11,7 @@ type Live = { id: string; icon: ReactNode; titolo: string; testo: string; vai: T
 /** Un promemoria arrivato (ricorrenze, controllo della settimana…): resta finché non lo leggi o lo cancelli. */
 type Stored = { id: string; kind: string; titolo: string; testo: string | null; vai: string | null; letta: boolean; created_at: string };
 
-const TABS: Tab[] = ["percorso", "linguaggio", "budget", "accademia", "fisico", "progressi", "armadio", "contenuti", "persone", "regali", "uscite", "lettere", "stile", "salute", "outfit"];
+const TABS: Tab[] = ["percorso", "linguaggio", "budget", "accademia", "fisico", "progressi", "armadio", "contenuti", "persone", "regali", "uscite", "lettere", "stile", "salute", "outfit", "fisionomia"];
 
 type Nav = Navigator & { setAppBadge?: (n?: number) => Promise<void>; clearAppBadge?: () => Promise<void> };
 

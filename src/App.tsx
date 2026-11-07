@@ -1,6 +1,6 @@
 import { Session } from "@supabase/supabase-js";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronDown, Compass, Fingerprint, Dumbbell, Feather, GraduationCap, HeartPulse, Loader2, LogOut, Moon, Plus, Shirt, Sparkles, Sun, TrendingUp, User, Wallet, Inbox, Heart, Gift, UtensilsCrossed, PenLine } from "lucide-react";
+import { ScanFace, ChevronDown, Compass, Fingerprint, Dumbbell, Feather, GraduationCap, HeartPulse, Loader2, LogOut, Moon, Plus, Shirt, Sparkles, Sun, TrendingUp, User, Wallet, Inbox, Heart, Gift, UtensilsCrossed, PenLine } from "lucide-react";
 import { FormEvent, ReactNode, useEffect, useState } from "react";
 import { Field, inputCls, PrimaryButton, Sheet, Toast } from "./components/ui";
 import { AppProvider, Tab, useApp } from "./lib/store";
@@ -22,6 +22,7 @@ import { StyleScreen } from "./screens/Style";
 import { AcademyScreen } from "./screens/Academy";
 import { PathScreen } from "./screens/Path";
 import { FitnessScreen } from "./screens/Fitness";
+import { FaceScreen } from "./screens/Face";
 import { LanguageScreen } from "./screens/Language";
 import { Questionnaire } from "./gentleman/Questionnaire";
 
@@ -98,6 +99,7 @@ const ITEMS: Record<Tab, NavItem> = {
   accademia: { id: "accademia", label: "Lezioni", short: "Lezioni", icon: I(GraduationCap) },
   salute: { id: "salute", label: "Salute", icon: I(HeartPulse) },
   fisico: { id: "fisico", label: "Allenamento", short: "Allenamento", icon: I(Dumbbell) },
+  fisionomia: { id: "fisionomia", label: "Fisionomia", icon: I(ScanFace) },
   profilo: { id: "profilo", label: "Profilo", icon: I(User) },
 };
 /** Le cinque aree, uguali nel menu laterale e nella barra in basso. Il profilo sta in alto a destra. */
@@ -105,7 +107,7 @@ const GROUPS: { id: string; label: string; icon: NavItem["icon"]; items: Tab[] }
   { id: "oggi", label: "Oggi", icon: I(Compass), items: ["percorso", "progressi"] },
   { id: "accademia", label: "Accademia", icon: I(GraduationCap), items: ["accademia", "contenuti", "linguaggio"] },
   { id: "stile", label: "Stile", icon: (p) => <Hanger size={p.size ?? 18} className={p.className} />, items: ["armadio", "outfit", "stile", "budget"] },
-  { id: "corpo", label: "Corpo", icon: I(Dumbbell), items: ["fisico", "salute"] },
+  { id: "corpo", label: "Corpo", icon: I(Dumbbell), items: ["fisico", "fisionomia", "salute"] },
   { id: "vita", label: "Vita", icon: I(Heart), items: ["persone", "regali", "uscite", "lettere"] },
 ];
 const groupOf = (t: Tab) => GROUPS.find((g) => g.items.includes(t)) || { id: "tu", label: "Tu", icon: I(User), items: ["profilo"] as Tab[] };
@@ -354,7 +356,7 @@ function Shell() {
     if (vai === "revisione") {
       app.setTab("percorso");
       setTimeout(() => window.dispatchEvent(new CustomEvent("habitus:revisione")), 600);
-    } else if (vai && ["percorso", "linguaggio", "budget", "accademia", "fisico", "progressi", "armadio", "contenuti", "persone", "regali", "uscite", "lettere"].includes(vai)) app.setTab(vai as Tab);
+    } else if (vai && ["percorso", "linguaggio", "budget", "accademia", "fisico", "progressi", "armadio", "contenuti", "persone", "regali", "uscite", "lettere", "fisionomia"].includes(vai)) app.setTab(vai as Tab);
     if (q.size) history.replaceState(null, "", window.location.pathname);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -430,6 +432,7 @@ function Shell() {
           {app.tab === "accademia" && <AcademyScreen />}
           {app.tab === "salute" && <Health />}
           {app.tab === "fisico" && <FitnessScreen />}
+          {app.tab === "fisionomia" && <FaceScreen />}
         </div>
       </main>
       {app.tab !== "armadio" && <AddGarmentSheet open={app.addOpen} onClose={() => app.setAddOpen(false)} />}
