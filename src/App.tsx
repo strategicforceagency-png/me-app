@@ -10,6 +10,7 @@ import { BudgetScreen } from "./screens/Budget";
 import { ProgressScreen } from "./screens/Progress";
 import { ContentsScreen } from "./screens/Contents";
 import { MaestroChat } from "./components/MaestroChat";
+import { PullToRefresh } from "./components/PullToRefresh";
 import { GiftsScreen, LettersScreen, OutingsScreen, PeopleScreen } from "./screens/Life";
 import { supabase, useSignedUrl } from "./lib/supabase";
 import { OutfitBuilder } from "./screens/OutfitBuilder";
@@ -422,6 +423,7 @@ function Shell() {
       {app.tab !== "armadio" && <AddGarmentSheet open={app.addOpen} onClose={() => app.setAddOpen(false)} />}
 
       <MaestroChat />
+      <PullToRefresh />
       <QuickAdd open={addMenu} onClose={() => setAddMenu(false)} />
 
       {/* Dock sul telefono: le cinque aree; dentro ogni area le sotto-sezioni sono in alto */}
