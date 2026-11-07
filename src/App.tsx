@@ -24,11 +24,17 @@ export { useTheme } from "./lib/theme";
 
 export default function App() {
   const [session, setSession] = useState<Session | null | undefined>(undefined);
+  const [recovery, setRecovery] = useState(() => /type=recovery/.test(window.location.hash));
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
-    const { data } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
+    const { data } = supabase.auth.onAuthStateChange((e, s) => {
+      if (e === "PASSWORD_RECOVERY") setRecovery(true);
+      setSession(s);
+    });
     return () => data.subscription.unsubscribe();
   }, []);
+
+  if (recovery && session) return <NewPassword onDone={() => setRecovery(false)} />;
 
   if (session === undefined)
     return (
@@ -360,6 +366,46 @@ function Shell() {
   );
 }
 
+/* ---------------- nuova password (dal link di recupero) ---------------- */
+function NewPassword({ onDone }: { onDone: () => void }) {
+  const [pw, setPw] = useState("");
+  const [pw2, setPw2] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const save = async (e: FormEvent) => {
+    e.preventDefault();
+    if (pw !== pw2) return setErr("Le due password non coincidono");
+    setBusy(true);
+    setErr("");
+    const { error } = await supabase.auth.updateUser({ password: pw });
+    setBusy(false);
+    if (error) return setErr(error.message);
+    history.replaceState(null, "", window.location.pathname);
+    onDone();
+  };
+  return (
+    <div className="min-h-[100dvh] bg-bg">
+      <div className="mx-auto w-full max-w-[430px] min-h-[100dvh] px-6 flex flex-col justify-center">
+        <Wordmark />
+        <h1 className="mt-8 font-display text-[36px] font-semibold leading-[1.05]">Scegli una nuova password</h1>
+        <p className="mt-2 text-muted">Poi, dal profilo, attiva la passkey: così non ti servirà più.</p>
+        <form onSubmit={save} className="mt-8 space-y-4">
+          <Field label="Nuova password">
+            <input className={inputCls} type="password" autoComplete="new-password" value={pw} onChange={(e) => setPw(e.target.value)} minLength={6} required />
+          </Field>
+          <Field label="Ripeti la password">
+            <input className={inputCls} type="password" autoComplete="new-password" value={pw2} onChange={(e) => setPw2(e.target.value)} minLength={6} required />
+          </Field>
+          {err && <p className="text-[14px] text-danger">{err}</p>}
+          <PrimaryButton type="submit" className="w-full" disabled={busy}>
+            {busy && <Loader2 size={18} className="animate-spin" />} Salva e entra
+          </PrimaryButton>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 function Auth() {
   const [mode, setMode] = useState<"in" | "up">("in");
   const [email, setEmail] = useState("");
@@ -368,6 +414,17 @@ function Auth() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [pkBusy, setPkBusy] = useState(false);
+  const [info, setInfo] = useState("");
+  const forgot = async () => {
+    setErr("");
+    setInfo("");
+    if (!email.includes("@")) return setErr("Scrivi prima la tua email qui sopra");
+    setBusy(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + window.location.pathname });
+    setBusy(false);
+    if (error) setErr(/rate|seconds/i.test(error.message) ? "Hai appena chiesto un link: aspetta un minuto e riprova" : error.message);
+    else setInfo("Ti ho mandato un'email con il link per scegliere una nuova password. Aprila da questo dispositivo.");
+  };
   const passkey = async () => {
     setPkBusy(true);
     setErr("");
@@ -459,10 +516,16 @@ function Auth() {
             />
           </Field>
           {err && <p className="text-[14px] text-danger">{err}</p>}
+          {info && <p className="text-[14px] text-gold">{info}</p>}
           <PrimaryButton type="submit" className={`w-full ${mode === "in" && passkeySupported() ? "!bg-card !text-ink !shadow-none" : ""}`} disabled={busy}>
             {busy && <Loader2 size={18} className="animate-spin" />} {mode === "in" ? "Accedi" : "Crea account"}
           </PrimaryButton>
         </form>
+        {mode === "in" && (
+          <button onClick={forgot} disabled={busy} className="mt-4 text-muted text-[14px] underline underline-offset-2">
+            Password dimenticata?
+          </button>
+        )}
         <button onClick={() => setMode(mode === "in" ? "up" : "in")} className="mt-5 text-gold text-[15px] font-medium">
           {mode === "in" ? "Prima volta? Crea il tuo account" : "Hai già un account? Accedi"}
         </button>
