@@ -26,16 +26,58 @@ export type Person = {
   created_at: string;
 };
 
+/** Elenco compatto delle categorie: si tocca una voce e si apre il campo. */
+function TasteList({ dettagli, onChange }: { dettagli: Record<string, string>; onChange: (k: string, v: string) => void }) {
+  const [open, setOpen] = useState<string | null>(null);
+  const filled = GUSTI.filter((g) => dettagli[g.id]?.trim()).length;
+  return (
+    <>
+      <div className="text-[12.5px] text-muted -mt-1 mb-2">{filled ? `${filled} di ${GUSTI.length} compilate · ` : ""}Tocca una voce e scrivi quello che sai.</div>
+      <div className="rounded-[16px] bg-card overflow-hidden divide-y divide-line">
+        {GUSTI.map((g) => {
+          const v = dettagli[g.id]?.trim();
+          const isOpen = open === g.id;
+          return (
+            <div key={g.id}>
+              <button type="button" onClick={() => setOpen(isOpen ? null : g.id)} className="w-full flex items-center gap-3 px-3.5 py-3 text-left active:bg-surface/60">
+                <span className="text-[18px] w-6 text-center shrink-0" aria-hidden>{g.icon}</span>
+                <span className="flex-1 min-w-0">
+                  <span className="block text-[15px] font-medium">{g.label}</span>
+                  {v && !isOpen && <span className="block text-[13px] text-muted truncate">{v}</span>}
+                </span>
+                {v && !isOpen ? <Check size={16} className="text-gold shrink-0" /> : <ChevronRight size={16} className={`text-muted shrink-0 transition-transform ${isOpen ? "rotate-90" : ""}`} />}
+              </button>
+              {isOpen && (
+                <div className="px-3.5 pb-3 -mt-1 pl-[50px]">
+                  <textarea
+                    autoFocus
+                    rows={2}
+                    value={dettagli[g.id] || ""}
+                    onChange={(e) => onChange(g.id, e.target.value)}
+                    placeholder={g.hint}
+                    autoComplete="off"
+                    className="w-full resize-none rounded-[12px] bg-surface p-2.5 text-[15px] leading-snug outline-none placeholder:text-muted/70"
+                  />
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
 /** Gusti divisi per categoria: chiari per te e per il consigliere dei regali. */
 export const GUSTI: { id: string; label: string; icon: string; hint: string }[] = [
-  { id: "moda", label: "Moda e borse", icon: "👜", hint: "Stile, marchi, colori, borse che porta (es. minimal, tinte neutre, ama le borse a mano piccole)" },
-  { id: "gioielli", label: "Gioielli e orologi", icon: "💍", hint: "Oro giallo, bianco o rosa? Argento? Pezzi delicati o importanti?" },
-  { id: "profumi", label: "Profumi e cura di sé", icon: "🌸", hint: "Profumo che usa, note che ama (agrumi, vaniglia…), creme, spa" },
-  { id: "fiori", label: "Fiori", icon: "💐", hint: "Fiori preferiti e colori (es. peonie bianche, niente gigli)" },
-  { id: "cibo", label: "Cibo, vino e ristoranti", icon: "🍷", hint: "Cucine preferite, vini, dolci, cosa non mangia, locali che ama" },
-  { id: "luoghi", label: "Luoghi e viaggi", icon: "🗺️", hint: "Città, mare o montagna, posti dove vorrebbe tornare o andare" },
-  { id: "passioni", label: "Passioni e tempo libero", icon: "📚", hint: "Libri, autori, musica, film e serie, sport, hobby" },
-  { id: "esperienze", label: "Esperienze che ama", icon: "🎟️", hint: "Concerti, teatro, mostre, corsi, cene speciali, giornate in spa" },
+  { id: "moda", label: "Moda e borse", icon: "👜", hint: "es. minimal, toni neutri, borse piccole a mano" },
+  { id: "gioielli", label: "Gioielli e orologi", icon: "💍", hint: "es. oro rosa, pezzi delicati" },
+  { id: "profumi", label: "Profumi e cura di sé", icon: "🌸", hint: "es. usa Chanel Chance, ama gli agrumi" },
+  { id: "fiori", label: "Fiori", icon: "💐", hint: "es. peonie bianche, niente gigli" },
+  { id: "cibo", label: "Cibo, vino e ristoranti", icon: "🍷", hint: "es. giapponese, bollicine, niente crostacei" },
+  { id: "luoghi", label: "Luoghi e viaggi", icon: "🗺️", hint: "es. Costiera, Parigi, ama il mare d'inverno" },
+  { id: "passioni", label: "Passioni e tempo libero", icon: "📚", hint: "es. gialli, cantautori, yoga" },
+  { id: "esperienze", label: "Esperienze che ama", icon: "🎟️", hint: "es. teatro, mostre, spa" },
 ];
 export const TAGLIE: { id: string; label: string; hint: string }[] = [
   { id: "taglia_abiti", label: "Abiti", hint: "es. S / 40" },
@@ -198,35 +240,13 @@ function PersonSheet({ person, onClose, onSaved }: { person: Partial<Person> | n
         </div>
 
         <Label>Cosa le piace</Label>
-        <div className="text-[12.5px] text-muted -mt-1 mb-2">Compila solo quello che sai: anche una parola aiuta.</div>
-        <div className="space-y-2">
-          {GUSTI.map((g) => (
-            <div key={g.id} className="rounded-[14px] bg-card px-3.5 pt-2.5 pb-1">
-              <div className="text-[12px] font-semibold text-muted flex items-center gap-1.5">
-                <span aria-hidden>{g.icon}</span> {g.label}
-              </div>
-              <textarea
-                rows={1}
-                value={p.dettagli?.[g.id] || ""}
-                onChange={(e) => {
-                  setD(g.id, e.target.value);
-                  e.target.style.height = "auto";
-                  e.target.style.height = e.target.scrollHeight + "px";
-                }}
-                placeholder={g.hint}
-                autoComplete="off"
-                autoCorrect="on"
-                className="w-full resize-none bg-transparent py-1.5 text-[15px] leading-snug outline-none placeholder:text-muted/70"
-              />
-            </div>
-          ))}
-          {p.gusti && (
-            <div className="rounded-[14px] bg-card px-3.5 pt-2.5 pb-1">
-              <div className="text-[12px] font-semibold text-muted">Altro</div>
-              <textarea rows={2} value={p.gusti || ""} onChange={(e) => set({ gusti: e.target.value })} autoComplete="off" className="w-full resize-none bg-transparent py-1.5 text-[15px] leading-snug outline-none" />
-            </div>
-          )}
-        </div>
+        <TasteList dettagli={p.dettagli || {}} onChange={setD} />
+        {p.gusti && (
+          <div className="mt-2 rounded-[14px] bg-card px-3.5 pt-2.5 pb-1">
+            <div className="text-[12px] font-semibold text-muted">Altro (annotato prima)</div>
+            <textarea rows={2} value={p.gusti || ""} onChange={(e) => set({ gusti: e.target.value })} autoComplete="off" className="w-full resize-none bg-transparent py-1.5 text-[15px] leading-snug outline-none" />
+          </div>
+        )}
 
         <Label>Cosa non le piace</Label>
         <textarea rows={2} value={p.non_piace || ""} onChange={(e) => set({ non_piace: e.target.value })} placeholder="Es. fiori recisi, oro giallo, sorprese in pubblico, profumi dolci" autoComplete="off" className="w-full resize-none rounded-[14px] bg-card p-3.5 text-[15px] outline-none" />
