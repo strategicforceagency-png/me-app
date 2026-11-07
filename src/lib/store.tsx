@@ -23,11 +23,22 @@ type Ctx = {
   setAddOpen: (b: boolean) => void;
   draft: Draft | null;
   setDraft: (d: Draft | null) => void;
+  /** apre una lezione dell'Accademia da altre sezioni ("corso/lezione") */
+  openLesson: (key: string) => void;
+  lessonTarget: string | null;
+  clearLessonTarget: () => void;
+  /** apre una sessione di allenamento in Fisico */
+  openSession: (giorno: string) => void;
+  sessionTarget: string | null;
+  clearSessionTarget: () => void;
+  quizOpen: boolean;
+  setQuizOpen: (b: boolean) => void;
 };
 export type Draft = { top: string[]; bottom: string | null; scarpe: string | null; preview?: string | null };
-export type Tab = "armadio" | "outfit" | "stile" | "accademia" | "salute" | "fisico" | "profilo";
+export type Tab = "percorso" | "armadio" | "outfit" | "stile" | "accademia" | "linguaggio" | "salute" | "fisico" | "profilo";
 
-const C = createContext<Ctx>(null as unknown as Ctx);
+export const AppCtx = createContext<Ctx>(null as unknown as Ctx);
+const C = AppCtx;
 export const useApp = () => useContext(C);
 
 export function AppProvider({ uid, email, children }: { uid: string; email: string; children: ReactNode }) {
@@ -37,7 +48,10 @@ export function AppProvider({ uid, email, children }: { uid: string; email: stri
   const [pending, setPending] = useState<Pending[]>([]);
   const [loading, setLoading] = useState(true);
   const [toastMsg, setToast] = useState<string | null>(null);
-  const [tab, setTab] = useState<Tab>("armadio");
+  const [tab, setTab] = useState<Tab>("percorso");
+  const [lessonTarget, setLessonTarget] = useState<string | null>(null);
+  const [sessionTarget, setSessionTarget] = useState<string | null>(null);
+  const [quizOpen, setQuizOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [draft, setDraft] = useState<Draft | null>(null);
   const t = useRef<number>();
@@ -99,6 +113,20 @@ export function AppProvider({ uid, email, children }: { uid: string; email: stri
         setAddOpen,
         draft,
         setDraft,
+        openLesson: (k) => {
+          setLessonTarget(k);
+          setTab("accademia");
+        },
+        lessonTarget,
+        clearLessonTarget: () => setLessonTarget(null),
+        openSession: (g) => {
+          setSessionTarget(g);
+          setTab("fisico");
+        },
+        sessionTarget,
+        clearSessionTarget: () => setSessionTarget(null),
+        quizOpen,
+        setQuizOpen,
       }}
     >
       {children}

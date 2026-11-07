@@ -1,6 +1,6 @@
 import { Session } from "@supabase/supabase-js";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronDown, Dumbbell, GraduationCap, HeartPulse, Loader2, LogOut, Menu, Moon, Plus, Shirt, Sparkles, Sun, User, X } from "lucide-react";
+import { ChevronDown, Compass, Dumbbell, Feather, GraduationCap, HeartPulse, Loader2, LogOut, Menu, Moon, Plus, Shirt, Sparkles, Sun, User, X } from "lucide-react";
 import { FormEvent, ReactNode, useEffect, useState } from "react";
 import { Field, inputCls, PrimaryButton, Toast } from "./components/ui";
 import { AppProvider, Tab, useApp } from "./lib/store";
@@ -11,6 +11,10 @@ import { AddGarmentSheet, Wardrobe } from "./screens/Wardrobe";
 import { Health } from "./screens/Health";
 import { StyleScreen } from "./screens/Style";
 import { AcademyScreen } from "./screens/Academy";
+import { PathScreen } from "./screens/Path";
+import { FitnessScreen } from "./screens/Fitness";
+import { LanguageScreen } from "./screens/Language";
+import { Questionnaire } from "./gentleman/Questionnaire";
 
 /* ---------------- tema chiaro / scuro (come Navy OS) ---------------- */
 type Theme = "light" | "dark";
@@ -92,23 +96,26 @@ function Hanger({ size = 24, className = "" }: { size?: number; className?: stri
 type NavItem = { id: Tab; label: string; short?: string; icon: (p: { size?: number; className?: string }) => JSX.Element; soon?: boolean };
 const I = (C: typeof Shirt) => (p: { size?: number; className?: string }) => <C size={p.size ?? 18} className={p.className} strokeWidth={1.8} />;
 const ITEMS: Record<Tab, NavItem> = {
+  percorso: { id: "percorso", label: "Il mio percorso", short: "Oggi", icon: I(Compass) },
+  linguaggio: { id: "linguaggio", label: "Linguaggio", icon: I(Feather) },
   armadio: { id: "armadio", label: "Armadio", icon: (p) => <Hanger size={p.size ?? 18} className={p.className} /> },
   outfit: { id: "outfit", label: "Outfit", icon: I(Shirt) },
   stile: { id: "stile", label: "Stile", icon: I(Sparkles) },
   accademia: { id: "accademia", label: "Accademia", short: "Impara", icon: I(GraduationCap) },
   salute: { id: "salute", label: "Salute", icon: I(HeartPulse) },
-  fisico: { id: "fisico", label: "Fisico", icon: I(Dumbbell), soon: true },
+  fisico: { id: "fisico", label: "Fisico", icon: I(Dumbbell) },
   profilo: { id: "profilo", label: "Profilo", icon: I(User) },
 };
 /** Gruppi del menu, come i riquadri di Navy OS. */
 const GROUPS: { label: string; items: Tab[] }[] = [
+  { label: "Percorso", items: ["percorso"] },
+  { label: "Accademia", items: ["accademia", "linguaggio"] },
   { label: "Stile", items: ["armadio", "outfit", "stile"] },
-  { label: "Impara", items: ["accademia"] },
-  { label: "Corpo", items: ["salute", "fisico"] },
+  { label: "Corpo", items: ["fisico", "salute"] },
   { label: "Tu", items: ["profilo"] },
 ];
 /** Dock sul telefono: 4 voci + Menu. */
-const DOCK: Tab[] = ["armadio", "outfit", "stile", "accademia", "salute"];
+const DOCK: Tab[] = ["percorso", "accademia", "armadio", "fisico", "linguaggio"];
 
 /* ---------------- barra laterale (computer) e menu (telefono) ---------------- */
 function NavGroup({ label, children }: { label: string; children: ReactNode }) {
@@ -247,7 +254,7 @@ function Shell() {
 
       {/* Intestazione su telefono */}
       <header className="sticky top-0 z-30 flex items-center gap-2 border-b border-line bg-bg/90 px-4 pb-2.5 pt-[calc(0.6rem+env(safe-area-inset-top))] backdrop-blur-xl lg:hidden">
-        <button onClick={() => app.setTab("armadio")} aria-label="Home">
+        <button onClick={() => app.setTab("percorso")} aria-label="Home">
           <Wordmark sub={false} />
         </button>
         <div className="ml-auto flex items-center gap-1">
@@ -262,13 +269,15 @@ function Shell() {
 
       <main className="lg:pl-[248px]">
         <div className="mx-auto w-full max-w-[1180px] pt-3 lg:pt-8">
+          {app.tab === "percorso" && <PathScreen />}
+          {app.tab === "linguaggio" && <LanguageScreen />}
           {app.tab === "armadio" && <Wardrobe />}
           {app.tab === "outfit" && <OutfitBuilder />}
           {app.tab === "profilo" && <Profile />}
           {app.tab === "stile" && <StyleScreen />}
           {app.tab === "accademia" && <AcademyScreen />}
           {app.tab === "salute" && <Health />}
-          {app.tab === "fisico" && <ComingSoon tab={app.tab} />}
+          {app.tab === "fisico" && <FitnessScreen />}
         </div>
       </main>
       {app.tab !== "armadio" && <AddGarmentSheet open={app.addOpen} onClose={() => app.setAddOpen(false)} />}
@@ -323,24 +332,17 @@ function Shell() {
           </div>
         )}
       </AnimatePresence>
+      {app.quizOpen && (
+        <Questionnaire
+          onClose={() => app.setQuizOpen(false)}
+          onDone={() => {
+            app.setQuizOpen(false);
+            app.setTab("percorso");
+            app.toast("Il tuo percorso è pronto");
+          }}
+        />
+      )}
       <Toast msg={app.toastMsg} />
-    </div>
-  );
-}
-
-function ComingSoon({ tab }: { tab: "salute" | "fisico" }) {
-  const s =
-    tab === "salute"
-      ? { t: "Salute", d: "Whoop e Apple Salute, sonno, recovery, piano pasti e lista della spesa.", i: <HeartPulse size={38} strokeWidth={1.5} /> }
-      : { t: "Fisico", d: "Schede di allenamento, carichi, progressi, misure e foto confronto.", i: <Dumbbell size={38} strokeWidth={1.5} /> };
-  return (
-    <div className="px-5 lg:px-10">
-      <h1 className="font-display text-[36px] lg:text-[44px] font-semibold leading-none">{s.t}</h1>
-      <div className="mt-16 flex flex-col items-center text-center px-8">
-        <div className="h-24 w-24 rounded-[28px] bg-gold-tint text-gold grid place-items-center">{s.i}</div>
-        <div className="mt-5 text-[12px] font-bold uppercase tracking-[0.16em] text-gold">In arrivo</div>
-        <p className="mt-2 text-muted max-w-[340px]">{s.d}</p>
-      </div>
     </div>
   );
 }

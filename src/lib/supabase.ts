@@ -67,6 +67,9 @@ export type Profile = {
   taglia_scarpe: string | null;
   ingest_token: string | null;
   style_guide: unknown | null;
+  gentleman: Record<string, unknown> | null;
+  path: unknown | null;
+  path_started_at: string | null;
 };
 export type OutfitItem = { garment_id: string; slot: Slot; layer: number };
 export type Outfit = {

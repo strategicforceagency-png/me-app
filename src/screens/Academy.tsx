@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { ArrowLeft, ArrowRight, Check, CheckCircle2, ChevronRight, Clock, Footprints, GraduationCap, Lightbulb, Loader2, Scissors, Send, Shirt, Sparkles, Watch, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, CheckCircle2, ChevronRight, Clock, Feather, Footprints, GraduationCap, Lightbulb, Loader2, Scissors, Send, Shirt, Sparkles, Umbrella, Watch, X } from "lucide-react";
 import { Fragment, ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { Figure } from "../academy/figures";
 import { allLessons, CORSI, lessonKey } from "../academy/content";
@@ -23,6 +23,8 @@ const ICONS: Record<string, (p: { size?: number }) => JSX.Element> = {
   scissors: (p) => <Scissors size={p.size} strokeWidth={1.8} />,
   footprints: (p) => <Footprints size={p.size} strokeWidth={1.8} />,
   watch: (p) => <Watch size={p.size} strokeWidth={1.8} />,
+  umbrella: (p) => <Umbrella size={p.size} strokeWidth={1.8} />,
+  feather: (p) => <Feather size={p.size} strokeWidth={1.8} />,
 };
 
 /* ---------------- testo con **grassetto** ed elenchi ---------------- */
@@ -73,7 +75,17 @@ type View = { c?: string; l?: string };
 
 export function AcademyScreen() {
   const app = useApp();
-  const [view, setView] = useState<View>({});
+  const [view, setView] = useState<View>(() => {
+    const [c, l] = (app?.lessonTarget || "").split("/");
+    return c ? { c, l } : {};
+  });
+  useEffect(() => {
+    if (!app?.lessonTarget) return;
+    const [c, l] = app.lessonTarget.split("/");
+    setView({ c, l });
+    app.clearLessonTarget();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [app?.lessonTarget]);
   const [done, setDone] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -117,7 +129,7 @@ function AcademyHome({ done, go }: { done: Set<string>; go: (v: View) => void })
     <div className="px-5 lg:px-10 pb-28 lg:pb-12">
       <header>
         <h1 className="font-display text-[36px] lg:text-[44px] font-semibold leading-none">Accademia</h1>
-        <p className="text-muted text-[14px] mt-2">Stile, galateo, grooming e accessori: le regole del gentiluomo, una lezione alla volta.</p>
+        <p className="text-muted text-[14px] mt-2">Stile, galateo, linguaggio, grooming e accessori: le regole del gentleman, una lezione alla volta.</p>
       </header>
 
       <div className="mt-6 rounded-[22px] bg-ink text-bg p-5 relative overflow-hidden">
@@ -413,6 +425,8 @@ const SUGGEST: Record<string, string[]> = {
   grooming: ["Come evito l'irritazione dopo la rasatura?", "Dove portarla al primo appuntamento?"],
   scarpe: ["Che scarpe con un abito grigio chiaro?", "Ogni quanto devo lucidare le scarpe?"],
   accessori: ["Che occhiali per il mio viso?", "Che orologio con lo smoking?"],
+  inglese: ["Come creo un look da campagna inglese con quello che ho?", "Flanella o fresco di lana per il mio lavoro?"],
+  vocabolario: ["Come smetto di dire \"cioè\"?", "Come rispondo a un complimento con eleganza?"],
 };
 function Maestro({ course, lesson }: { course: Course; lesson: Lesson }) {
   const [msgs, setMsgs] = useState<Msg[]>([]);
