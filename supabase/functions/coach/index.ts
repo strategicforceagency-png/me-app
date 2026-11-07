@@ -40,9 +40,10 @@ Deno.serve(async (req) => {
     if (!question) return json({ error: "Scrivi una domanda" }, 400);
     const history = Array.isArray(b.history) ? b.history.slice(-6) : [];
 
-    const [{ data: prof }, { data: wardrobe }] = await Promise.all([
+    const [{ data: prof }, { data: wardrobe }, { data: notes }] = await Promise.all([
       sb.from("profiles").select("nome, altezza, peso, taglia_top, taglia_pantaloni, taglia_scarpe, style_guide").eq("id", user.id).maybeSingle(),
       sb.from("garments").select("nome, categoria, colore").limit(150),
+      sb.from("knowledge").select("tema, titolo, affermazione, versione_corretta, verdetto").eq("stato", "approvata").limit(80),
     ]);
     // deno-lint-ignore no-explicit-any
     const guide = prof?.style_guide as any;
@@ -55,7 +56,8 @@ Se una regola è tradizionale ma oggi flessibile, dillo. Su salute della pelle o
 Lezione aperta: ${b.lesson ? JSON.stringify(b.lesson).slice(0, 2500) : "nessuna"}
 Utente: ${prof?.nome || "—"}, ${prof?.altezza ?? "?"} cm, ${prof?.peso ?? "?"} kg, taglie ${prof?.taglia_top || "?"}/${prof?.taglia_pantaloni || "?"}/${prof?.taglia_scarpe || "?"}.
 Il suo stile: ${guide?.nome_stile ? `${guide.nome_stile} — ${(guide.parole_chiave || []).join(", ")}` : "non ancora definito"}.
-Il suo armadio (${wardrobe?.length || 0} capi): ${(wardrobe || []).map((g) => `${g.nome} (${g.categoria}${g.colore ? ", " + g.colore : ""})`).join("; ").slice(0, 3000) || "vuoto"}.`;
+Il suo armadio (${wardrobe?.length || 0} capi): ${(wardrobe || []).map((g) => `${g.nome} (${g.categoria}${g.colore ? ", " + g.colore : ""})`).join("; ").slice(0, 3000) || "vuoto"}.
+Il suo quaderno (insegnamenti che ha raccolto da contenuti esterni, verificati e approvati da lui; tienine conto e citali quando pertinenti, segnalando se un'opinione è solo gusto): ${(notes || []).map((n) => `[${n.tema}] ${n.titolo}: ${n.versione_corretta || n.affermazione}${n.verdetto === "opinione" ? " (opinione)" : ""}`).join(" | ").slice(0, 5000) || "vuoto"}.`;
 
     const contents = [
       ...history

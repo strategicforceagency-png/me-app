@@ -1,3 +1,4 @@
+import { CourseNotes } from "./Contents";
 import { motion } from "framer-motion";
 import { ArrowLeft, ArrowRight, Check, CheckCircle2, ChevronRight, Clock, Feather, Footprints, GraduationCap, Lightbulb, Loader2, Scissors, Send, Shirt, Sparkles, Umbrella, Watch, X } from "lucide-react";
 import { Fragment, ReactNode, useEffect, useMemo, useRef, useState } from "react";
@@ -229,6 +230,7 @@ function CourseView({ course, done, go }: { course: Course; done: Set<string>; g
           );
         })}
       </div>
+      <CourseNotes corso={course.id} />
     </div>
   );
 }

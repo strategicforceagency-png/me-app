@@ -1,6 +1,6 @@
 import { Session } from "@supabase/supabase-js";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronDown, Compass, Fingerprint, Dumbbell, Feather, GraduationCap, HeartPulse, Loader2, LogOut, Moon, Plus, Shirt, Sparkles, Sun, TrendingUp, User, Wallet } from "lucide-react";
+import { ChevronDown, Compass, Fingerprint, Dumbbell, Feather, GraduationCap, HeartPulse, Loader2, LogOut, Moon, Plus, Shirt, Sparkles, Sun, TrendingUp, User, Wallet, Inbox } from "lucide-react";
 import { FormEvent, ReactNode, useEffect, useState } from "react";
 import { Field, inputCls, PrimaryButton, Toast } from "./components/ui";
 import { AppProvider, Tab, useApp } from "./lib/store";
@@ -8,6 +8,7 @@ import { useTheme } from "./lib/theme";
 import { passkeyError, passkeySupported, signInPasskey } from "./lib/passkey";
 import { BudgetScreen } from "./screens/Budget";
 import { ProgressScreen } from "./screens/Progress";
+import { ContentsScreen } from "./screens/Contents";
 import { supabase, useSignedUrl } from "./lib/supabase";
 import { OutfitBuilder } from "./screens/OutfitBuilder";
 import { Profile } from "./screens/Profile";
@@ -85,6 +86,7 @@ const ITEMS: Record<Tab, NavItem> = {
   stile: { id: "stile", label: "Ispirazioni", icon: I(Sparkles) },
   budget: { id: "budget", label: "Budget e acquisti", short: "Budget", icon: I(Wallet) },
   progressi: { id: "progressi", label: "Progressi", icon: I(TrendingUp) },
+  contenuti: { id: "contenuti", label: "Contenuti", icon: I(Inbox) },
   accademia: { id: "accademia", label: "Accademia", short: "Impara", icon: I(GraduationCap) },
   salute: { id: "salute", label: "Salute", icon: I(HeartPulse) },
   fisico: { id: "fisico", label: "Fisico", icon: I(Dumbbell) },
@@ -93,7 +95,7 @@ const ITEMS: Record<Tab, NavItem> = {
 /** Gruppi del menu, come i riquadri di Navy OS. */
 const GROUPS: { id: string; label: string; short: string; icon: NavItem["icon"]; items: Tab[] }[] = [
   { id: "oggi", label: "Percorso", short: "Oggi", icon: I(Compass), items: ["percorso", "progressi"] },
-  { id: "impara", label: "Accademia", short: "Impara", icon: I(GraduationCap), items: ["accademia", "linguaggio"] },
+  { id: "impara", label: "Accademia", short: "Impara", icon: I(GraduationCap), items: ["accademia", "contenuti", "linguaggio"] },
   { id: "stile", label: "Stile", short: "Stile", icon: (p) => <Hanger size={p.size ?? 18} className={p.className} />, items: ["armadio", "outfit", "stile", "budget"] },
   { id: "corpo", label: "Corpo", short: "Corpo", icon: I(Dumbbell), items: ["fisico", "salute"] },
   { id: "tu", label: "Tu", short: "Tu", icon: I(User), items: ["profilo"] },
@@ -254,7 +256,7 @@ function Shell() {
     if (vai === "revisione") {
       app.setTab("percorso");
       setTimeout(() => window.dispatchEvent(new CustomEvent("habitus:revisione")), 600);
-    } else if (vai && ["percorso", "linguaggio", "budget", "accademia", "fisico", "progressi", "armadio"].includes(vai)) app.setTab(vai as Tab);
+    } else if (vai && ["percorso", "linguaggio", "budget", "accademia", "fisico", "progressi", "armadio", "contenuti"].includes(vai)) app.setTab(vai as Tab);
     if (q.size) history.replaceState(null, "", window.location.pathname);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -315,6 +317,7 @@ function Shell() {
           <SubTabs />
           {app.tab === "budget" && <BudgetScreen />}
           {app.tab === "progressi" && <ProgressScreen />}
+          {app.tab === "contenuti" && <ContentsScreen />}
           {app.tab === "percorso" && <PathScreen />}
           {app.tab === "linguaggio" && <LanguageScreen />}
           {app.tab === "armadio" && <Wardrobe />}
