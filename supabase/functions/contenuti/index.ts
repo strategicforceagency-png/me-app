@@ -17,7 +17,7 @@ const GRAPH = "https://graph.facebook.com/v23.0";
 const MAX_IMG = 20, MAX_VID = 3, MAX_VID_BYTES = 45 * 1024 * 1024;
 
 export const TEMI = ["Stile e vestiti", "Cravatte e accessori", "Scarpe", "Galateo", "Appuntamenti e relazioni", "Grooming", "Linguaggio", "Fisico", "Salute", "Mentalità", "Altro"];
-const CORSI = ["vestirsi", "galateo", "cravatte", "grooming", "scarpe", "accessori", "inglese", "vocabolario"];
+const CORSI = ["vestirsi", "galateo", "coppia", "cravatte", "grooming", "scarpe", "accessori", "inglese", "vocabolario"];
 const VERDETTI = ["fondato", "in_parte", "opinione", "infondato", "non_verificabile"];
 
 const key = () => {
