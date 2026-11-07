@@ -36,7 +36,17 @@ async function userFrom(req: Request) {
   return data.user;
 }
 
-async function deliver(sb: ReturnType<typeof admin>, userId: string, msg: { title: string; body: string; url?: string; tag?: string }) {
+/** Salva la notifica nell'area notifiche dell'app (resta anche se il telefono la perde). */
+async function store(sb: ReturnType<typeof admin>, userId: string, msg: { title: string; body: string; url?: string; tag?: string }) {
+  const vai = new URL(msg.url || "./", SUBJECT).searchParams.get("vai");
+  await sb.from("notifications").insert({ user_id: userId, kind: msg.tag || "info", titolo: msg.title, testo: msg.body, vai });
+}
+async function unread(sb: ReturnType<typeof admin>, userId: string) {
+  const { count } = await sb.from("notifications").select("id", { count: "exact", head: true }).eq("user_id", userId).eq("letta", false);
+  return count || 0;
+}
+
+async function deliver(sb: ReturnType<typeof admin>, userId: string, msg: { title: string; body: string; url?: string; tag?: string; count?: number }) {
   const v = await vapid(sb);
   const { data: subs } = await sb.from("push_subscriptions").select("endpoint, p256dh, auth").eq("user_id", userId);
   let ok = 0;
@@ -156,11 +166,11 @@ Deno.serve(async (req) => {
     if (route === "tick") {
       const { data: sec } = await sb.from("app_secrets").select("value").eq("name", "cron").single();
       if (!sec || req.headers.get("x-cron") !== sec.value) return json({ error: "no" }, 401);
-      const { data: profs } = await sb.from("profiles").select("id, nome, path, path_started_at, promemoria").not("promemoria", "is", null);
+      const { data: profs } = await sb.from("profiles").select("id, nome, path, path_started_at, promemoria");
       let sent = 0;
       for (const p of profs || []) {
         const s = p.promemoria || {};
-        if (!s.attivi) continue;
+        const pushOn = !!s.attivi;
         const now = localNow(s.tz || "Europe/Rome");
         const slots: [string, string | undefined, boolean][] = [
           ["mattina", s.mattina, s.mattina_on !== false],
@@ -170,12 +180,17 @@ Deno.serve(async (req) => {
         ];
         for (const [kind, at, on] of slots) {
           if (!on || !at) continue;
+          // ricorrenze e controllo settimanale finiscono sempre nell'area notifiche; buongiorno e sera solo come push
+          const inApp = kind === "ricorrenze" || kind === "revisione";
+          if (!pushOn && !inApp) continue;
           const diff = now.min - toMin(at);
           if (diff < 0 || diff >= 15) continue;
           const { error } = await sb.from("push_log").insert({ user_id: p.id, kind, day: now.day });
           if (error) continue; // già inviato oggi
           const msg = await compose(sb, p, kind, now.day, now.wd);
-          if (msg) sent += (await deliver(sb, p.id, msg)).ok;
+          if (!msg) continue;
+          if (inApp) await store(sb, p.id, msg);
+          if (pushOn) sent += (await deliver(sb, p.id, { ...msg, count: await unread(sb, p.id) })).ok;
         }
       }
       return json({ sent });
@@ -195,7 +210,9 @@ Deno.serve(async (req) => {
       return json({ ok: true });
     }
     if (route === "test") {
-      const r = await deliver(sb, user.id, { title: "Habitus", body: "I promemoria funzionano. A domattina.", url: "./", tag: "test" });
+      const m = { title: "Habitus", body: "I promemoria funzionano. A domattina.", url: "./?vai=percorso", tag: "test" };
+      await store(sb, user.id, m);
+      const r = await deliver(sb, user.id, { ...m, count: await unread(sb, user.id) });
       if (!r.total) return json({ error: "Nessun dispositivo iscritto" }, 400);
       if (!r.ok) return json({ error: "Invio non riuscito, riattiva i promemoria" }, 502);
       return json(r);

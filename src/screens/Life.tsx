@@ -91,7 +91,9 @@ type Idea = { titolo: string; categoria?: string; perche?: string; prezzo?: stri
 type Place = { nome: string; tipo?: string; zona?: string; indirizzo?: string | null; prezzo?: string; voto?: string | null; perche?: string; punti_forti?: string[]; punti_deboli?: string[]; atmosfera?: string; dress_code?: string; prenotazione?: string; link?: string | null; ricerca?: string; itinerario?: { giorno: string; piano: string }[]; tocco?: string };
 type Fonte = { titolo: string; url: string };
 
-const RELAZIONI = ["Partner", "Moglie", "Fidanzata", "Mamma", "Papà", "Sorella", "Fratello", "Amica", "Amico", "Collega", "Altro"];
+/** "le" o "gli" a seconda della persona. */
+const MASCHILI = ["Figlio", "Papà", "Fratello", "Amico"];
+const RELAZIONI = ["Partner", "Moglie", "Fidanzata", "Figlio", "Figlia", "Mamma", "Papà", "Sorella", "Fratello", "Amica", "Amico", "Collega", "Altro"];
 const TIPI_DATA = ["Compleanno", "Anniversario", "Onomastico", "Primo appuntamento", "Altro"];
 const OCCASIONI = ["Compleanno", "Anniversario", "San Valentino", "Natale", "Onomastico", "Festa della mamma", "Un traguardo", "Per farmi perdonare", "Senza motivo"];
 const BUDGET_REGALO = ["Fino a 30 €", "30-80 €", "80-150 €", "150-300 €", "Oltre 300 €"];
@@ -239,7 +241,7 @@ function PersonSheet({ person, onClose, onSaved }: { person: Partial<Person> | n
           </button>
         </div>
 
-        <Label>Cosa le piace</Label>
+        <Label>{MASCHILI.includes(p.relazione || "") ? "Cosa gli piace" : "Cosa le piace"}</Label>
         <TasteList dettagli={p.dettagli || {}} onChange={setD} />
         {p.gusti && (
           <div className="mt-2 rounded-[14px] bg-card px-3.5 pt-2.5 pb-1">
@@ -248,7 +250,7 @@ function PersonSheet({ person, onClose, onSaved }: { person: Partial<Person> | n
           </div>
         )}
 
-        <Label>Cosa non le piace</Label>
+        <Label>{MASCHILI.includes(p.relazione || "") ? "Cosa non gli piace" : "Cosa non le piace"}</Label>
         <textarea rows={2} value={p.non_piace || ""} onChange={(e) => set({ non_piace: e.target.value })} placeholder="Es. fiori recisi, oro giallo, sorprese in pubblico, profumi dolci" autoComplete="off" className="w-full resize-none rounded-[14px] bg-card p-3.5 text-[15px] outline-none" />
 
         <Label>Taglie e misure</Label>

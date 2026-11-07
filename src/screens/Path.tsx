@@ -47,6 +47,7 @@ export function useChecks() {
       navigator.vibrate?.(10);
       await supabase.from("path_checks").upsert({ key, day });
     } else await supabase.from("path_checks").delete().match({ key, day });
+    window.dispatchEvent(new Event("habitus:notifiche"));
   };
   return { has, toggle, reload: load };
 }
@@ -113,13 +114,6 @@ function PathView({ path }: { path: Path }) {
   const habits = activeHabits(path, week);
   const habitsDone = habits.filter((h) => has(`h:${h.id}`, true)).length;
   const prog = useProgressData();
-  // numerino sull'icona dell'app: le abitudini che mancano oggi
-  useEffect(() => {
-    const nav = navigator as Navigator & { setAppBadge?: (n?: number) => Promise<void>; clearAppBadge?: () => Promise<void> };
-    const left = habits.length - habitsDone;
-    if (left > 0) nav.setAppBadge?.(left).catch(() => {});
-    else nav.clearAppBadge?.().catch(() => {});
-  }, [habits.length, habitsDone]);
   const due = prog.loaded ? dueReview(path, app.profile?.path_started_at, prog.reviews) : null;
   const trialsDue = prog.loaded ? dueTrials(path, app.profile?.path_started_at, prog.trials) : [];
   const [baseOpen, setBaseOpen] = useState(false);

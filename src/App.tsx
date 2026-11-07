@@ -10,6 +10,7 @@ import { BudgetScreen } from "./screens/Budget";
 import { ProgressScreen } from "./screens/Progress";
 import { ContentsScreen } from "./screens/Contents";
 import { MaestroChat } from "./components/MaestroChat";
+import { BellButton, NotificationsSheet, useNotifications } from "./components/Notifications";
 import { PullToRefresh } from "./components/PullToRefresh";
 import { GiftsScreen, LettersScreen, OutingsScreen, PeopleScreen } from "./screens/Life";
 import { supabase, useSignedUrl } from "./lib/supabase";
@@ -236,7 +237,7 @@ function NavGroup({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function SidebarBody({ onNav, badges, onAdd }: { onNav?: () => void; badges: Badges; onAdd: () => void }) {
+function SidebarBody({ onNav, badges, onAdd, bell }: { onNav?: () => void; badges: Badges; onAdd: () => void; bell?: ReactNode }) {
   const app = useApp();
   const { theme, toggle } = useTheme();
   const go = (t: Tab) => {
@@ -249,6 +250,7 @@ function SidebarBody({ onNav, badges, onAdd }: { onNav?: () => void; badges: Bad
         <div className="flex-1 min-w-0">
           <Wordmark />
         </div>
+        {bell}
         <button
           onClick={() => {
             onAdd();
@@ -309,6 +311,8 @@ function SidebarBody({ onNav, badges, onAdd }: { onNav?: () => void; badges: Bad
 function Shell() {
   const app = useApp();
   const badges = useBadges(app.tab);
+  const notifiche = useNotifications();
+  const [bellOpen, setBellOpen] = useState(false);
   const [addMenu, setAddMenu] = useState(false);
   const [last, setLast] = useState<Record<string, Tab>>({});
   const [online, setOnline] = useState(navigator.onLine);
@@ -376,7 +380,7 @@ function Shell() {
     <div className="min-h-[100dvh] bg-bg">
       {/* Barra laterale su computer */}
       <aside className="fixed inset-y-0 left-0 hidden w-[248px] border-r border-line bg-sidebar lg:block">
-        <SidebarBody badges={badges} onAdd={() => setAddMenu(true)} />
+        <SidebarBody badges={badges} onAdd={() => setAddMenu(true)} bell={<BellButton count={notifiche.count} onClick={() => setBellOpen(true)} className="shrink-0" />} />
       </aside>
 
       {/* Intestazione su telefono */}
@@ -385,6 +389,7 @@ function Shell() {
           <Wordmark sub={false} />
         </button>
         <div className="ml-auto flex items-center gap-1">
+          <BellButton count={notifiche.count} onClick={() => setBellOpen(true)} />
           <button onClick={() => setAddMenu(true)} className="h-9 w-9 grid place-items-center rounded-full bg-brand text-brand-fg shadow-pill" aria-label="Aggiungi">
             <Plus size={19} />
           </button>
@@ -449,6 +454,8 @@ function Shell() {
           );
         })}
       </nav>
+
+      <NotificationsSheet open={bellOpen} onClose={() => setBellOpen(false)} n={notifiche} />
 
       {app.quizOpen && (
         <Questionnaire

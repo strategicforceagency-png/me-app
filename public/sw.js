@@ -2,7 +2,7 @@
  * Pagina: prima la rete (così ogni apertura prende la versione nuova), senza rete la copia salvata.
  * File dell'app (nomi con impronta) e caratteri: dalla copia salvata.
  * Dati (Supabase, AI): sempre dalla rete, mai salvati qui. */
-const VERSION = "habitus-v4";
+const VERSION = "habitus-v5";
 const SHELL = ["./", "./manifest.webmanifest", "./habitus.svg?v=4", "./habitus-180.png?v=4", "./habitus-192.png?v=4", "./habitus-512.png?v=4"];
 
 self.addEventListener("install", (e) => {
@@ -73,14 +73,16 @@ self.addEventListener("push", (e) => {
     d = { body: e.data && e.data.text() };
   }
   const title = d.title || "Habitus";
+  // numerino sull'icona dell'app
+  const badge = typeof d.count === "number" && d.count > 0 && self.navigator.setAppBadge ? self.navigator.setAppBadge(d.count).catch(() => {}) : Promise.resolve();
   e.waitUntil(
-    self.registration.showNotification(title, {
+    badge.then(() => self.registration.showNotification(title, {
       body: d.body || "",
       icon: "habitus-192.png?v=4",
       badge: "habitus-192.png?v=4",
       tag: d.tag || "habitus",
       data: { url: d.url || "./" },
-    })
+    }))
   );
 });
 self.addEventListener("notificationclick", (e) => {
