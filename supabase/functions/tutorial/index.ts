@@ -82,6 +82,96 @@ async function scrivi(prompt: string) {
   throw new Error(last);
 }
 
+/** Ricerca Google vera: risposta in prosa (con l'obbligo di JSON il modello non cerca), con le fonti consultate. */
+async function ricerca(domanda: string) {
+  let last = "Nessun modello AI disponibile";
+  for (const m of await testo()) {
+    const r = await gfetch(`${GEM}/models/${m}:generateContent?key=${key()}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: domanda }] }], tools: [{ google_search: {} }], generationConfig: { temperature: 0.1, maxOutputTokens: 8000 } }),
+    }, 110000);
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      last = j?.error?.message || `Errore ${r.status}`;
+      continue;
+    }
+    const c = j.candidates?.[0];
+    // deno-lint-ignore no-explicit-any
+    const testo_ = (c?.content?.parts || []).filter((p: any) => !p.thought).map((p: any) => p.text || "").join("");
+    // deno-lint-ignore no-explicit-any
+    const fonti = ((c?.groundingMetadata?.groundingChunks || []) as any[])
+      .map((g) => g.web)
+      .filter((w) => w?.uri)
+      .reduce((acc: { titolo: string; url: string }[], w) => (acc.some((a) => a.titolo === w.title) ? acc : [...acc, { titolo: w.title || "fonte", url: w.uri }]), [])
+      .slice(0, 8);
+    if (testo_ && fonti.length >= 2) return { testo: testo_, fonti };
+    last = "La ricerca non ha trovato abbastanza fonti";
+  }
+  throw new Error(last);
+}
+/** Risposta JSON senza strumenti. */
+async function jsonDa(prompt: string, campo: string) {
+  let last = "Nessun modello AI disponibile";
+  for (const m of await testo()) {
+    const r = await gfetch(`${GEM}/models/${m}:generateContent?key=${key()}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { temperature: 0.1, responseMimeType: "application/json", maxOutputTokens: 12000 } }),
+    }, 90000);
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      last = j?.error?.message || `Errore ${r.status}`;
+      continue;
+    }
+    // deno-lint-ignore no-explicit-any
+    const out = parseJson((j.candidates?.[0]?.content?.parts || []).filter((p: any) => !p.thought).map((p: any) => p.text || "").join(""));
+    if (out && campo in out) return out;
+    last = "Risposta non valida";
+  }
+  throw new Error(last);
+}
+
+// deno-lint-ignore no-explicit-any
+async function verifica(admin: SupabaseClient, t: any) {
+  const tentativi = (t.verifica?.tentativi || 0) + 1;
+  const passi = (t.data.passaggi || []).map((p: { titolo: string; testo: string }, i: number) => `${i + 1}. ${p.titolo}: ${p.testo}`).join("\n");
+  try {
+    // 1) ricerca: cosa insegnano i tutorial affini pubblicati online
+    const { testo: trovato, fonti } = await ricerca(`Cerca online almeno 3 tutorial affini e autorevoli su questo gesto: "${t.titolo}" (sartorie, camicerie e calzolai storici, maison, manuali di galateo, testate serie di stile maschile come Gentleman's Gazette, Permanent Style, Art of Manliness, Mr Porter; dermatologi per rasatura e pelle; anche WikiHow). Per ciascuna fonte riassumi i passaggi che indica, nell'ordine, con i dettagli pratici (misure, direzioni, mani, errori da evitare), citando il sito.`);
+    // 2) confronto passo per passo e correzione
+    const out = await jsonDa(`Devi decidere se questa guida pratica è pronta per essere pubblicata. Confrontala passo per passo con ciò che dicono i tutorial trovati online (sotto). Controlla che ogni passaggio sia corretto, che l'ordine sia giusto, che non manchino gesti importanti e che non ci siano dettagli inventati. Se serve, correggila restando semplice e chiara.
+
+GUIDA: ${t.titolo}
+${passi}
+
+COSA DICONO I TUTORIAL TROVATI ONLINE:
+${trovato.slice(0, 12000)}
+
+Rispondi SOLO con JSON: {"verdetto":"fondato | in_parte | infondato","spiegazione":"2-3 frasi: cosa dicono le fonti e cosa hai corretto","correzioni":[{"passaggio":1,"nota":"cosa hai cambiato e perché"}],"passaggi":[{"titolo":"…","testo":"…","consiglio":null,"attenzione":null,"illustrazione":"descrizione visiva precisa per l'illustratore"}]}
+"passaggi" = la guida definitiva (corretta se in_parte, identica se fondato; vuota se infondato).`, "verdetto");
+    if (fonti.length < 2) throw new Error("fonti insufficienti");
+    const verd = ["fondato", "in_parte", "infondato"].includes(out.verdetto) ? out.verdetto : "in_parte";
+    const ver = { verdetto: verd, spiegazione: String(out.spiegazione || ""), correzioni: Array.isArray(out.correzioni) ? out.correzioni.slice(0, 12) : [], fonti, tentativi };
+    if (verd === "infondato" || !Array.isArray(out.passaggi) || out.passaggi.length < 3) {
+      await admin.from("tutorials").update({ stato: "scartato", verifica: ver, decided_at: new Date().toISOString() }).eq("id", t.id);
+      return "scartato";
+    }
+    const vecchi = t.data.passaggi || [];
+    const passaggi = out.passaggi.slice(0, 10).map((p: Record<string, unknown>, i: number) => {
+      const uguale = vecchi[i] && vecchi[i].titolo === p.titolo && vecchi[i].testo === p.testo;
+      return { titolo: String(p.titolo || ""), testo: String(p.testo || ""), consiglio: p.consiglio || null, attenzione: p.attenzione || null, momento: null, illustrazione: String(p.illustrazione || vecchi[i]?.illustrazione || p.titolo || ""), img: uguale ? vecchi[i].img || null : null };
+    });
+    const tutte = passaggi.every((p: { img: string | null }) => p.img);
+    await admin.from("tutorials").update({ stato: "approvato", verifica: ver, data: { ...t.data, passaggi }, img_status: tutte ? "fatto" : "da_fare", decided_at: new Date().toISOString() }).eq("id", t.id);
+    return "approvato";
+  } catch (e) {
+    // si riprova più tardi; dopo 3 tentativi resta da rivedere (non pubblicata)
+    await admin.from("tutorials").update({ verifica: { verdetto: "non_verificabile", spiegazione: `Verifica non riuscita: ${(e as Error).message}`, correzioni: [], fonti: [], tentativi } }).eq("id", t.id);
+    return "errore";
+  }
+}
+
 async function disegna(parts: unknown[]) {
   let last = "Nessun modello di immagini disponibile";
   let quota = false;
@@ -159,7 +249,16 @@ async function passo(admin: SupabaseClient, secret: string, c: Catena) {
   c.creati ||= 0;
   c.errori ||= 0;
   if (c.errori > 8) return { stop: "troppi errori" };
-  // 1) illustrazioni mancanti
+  // 0) guide appena scritte: verifica online prima di pubblicarle
+  const { data: daVer } = await admin.from("tutorials").select("*").eq("user_id", c.user_id).not("lezione", "is", null).eq("stato", "proposta").order("created_at").limit(5);
+  const v = (daVer || []).find((x) => (x.verifica?.tentativi || 0) < 3);
+  if (v) {
+    const r = await verifica(admin, v);
+    if (r === "errore") c.errori++;
+    prossimo(secret, c);
+    return { ok: true, verificata: v.titolo, esito: r };
+  }
+  // 1) illustrazioni mancanti (solo guide verificate)
   const { data: aperti } = await admin.from("tutorials").select("*").eq("user_id", c.user_id).not("lezione", "is", null).eq("stato", "approvato").in("img_status", ["da_fare", "in_corso"]).order("created_at").limit(1);
   const t = aperti?.[0];
   if (t) {
@@ -180,7 +279,7 @@ async function passo(admin: SupabaseClient, secret: string, c: Catena) {
       await fetch(`${URL_}/functions/v1/promemoria/invia`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-cron": secret },
-        body: JSON.stringify({ user_id: c.user_id, title: "I tutorial illustrati sono pronti", body: `${c.creati} guide passo passo in stile WikiHow, dentro le lezioni dell'Accademia.`, url: "./?vai=accademia", tag: "tutorial" }),
+        body: JSON.stringify({ user_id: c.user_id, title: "I tutorial illustrati sono pronti", body: `${c.creati} guide passo passo in stile WikiHow, verificate con tutorial e fonti online, dentro le lezioni dell'Accademia.`, url: "./?vai=accademia", tag: "tutorial" }),
       }).catch(() => null);
     }
     return { fine: true, creati: c.creati };
@@ -210,10 +309,9 @@ ${String(l.testo).slice(0, 9000)}`);
         titolo: String(tu.titolo || l.titolo).slice(0, 140),
         lezione: ref,
         data: { intro: tu.intro || "", difficolta: tu.difficolta || "facile", minuti: Number(tu.minuti) || 5, occorrente: tu.occorrente || [], passaggi, consigli: tu.consigli || [], errori: tu.errori || [] },
-        verifica: { verdetto: "fondato", spiegazione: "Tratto da una lezione dell'Accademia, già verificata con le fonti indicate nella lezione.", correzioni: [], fonti: [] },
+        verifica: null,
         img_status: "da_fare",
-        stato: "approvato",
-        decided_at: new Date().toISOString(),
+        stato: "proposta",
       });
       c.creati++;
     } else {

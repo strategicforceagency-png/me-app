@@ -34,7 +34,17 @@ const ICONS: Record<string, (p: { size?: number }) => JSX.Element> = {
 
 /* ---------------- testo con **grassetto** ed elenchi ---------------- */
 function inline(t: string): ReactNode[] {
-  return t.split(/(\*\*[^*]+\*\*)/g).map((s, i) => (s.startsWith("**") && s.endsWith("**") ? <b key={i}>{s.slice(2, -2)}</b> : <Fragment key={i}>{s}</Fragment>));
+  return t.split(/(\*\*[^*]+\*\*|\[[^\]]+\]\(https?:\/\/[^)\s]+\))/g).map((s, i) => {
+    if (s.startsWith("**") && s.endsWith("**")) return <b key={i}>{s.slice(2, -2)}</b>;
+    const l = s.match(/^\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)$/);
+    if (l)
+      return (
+        <a key={i} href={l[2]} target="_blank" rel="noreferrer" className="underline decoration-line underline-offset-2 hover:text-gold">
+          {l[1]}
+        </a>
+      );
+    return <Fragment key={i}>{s}</Fragment>;
+  });
 }
 export function RichText({ text }: { text: string }) {
   const lines = text.split(/\n+/).map((l) => l.trim()).filter(Boolean);

@@ -90,14 +90,48 @@ async function ask0(prompt: string, search: boolean): Promise<{ out: any; fonti:
   }
   throw new Error(/quota|exceeded|demand|overloaded/i.test(last) ? "quota AI esaurita per ora" : last);
 }
-async function ask(prompt: string) {
-  try {
-    return { ...(await ask0(prompt, true)), senza_ricerca: false };
-  } catch (e) {
-    if (!/quota|tempo/i.test(String(e))) throw e;
-    const nota = "\n\nATTENZIONE: in questo momento NON hai accesso alla ricerca web. Usa ciò che sai con certezza, niente link inventati, prezzi solo come fasce indicative, e diglielo con garbo se qualcosa va verificato.";
-    return { ...(await ask0(prompt + nota, false)), senza_ricerca: true };
+/** Ricerca Google vera, in prosa: con l'obbligo di rispondere in JSON il modello non cerca. */
+async function ricerca(domanda: string): Promise<{ testo: string; fonti: Fonte[] }> {
+  let last = "Nessun modello AI disponibile";
+  for (const m of ordina(await models())) {
+    const r = await gfetch(`${GEM}/models/${m}:generateContent?key=${key()}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: domanda }] }], tools: [{ google_search: {} }], generationConfig: { temperature: 0.2, maxOutputTokens: 8000 } }),
+    }, 110000);
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      last = j?.error?.message || `Errore ${r.status}`;
+      continue;
+    }
+    const c = j.candidates?.[0];
+    // deno-lint-ignore no-explicit-any
+    const testo = (c?.content?.parts || []).filter((p: any) => !p.thought).map((p: any) => p.text || "").join("");
+    // deno-lint-ignore no-explicit-any
+    const fonti = ((c?.groundingMetadata?.groundingChunks || []) as any[])
+      .map((g) => g.web)
+      .filter((w) => w?.uri)
+      .reduce((acc: Fonte[], w) => (acc.some((a) => a.titolo === w.title) ? acc : [...acc, { titolo: w.title || "fonte", url: w.uri }]), [])
+      .slice(0, 8);
+    if (testo) return { testo, fonti };
+    last = "Ricerca vuota";
   }
+  throw new Error(last);
+}
+/** Prima cerca davvero sul web (in prosa), poi scrive il resoconto in JSON partendo da ciò che ha trovato. */
+async function ask(prompt: string, incarico: string) {
+  let trovato: { testo: string; fonti: Fonte[] } | null = null;
+  try {
+    trovato = await ricerca(`Sei l'assistente di ricerca di un maggiordomo. Cerca online tutto ciò che serve per svolgere questo incarico, con informazioni aggiornate e verificabili (orari, giorni di apertura, prezzi, disponibilità, recensioni, indirizzi, alternative). Riporta i fatti trovati citando i siti, senza inventare nulla. Oggi è ${oraRoma()}. Incarico: «${incarico}»`);
+  } catch {
+    trovato = null;
+  }
+  const conRicerca = !!trovato && trovato.fonti.length > 0;
+  const extra = conRicerca
+    ? `\n\nRICERCA WEB APPENA FATTA (usa questi fatti, non inventarne altri; se qualcosa non risulta, dillo):\n${trovato!.testo.slice(0, 12000)}`
+    : "\n\nATTENZIONE: in questo momento la ricerca web non ha dato risultati. Usa ciò che sai con certezza, niente link inventati, prezzi solo come fasce indicative, e diglielo con garbo se qualcosa va verificato.";
+  const r = await ask0(prompt + extra, false);
+  return { out: r.out, fonti: conRicerca ? trovato!.fonti : [], senza_ricerca: !conRicerca };
 }
 
 /** "2026-11-09T09:00" inteso come ora di Roma → istante UTC */
@@ -162,9 +196,9 @@ Rispondi SOLO con JSON valido in italiano:
 "breve":"testo della notifica, max 140 caratteri, con la cosa più importante",
 "vai":"la sezione dell'app più utile per proseguire, una tra ${VAI.join(", ")}",
 "seguito":null oppure {"testo":"un eventuale incarico successivo che lui ha chiesto (es. ricordarglielo più avanti)","quando":"YYYY-MM-DDTHH:MM ora italiana"}}`;
-    const { out, fonti, senza_ricerca } = await ask(prompt);
+    const { out, fonti, senza_ricerca } = await ask(prompt, t.testo);
     const vai = VAI.includes(out.vai) ? out.vai : "alfred";
-    const esito = String(out.esito || "").trim() + (senza_ricerca ? "\n\n_La ricerca web di Google oggi non era disponibile: ho usato ciò che so, verifichi prezzi e disponibilità._" : "");
+    const esito = String(out.esito || "").trim() + (fonti.length ? `\n\nFonti consultate: ${fonti.map((f) => `[${f.titolo}](${f.url})`).join(", ")}` : "") + (senza_ricerca ? "\n\n_La ricerca web di Google oggi non era disponibile: ho usato ciò che so, verifichi prezzi e disponibilità._" : "");
     await admin.from("incarichi").update({ stato: "fatto", esito, breve: String(out.breve || "").slice(0, 200), vai, fonti, fatto_at: new Date().toISOString() }).eq("id", id);
     if (!t.riservato) await admin.from("maestro_messages").insert({ user_id: t.user_id, role: "model", text: `${String(out.sintesi || out.breve || "").trim()}\n\n📋 **Incarico svolto** — ${t.testo}\n\n${esito}` });
     if (out.seguito?.testo) {
