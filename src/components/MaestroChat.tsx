@@ -298,7 +298,7 @@ export function MaestroChat() {
               )}
               {busy && (
                 <div className="flex gap-2 items-center text-muted text-[13px]">
-                  <div className="h-7 w-7 rounded-full bg-hero text-gold grid place-items-center font-display text-[13px]">M</div>
+                  <AlfredAvatar size={28} className="shrink-0" />
                   <span className="flex gap-1">
                     {[0, 1, 2].map((d) => (
                       <motion.span key={d} className="h-1.5 w-1.5 rounded-full bg-gold" animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1.1, repeat: Infinity, delay: d * 0.2 }} />
