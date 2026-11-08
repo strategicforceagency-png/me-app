@@ -1,6 +1,6 @@
 import { Session } from "@supabase/supabase-js";
 import { AnimatePresence, motion } from "framer-motion";
-import { ScanFace, ChevronDown, Compass, Fingerprint, Dumbbell, Feather, GraduationCap, HeartPulse, Loader2, LogOut, Moon, Plus, Shirt, Sparkles, Sun, TrendingUp, User, Wallet, Inbox, Heart, Gift, UtensilsCrossed, PenLine } from "lucide-react";
+import { ScanFace, SprayCan, Briefcase, ChevronDown, Compass, Fingerprint, Dumbbell, Feather, GraduationCap, HeartPulse, Loader2, LogOut, Moon, Plus, Shirt, Sparkles, Sun, TrendingUp, User, Wallet, Inbox, Heart, Gift, UtensilsCrossed, PenLine } from "lucide-react";
 import { FormEvent, ReactNode, useEffect, useState } from "react";
 import { Field, inputCls, PrimaryButton, Sheet, Toast } from "./components/ui";
 import { AppProvider, Tab, useApp } from "./lib/store";
@@ -23,6 +23,7 @@ import { AcademyScreen } from "./screens/Academy";
 import { PathScreen } from "./screens/Path";
 import { FitnessScreen } from "./screens/Fitness";
 import { FaceScreen } from "./screens/Face";
+import { FragrancesScreen, LeatherScreen } from "./screens/Collezione";
 import { LanguageScreen } from "./screens/Language";
 import { Questionnaire } from "./gentleman/Questionnaire";
 
@@ -100,13 +101,15 @@ const ITEMS: Record<Tab, NavItem> = {
   salute: { id: "salute", label: "Salute", icon: I(HeartPulse) },
   fisico: { id: "fisico", label: "Allenamento", short: "Allenamento", icon: I(Dumbbell) },
   fisionomia: { id: "fisionomia", label: "Fisionomia", icon: I(ScanFace) },
+  profumi: { id: "profumi", label: "Profumi", icon: I(SprayCan) },
+  pelletteria: { id: "pelletteria", label: "Pelletteria", icon: I(Briefcase) },
   profilo: { id: "profilo", label: "Profilo", icon: I(User) },
 };
 /** Le cinque aree, uguali nel menu laterale e nella barra in basso. Il profilo sta in alto a destra. */
 const GROUPS: { id: string; label: string; icon: NavItem["icon"]; items: Tab[] }[] = [
   { id: "oggi", label: "Oggi", icon: I(Compass), items: ["percorso", "progressi"] },
   { id: "accademia", label: "Accademia", icon: I(GraduationCap), items: ["accademia", "contenuti", "linguaggio"] },
-  { id: "stile", label: "Stile", icon: (p) => <Hanger size={p.size ?? 18} className={p.className} />, items: ["armadio", "outfit", "stile", "budget"] },
+  { id: "stile", label: "Stile", icon: (p) => <Hanger size={p.size ?? 18} className={p.className} />, items: ["armadio", "outfit", "stile", "profumi", "pelletteria", "budget"] },
   { id: "corpo", label: "Corpo", icon: I(Dumbbell), items: ["fisico", "fisionomia", "salute"] },
   { id: "vita", label: "Vita", icon: I(Heart), items: ["persone", "regali", "uscite", "lettere"] },
 ];
@@ -356,7 +359,7 @@ function Shell() {
     if (vai === "revisione") {
       app.setTab("percorso");
       setTimeout(() => window.dispatchEvent(new CustomEvent("habitus:revisione")), 600);
-    } else if (vai && ["percorso", "linguaggio", "budget", "accademia", "fisico", "progressi", "armadio", "contenuti", "persone", "regali", "uscite", "lettere", "fisionomia"].includes(vai)) app.setTab(vai as Tab);
+    } else if (vai && ["percorso", "linguaggio", "budget", "accademia", "fisico", "progressi", "armadio", "contenuti", "persone", "regali", "uscite", "lettere", "fisionomia", "profumi", "pelletteria"].includes(vai)) app.setTab(vai as Tab);
     if (q.size) history.replaceState(null, "", window.location.pathname);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -433,6 +436,8 @@ function Shell() {
           {app.tab === "salute" && <Health />}
           {app.tab === "fisico" && <FitnessScreen />}
           {app.tab === "fisionomia" && <FaceScreen />}
+          {app.tab === "profumi" && <FragrancesScreen />}
+          {app.tab === "pelletteria" && <LeatherScreen />}
         </div>
       </main>
       {app.tab !== "armadio" && <AddGarmentSheet open={app.addOpen} onClose={() => app.setAddOpen(false)} />}

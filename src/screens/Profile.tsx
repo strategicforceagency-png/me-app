@@ -1,6 +1,7 @@
 import { Camera, Download, Heart, Loader2, LogOut, Moon, Plus, Settings, Shirt, SlidersHorizontal, Sun, Trash2 } from "lucide-react";
 import { RemindersCard } from "../components/Reminders";
 import { PasskeysCard } from "../components/Passkeys";
+import { AlfredSettings } from "../components/AlfredSettings";
 import { SchedaCard, type SchedaData } from "../components/Scheda";
 import { useTheme } from "../lib/theme";
 import { useRef, useState } from "react";
@@ -139,6 +140,9 @@ export function Profile() {
         <div className="h-4" />
       </Sheet>
       <div className="mt-8 max-w-[720px]">
+        <AlfredSettings />
+      </div>
+      <div className="mt-3 max-w-[720px]">
         <SchedaCard
           title="Cosa Habitus sa di te"
           scheda={(app.profile?.scheda as SchedaData) || {}}

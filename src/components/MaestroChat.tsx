@@ -1,9 +1,10 @@
-import { AlfredIcon } from "./AlfredIcon";
+import { AlfredAvatar } from "./AlfredIcon";
+import { AlfredCall } from "./AlfredCall";
 import { AnimatePresence, motion } from "framer-motion";
-import { Eraser, Loader2, Mic, SendHorizontal, Volume2, VolumeX, X } from "lucide-react";
+import { Eraser, Loader2, Mic, Phone, SendHorizontal, Volume2, VolumeX, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useApp } from "../lib/store";
-import { fn, supabase, learnMe } from "../lib/supabase";
+import { fn, supabase, learnMe, uploadImage } from "../lib/supabase";
 import { RichText } from "../screens/Academy";
 
 type Msg = { id?: string; role: "user" | "model"; text: string };
@@ -14,6 +15,8 @@ const SCREEN: Record<string, string> = {
   accademia: "Accademia (lezioni)",
   contenuti: "Contenuti e quaderno",
   linguaggio: "Laboratorio del linguaggio",
+  profumi: "Profumi (la sua collezione e il profilo olfattivo)",
+  pelletteria: "Pelletteria (borse, cinture, portafogli)",
   fisionomia: "Fisionomia (analisi del viso: taglio di capelli, barba, montature)",
   armadio: "Armadio",
   outfit: "Crea outfit",
@@ -64,6 +67,19 @@ export function MaestroChat() {
   const [voice, setVoice] = useState(getVoice);
   const [listening, setListening] = useState(false);
   const [armed, setArmed] = useState(0);
+  const faceRef = useRef<HTMLInputElement>(null);
+  /** Il volto di Alfred lo sceglie l'utente: un'immagine sua, privata. */
+  const changeFace = async (f?: File) => {
+    if (!f) return;
+    try {
+      const { data: u } = await supabase.auth.getUser();
+      const path = await uploadImage("avatars", u.user!.id, f, "alfred");
+      await app.setProfile({ alfred_foto: path });
+      app.toast("Il nuovo volto di Alfred è pronto");
+    } catch (e) {
+      app.toast((e as Error).message);
+    }
+  };
   const end = useRef<HTMLDivElement>(null);
   const rec = useRef<SR | null>(null);
   const input = useRef<HTMLTextAreaElement>(null);
@@ -76,6 +92,12 @@ export function MaestroChat() {
       setMsgs([]);
     }
   }, []);
+  const [call, setCall] = useState(false);
+  useEffect(() => {
+    const f = () => load();
+    window.addEventListener("habitus:chat-ricarica", f);
+    return () => window.removeEventListener("habitus:chat-ricarica", f);
+  }, [load]);
   useEffect(() => {
     if (open && msgs === null) load();
   }, [open, msgs, load]);
@@ -172,7 +194,7 @@ export function MaestroChat() {
             aria-label="Parla con Alfred"
             className="fixed right-4 bottom-[calc(88px+env(safe-area-inset-bottom))] lg:right-8 lg:bottom-8 z-[35] h-14 w-14 rounded-full shadow-dock grid place-items-center"
           >
-            <AlfredIcon size={56} className="text-gold" />
+            <AlfredAvatar size={56} />
           </motion.button>
         )}
       </AnimatePresence>
@@ -188,11 +210,17 @@ export function MaestroChat() {
             className="fixed z-[55] inset-0 lg:inset-auto lg:right-8 lg:bottom-8 lg:h-[640px] lg:max-h-[calc(100vh-64px)] lg:w-[420px] lg:rounded-[26px] lg:shadow-dock lg:ring-1 lg:ring-line bg-bg flex flex-col overflow-hidden"
           >
             <div className="bg-hero text-herofg px-4 pb-3.5 pt-[calc(14px+env(safe-area-inset-top))] lg:pt-4 flex items-center gap-3">
-              <AlfredIcon size={40} className="text-gold shrink-0" />
+              <button onClick={() => faceRef.current?.click()} className="relative shrink-0" aria-label="Cambia il volto di Alfred" title="Cambia il volto di Alfred">
+                <AlfredAvatar size={40} />
+              </button>
+              <input ref={faceRef} type="file" accept="image/*" className="hidden" onChange={(e) => changeFace(e.target.files?.[0])} />
               <div className="flex-1 min-w-0">
                 <div className="font-display text-[20px] leading-none">Alfred</div>
                 <div className="text-[12px] opacity-70 mt-1">Il suo maggiordomo personale</div>
               </div>
+              <button onClick={() => setCall(true)} className="h-9 w-9 grid place-items-center rounded-full bg-gold/20 text-gold hover:bg-gold/30" aria-label="Chiama Alfred" title="Chiama Alfred">
+                <Phone size={17} />
+              </button>
               <button onClick={toggleVoice} className="h-9 w-9 grid place-items-center rounded-full hover:bg-white/10" aria-label="Lettura ad alta voce">
                 {voice ? <Volume2 size={18} className="text-gold" /> : <VolumeX size={18} className="opacity-70" />}
               </button>
@@ -215,7 +243,7 @@ export function MaestroChat() {
               {msgs?.length === 0 && (
                 <div className="pt-4">
                   <div className="rounded-[20px] bg-surface shadow-soft p-4 text-[14.5px] leading-relaxed">
-                    {new Date().getHours() < 13 ? "Buongiorno" : "Buonasera"}, signorino{app.profile?.nome ? ` ${app.profile.nome.split(" ")[0]}` : ""}. Alfred, al suo servizio. Che si tratti di cosa indossare, di come comportarsi o di trovare le parole giuste, mi chieda pure: conosco il suo armadio, il suo percorso e, mi permetta, anche qualche sua debolezza.
+                    {new Date().getHours() < 13 ? "Buongiorno" : "Buonasera"}, signor{app.profile?.nome ? ` ${app.profile.nome.split(" ")[0]}` : "e"}. Alfred, al suo servizio. Che si tratti di cosa indossare, di come comportarsi o di trovare le parole giuste, mi chieda pure: conosco il suo armadio, il suo percorso e, mi permetta, anche qualche sua debolezza.
                   </div>
                   <div className="mt-3 flex flex-col gap-2">
                     {SUGGESTIONS.map((s) => (
@@ -242,7 +270,7 @@ export function MaestroChat() {
                   </div>
                 ) : (
                   <div key={m.id || i} className="flex gap-2">
-                    <AlfredIcon size={28} className="text-gold shrink-0 mt-0.5" />
+                    <AlfredAvatar size={28} className="shrink-0 mt-0.5" />
                     <div className="max-w-[88%] rounded-[18px] rounded-tl-[6px] bg-surface shadow-soft px-3.5 py-2.5 text-[14.5px] leading-relaxed">
                       <RichText text={m.text} />
                       {"speechSynthesis" in window && (
@@ -299,6 +327,7 @@ export function MaestroChat() {
           </motion.div>
         )}
       </AnimatePresence>
+      <AlfredCall open={call} onClose={() => setCall(false)} />
     </>
   );
 }

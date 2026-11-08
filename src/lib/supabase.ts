@@ -75,6 +75,10 @@ export type Profile = {
   citta?: string | null;
   scheda?: unknown;
   palette?: unknown;
+  alfred_foto?: string | null;
+  alfred_voce?: string | null;
+  profumi_analisi?: unknown;
+  pelle_analisi?: unknown;
 };
 export type OutfitItem = { garment_id: string; slot: Slot; layer: number };
 export type Outfit = {

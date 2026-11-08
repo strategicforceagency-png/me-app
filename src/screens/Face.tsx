@@ -1,6 +1,6 @@
 import { Camera, Check, Palette as Palette2Icon, Copy, ExternalLink, Glasses, Loader2, RefreshCw, Scissors, ShieldAlert, Shirt, Sparkles, X } from "lucide-react";
 import { ReactNode, useCallback, useEffect, useRef, useState } from "react";
-import { AlfredIcon } from "../components/AlfredIcon";
+import { AlfredAvatar } from "../components/AlfredIcon";
 import { inputCls } from "../components/ui";
 import { useApp } from "../lib/store";
 import { fn, supabase, uploadImage, useSignedUrl } from "../lib/supabase";
@@ -108,7 +108,7 @@ export function FaceScreen() {
   return (
     <div className="px-5 lg:px-10 pb-32 max-w-[860px]">
       <h1 className="font-display text-[36px] lg:text-[44px] font-semibold leading-none">Fisionomia</h1>
-      <p className="text-[14.5px] text-muted mt-2 leading-relaxed">Una foto del viso e capisco forma e proporzioni: il taglio di capelli, la barba, le montature e i colletti che ti valorizzano. Con la frase pronta da leggere al barbiere.</p>
+      <p className="text-[14.5px] text-muted mt-2 leading-relaxed">Una foto del viso e capisco forma e proporzioni: il taglio di capelli e la barba che ti valorizzano, con la frase pronta per il barbiere, la tua armocromia, le montature e i colletti.</p>
 
       {rows === null ? (
         <div className="grid place-items-center py-16 text-muted">
@@ -299,7 +299,7 @@ function Result({ row, onChoose, onChooseBeard }: { row: Row; onChoose: (i: numb
       )}
       {a.riassunto && (
         <div className="mt-4 flex gap-3 rounded-[18px] bg-surface shadow-soft p-4">
-          <AlfredIcon size={36} className="text-gold shrink-0" />
+          <AlfredAvatar size={36} className="shrink-0" />
           <p className="text-[14.5px] leading-relaxed italic">{a.riassunto}</p>
         </div>
       )}
@@ -490,11 +490,11 @@ const Swatch = ({ c, small }: { c: Colore; small?: boolean }) => (
   </div>
 );
 
-/** La palette personale: stagione, colori, neutri, da evitare, metalli e come usarla nel guardaroba. */
+/** L'armocromia personale: stagione, colori, neutri, da evitare, metalli e come usarla nel guardaroba. */
 export function PaletteView({ p }: { p: Palette }) {
   return (
     <>
-      <H icon={<Palette2Icon size={13} className="text-gold" />}>La tua palette</H>
+      <H icon={<Palette2Icon size={13} className="text-gold" />}>La tua armocromia</H>
       <div className="rounded-[20px] bg-surface shadow-soft p-4">
         <div className="font-display text-[24px] leading-tight">{p.stagione || "La tua stagione"}</div>
         <div className="mt-1.5 flex flex-wrap gap-1.5">
@@ -528,7 +528,7 @@ export function PaletteView({ p }: { p: Palette }) {
           </div>
         )}
         {p.affidabilita && <div className="mt-3 text-[12px] text-muted">📷 {p.affidabilita}</div>}
-        <div className="mt-3 text-[12px] text-muted">Questa palette guida da ora la tua guida di stile, gli abbinamenti e i consigli di Alfred.</div>
+        <div className="mt-3 text-[12px] text-muted">La tua armocromia guida da ora la guida di stile, gli abbinamenti e i consigli di Alfred.</div>
       </div>
     </>
   );
@@ -548,14 +548,14 @@ export function PaletteStrip() {
             ))}
           </div>
           <span className="flex-1 min-w-0">
-            <span className="block text-[13.5px] font-semibold truncate">La tua palette · {p.stagione}</span>
+            <span className="block text-[13.5px] font-semibold truncate">Armocromia · {p.stagione}</span>
             <span className="block text-[12px] text-muted truncate">Guida colori di abiti e abbinamenti</span>
           </span>
         </>
       ) : (
         <span className="flex-1 min-w-0">
-          <span className="block text-[13.5px] font-semibold">Scopri la tua palette di colori</span>
-          <span className="block text-[12px] text-muted">Una foto del viso in Fisionomia e i colori da indossare saranno su misura</span>
+          <span className="block text-[13.5px] font-semibold">Scopri la tua armocromia</span>
+          <span className="block text-[12px] text-muted">Una foto del viso in Fisionomia: i colori da indossare diventano su misura</span>
         </span>
       )}
       <ExternalLink size={14} className="text-muted shrink-0" />

@@ -16,8 +16,8 @@ const GEM = "https://generativelanguage.googleapis.com";
 const GRAPH = "https://graph.facebook.com/v23.0";
 const MAX_IMG = 20, MAX_VID = 3, MAX_VID_BYTES = 45 * 1024 * 1024;
 
-export const TEMI = ["Stile e vestiti", "Cravatte e accessori", "Scarpe", "Galateo", "Appuntamenti e relazioni", "Grooming", "Linguaggio", "Fisico", "Salute", "Mentalità", "Altro"];
-const CORSI = ["vestirsi", "galateo", "coppia", "cravatte", "grooming", "scarpe", "accessori", "inglese", "vocabolario"];
+export const TEMI = ["Stile e vestiti", "Cravatte e accessori", "Scarpe", "Galateo", "Appuntamenti e relazioni", "Grooming", "Profumi", "Pelletteria e borse", "Linguaggio", "Fisico", "Salute", "Mentalità", "Altro"];
+const CORSI = ["vestirsi", "galateo", "coppia", "cravatte", "grooming", "scarpe", "accessori", "profumi", "pelletteria", "inglese", "vocabolario"];
 const VERDETTI = ["fondato", "in_parte", "opinione", "infondato", "non_verificabile"];
 
 const key = () => {
@@ -423,7 +423,7 @@ Passaggio: ${steps[i].titolo} — ${steps[i].testo}`,
       if (parts.length === 0) throw new Error("Niente da analizzare");
 
       parts.push({
-        text: `Sei il direttore dell'Accademia di Habitus, scuola personale per diventare un gentleman (gentiluomo inglese anni '60-'70 adattato all'Italia di oggi). Manuel ti ha portato questo contenuto (${c.title || c.source || "file"}). Fai una CERNITA COMPLETA di tutto ciò che il contenuto insegna, consiglia o afferma, non solo i vestiti: come vestirsi e abbinare, cravatte, pochette e accessori, scarpe, galateo e comportamento, appuntamenti e relazioni, grooming, linguaggio, fisico, salute, mentalità. Guarda i video per intero e ascolta l'audio: spesso i consigli sono detti a voce. Ignora sponsorizzazioni, codici sconto e inviti a seguire.
+        text: `Sei il direttore dell'Accademia di Habitus, scuola personale per diventare un gentleman (gentiluomo inglese anni '60-'70 adattato all'Italia di oggi). Manuel ti ha portato questo contenuto (${c.title || c.source || "file"}). Fai una CERNITA COMPLETA di tutto ciò che il contenuto insegna, consiglia o afferma, non solo i vestiti: come vestirsi e abbinare, cravatte, pochette e accessori, scarpe, profumi, borse e pelletteria, galateo e comportamento, appuntamenti e relazioni, grooming, linguaggio, fisico, salute, mentalità. Guarda i video per intero e ascolta l'audio: spesso i consigli sono detti a voce. Ignora sponsorizzazioni, codici sconto e inviti a seguire.
 
 Rispondi SOLO con JSON valido in italiano:
 {"titolo":"titolo breve e chiaro del contenuto","riassunto":"2-3 frasi su cosa insegna","temi":["temi presenti"],"insegnamenti":[{"tema":"uno tra ${TEMI.join(", ")}","corso":"uno tra ${CORSI.join(", ")} oppure null","titolo":"titolo breve","affermazione":"cosa sostiene il contenuto, riportato fedelmente anche se discutibile","dettaglio":"come lo spiega, esempi, passaggi pratici","dove":"es. video 1 al minuto 0:40, immagine 3, didascalia, testo"}],"stile":null,"tutorial":[]}
@@ -482,7 +482,7 @@ Regole:
       await sb.from("knowledge").delete().eq("content_id", id).eq("stato", "proposta");
       const results: Record<string, unknown>[] = [];
       const one = async (x: (typeof ins)[number]) => {
-        const prompt = `Verifica questo insegnamento con fonti autorevoli e aggiornate (manuali e istituzioni di galateo, sartorie e camicerie storiche, testate di stile maschile serie, dermatologi ed enti sanitari, linee guida ufficiali, Accademia della Crusca e Treccani per la lingua). Contesto: stile e comportamento del gentleman classico, oggi, in Italia.
+        const prompt = `Verifica questo insegnamento con fonti autorevoli e aggiornate (manuali e istituzioni di galateo, sartorie e camicerie storiche, testate di stile maschile serie, maison e profumieri, pellettieri e concerie, dermatologi ed enti sanitari, linee guida ufficiali, Accademia della Crusca e Treccani per la lingua). Contesto: stile e comportamento del gentleman classico, oggi, in Italia.
 
 Tema: ${x.tema}
 Insegnamento: ${x.titolo}

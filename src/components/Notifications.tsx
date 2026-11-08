@@ -1,4 +1,4 @@
-import { Bell, BookOpen, CalendarHeart, CheckCheck, ChevronRight, ClipboardCheck, Compass, Inbox, ListChecks, Trash2 } from "lucide-react";
+import { Bell, BookOpen, Briefcase, CalendarHeart, CheckCheck, ChevronRight, ClipboardCheck, Compass, Inbox, ListChecks, Trash2 } from "lucide-react";
 import { ReactNode, useCallback, useEffect, useState } from "react";
 import { activeHabits, currentWeek, todayISO, type Path } from "../gentleman/types";
 import { useApp, type Tab } from "../lib/store";
@@ -11,7 +11,7 @@ type Live = { id: string; icon: ReactNode; titolo: string; testo: string; vai: T
 /** Un promemoria arrivato (ricorrenze, controllo della settimana…): resta finché non lo leggi o lo cancelli. */
 type Stored = { id: string; kind: string; titolo: string; testo: string | null; vai: string | null; letta: boolean; created_at: string };
 
-const TABS: Tab[] = ["percorso", "linguaggio", "budget", "accademia", "fisico", "progressi", "armadio", "contenuti", "persone", "regali", "uscite", "lettere", "stile", "salute", "outfit", "fisionomia"];
+const TABS: Tab[] = ["percorso", "linguaggio", "budget", "accademia", "fisico", "progressi", "armadio", "contenuti", "persone", "regali", "uscite", "lettere", "stile", "salute", "outfit", "fisionomia", "profumi", "pelletteria"];
 
 type Nav = Navigator & { setAppBadge?: (n?: number) => Promise<void>; clearAppBadge?: () => Promise<void> };
 
@@ -33,6 +33,7 @@ export function useNotifications() {
       path ? supabase.from("field_trials").select("key, voto, note, done_at") : Promise.resolve({ data: [] }),
       path ? supabase.from("path_checks").select("key").eq("day", today) : Promise.resolve({ data: [] }),
     ]);
+    const pelle = await supabase.from("collezione").select("nome, ultima_cura, created_at").eq("tipo", "pelle").eq("stato", "mio");
     const out: Live[] = [];
 
     // ricorrenze entro 7 giorni
@@ -51,6 +52,11 @@ export function useNotifications() {
     soon.sort((a, b) => a.n - b.n);
     for (const [i, s] of soon.entries())
       out.push({ id: `ric-${i}`, icon: <CalendarHeart size={18} />, titolo: s.n === 0 ? "È oggi" : "Si avvicina", testo: s.txt, vai: "persone" });
+
+    // pelle da nutrire (ogni 4 mesi circa)
+    const daNutrire = ((pelle.data as { nome: string; ultima_cura: string | null; created_at: string }[]) || []).filter((x) => (Date.now() - Date.parse(x.ultima_cura || x.created_at)) / 86400000 >= 120);
+    if (daNutrire.length)
+      out.push({ id: "pelle", icon: <Briefcase size={18} />, titolo: daNutrire.length === 1 ? "Un pezzo in pelle da nutrire" : `${daNutrire.length} pezzi in pelle da nutrire`, testo: daNutrire.map((x) => x.nome).slice(0, 3).join(", "), vai: "pelletteria" });
 
     // contenuti da approvare
     const prop = (k.count || 0) + (t.count || 0);

@@ -1,3 +1,5 @@
+import { useApp } from "../lib/store";
+import { useSignedUrl } from "../lib/supabase";
 /**
  * Alfred, il maggiordomo di Habitus: frac, colletto alato e papillon.
  * Disegno originale, in oro sul verde del club.
@@ -32,4 +34,13 @@ export function AlfredIcon({ size = 40, className = "" }: { size?: number; class
       <circle cx="24" cy="24" r="23.25" fill="none" stroke="currentColor" strokeOpacity=".5" strokeWidth="1.5" />
     </svg>
   );
+}
+
+/** Il volto di Alfred: l'immagine scelta dall'utente se c'è, altrimenti l'icona. */
+export function AlfredAvatar({ size = 40, className = "" }: { size?: number; className?: string }) {
+  const app = useApp();
+  const url = useSignedUrl("avatars", app.profile?.alfred_foto || null);
+  if (url)
+    return <img src={url} alt="Alfred" width={size} height={size} style={{ width: size, height: size }} className={`rounded-full object-cover ring-1 ring-gold/50 ${className}`} />;
+  return <AlfredIcon size={size} className={`text-gold ${className}`} />;
 }
