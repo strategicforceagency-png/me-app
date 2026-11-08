@@ -1,7 +1,6 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { Loader2, Mic, MicOff, PhoneOff } from "lucide-react";
+import { Loader2, Lock, LockOpen, Mic, MicOff, PhoneOff } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { useApp } from "../lib/store";
 import { fn, supabase } from "../lib/supabase";
 import { AlfredAvatar } from "./AlfredIcon";
 
@@ -39,7 +38,6 @@ function toPcm16(f: Float32Array, rate: number) {
 }
 
 export function AlfredCall({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const app = useApp();
   const [stato, setStato] = useState<Stato>("chiamo");
   const [errore, setErrore] = useState("");
   const [muto, setMuto] = useState(false);
@@ -61,7 +59,33 @@ export function AlfredCall({ open, onClose }: { open: boolean; onClose: () => vo
     tIn: string;
     tOut: string;
     chiuso: boolean;
-  }>({ next: 0, sources: [], buf: [], bufLen: 0, muto: false, pronto: false, tIn: "", tOut: "", chiuso: false });
+    riservata: boolean;
+    model: string;
+    escludi: string[];
+    altri: number;
+  }>({ next: 0, sources: [], buf: [], bufLen: 0, muto: false, pronto: false, tIn: "", tOut: "", chiuso: false, riservata: false, model: "", escludi: [], altri: 0 });
+  const [riservata, setRiservata] = useState(() => {
+    try {
+      return localStorage.getItem("habitus-chiamata-riservata") === "1";
+    } catch {
+      return false;
+    }
+  });
+  r.current.riservata = riservata;
+  const toggleRiservata = () => {
+    const v = !riservata;
+    setRiservata(v);
+    r.current.riservata = v;
+    if (v) {
+      r.current.tIn = "";
+      r.current.tOut = "";
+    }
+    try {
+      localStorage.setItem("habitus-chiamata-riservata", v ? "1" : "0");
+    } catch {
+      /* */
+    }
+  };
 
   const salvaTurno = () => {
     const s = r.current;
@@ -70,7 +94,8 @@ export function AlfredCall({ open, onClose }: { open: boolean; onClose: () => vo
     if (s.tOut.trim()) rows.push({ role: "model", text: s.tOut.trim() });
     s.tIn = "";
     s.tOut = "";
-    if (rows.length) supabase.from("maestro_messages").insert(rows).then(() => {});
+    // chiamata riservata: niente viene salvato
+    if (rows.length && !s.riservata) supabase.from("maestro_messages").insert(rows).then(() => {});
   };
 
   const chiudi = () => {
@@ -133,8 +158,9 @@ export function AlfredCall({ open, onClose }: { open: boolean; onClose: () => vo
     };
   };
 
-  const avvia = async () => {
+  const avvia = async (retry = false) => {
     const s = r.current;
+    if (!retry) s.escludi = [];
     s.chiuso = false;
     s.pronto = false;
     setStato("chiamo");
@@ -152,7 +178,9 @@ export function AlfredCall({ open, onClose }: { open: boolean; onClose: () => vo
       }
       await Promise.all([s.outCtx.resume(), s.inCtx.resume()]);
       s.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 } });
-      const { token, setup } = await fn<{ token: string; setup: unknown }>("voce", "", {});
+      const { token, setup, model, altri } = await fn<{ token: string; setup: unknown; model: string; altri: number }>("voce", "", { escludi: s.escludi });
+      s.model = model;
+      s.altri = altri;
       if (s.chiuso) return;
 
       const url = URL.createObjectURL(new Blob([WORKLET], { type: "application/javascript" }));
@@ -226,7 +254,21 @@ export function AlfredCall({ open, onClose }: { open: boolean; onClose: () => vo
       };
       ws.onclose = (e) => {
         if (s.chiuso) return;
-        setErrore(e.reason ? `Linea chiusa: ${e.reason}` : "La chiamata è terminata.");
+        // quota finita su questa linea: si prova subito la successiva
+        if (!s.pronto && /exhaust|quota|RESOURCE|not found|not supported|unavailable/i.test(e.reason || "") && s.altri > 0) {
+          s.escludi = [...s.escludi, s.model];
+          chiudi();
+          setSottotitolo("Linea occupata, provo un'altra linea…");
+          setTimeout(() => avvia(true), 300);
+          return;
+        }
+        setErrore(
+          /exhaust|quota|RESOURCE/i.test(e.reason || "")
+            ? "Alfred ha esaurito i minuti gratuiti di Google per ora. Riprovi più tardi, oppure attivi la fatturazione su Google AI Studio per chiamarlo senza limiti."
+            : e.reason
+              ? `Linea chiusa: ${e.reason}`
+              : "La chiamata è terminata.",
+        );
         setStato(e.code === 1000 ? "fine" : "errore");
         chiudi();
       };
@@ -288,7 +330,7 @@ export function AlfredCall({ open, onClose }: { open: boolean; onClose: () => vo
           <div className="mt-6 flex items-center gap-8">
             {stato === "errore" || stato === "fine" ? (
               <>
-                <button onClick={avvia} className="h-16 px-6 rounded-full bg-gold text-hero font-semibold">
+                <button onClick={() => avvia()} className="h-16 px-6 rounded-full bg-gold text-hero font-semibold">
                   Richiama
                 </button>
                 <button onClick={onClose} className="h-16 px-6 rounded-full bg-white/10 font-semibold">
@@ -306,7 +348,10 @@ export function AlfredCall({ open, onClose }: { open: boolean; onClose: () => vo
               </>
             )}
           </div>
-          {app.profile && stato !== "errore" && <div className="mt-5 text-[11.5px] opacity-50">Quello che vi dite resta nella chat di Alfred.</div>}
+          <button onClick={toggleRiservata} className={`mt-5 h-10 px-4 rounded-full text-[13px] font-semibold flex items-center gap-2 ${riservata ? "bg-gold text-hero" : "bg-white/10"}`} aria-pressed={riservata}>
+            {riservata ? <Lock size={15} /> : <LockOpen size={15} />} Chiamata riservata {riservata ? "attiva" : ""}
+          </button>
+          <div className="mt-2 text-[11.5px] opacity-60 text-center max-w-[320px]">{riservata ? "Niente di questa chiamata viene salvato nella chat né usato per la tua scheda." : "Quello che vi dite resta nella chat di Alfred."}</div>
         </motion.div>
       )}
     </AnimatePresence>

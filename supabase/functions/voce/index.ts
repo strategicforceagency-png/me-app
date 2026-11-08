@@ -14,23 +14,24 @@ const json = (d: unknown, s = 200) => new Response(JSON.stringify(d), { status: 
 const GEM = "https://generativelanguage.googleapis.com";
 const VOCI = ["Charon", "Orus", "Algenib", "Iapetus", "Schedar", "Enceladus"];
 
-let liveModel: string | null = null;
-async function pickModel(key: string) {
-  if (liveModel) return liveModel;
+let liveCache: string[] | null = null;
+/** I modelli vocali disponibili, dal migliore: se uno esaurisce la quota si passa al successivo. */
+async function liveModels(key: string) {
+  if (liveCache) return liveCache;
   const env = Deno.env.get("GEMINI_LIVE_MODEL");
-  if (env) return (liveModel = env);
+  let live: string[] = [];
   try {
     const j = await (await fetch(`${GEM}/v1beta/models?key=${key}&pageSize=1000`)).json();
     // deno-lint-ignore no-explicit-any
-    const live: string[] = (j.models || []).filter((m: any) => (m.supportedGenerationMethods || []).includes("bidiGenerateContent")).map((m: any) => String(m.name).replace("models/", ""));
-    const ver = (n: string) => parseFloat(n.match(/gemini-(\d+(?:\.\d+)?)/)?.[1] || "0");
-    const score = (n: string) => ver(n) * 10 + (/native-audio|live/.test(n) ? 3 : 0) + (/preview|exp/.test(n) ? -1 : 0) + (/flash/.test(n) ? 1 : 0);
-    live.sort((a, b) => score(b) - score(a));
-    if (live[0]) return (liveModel = live[0]);
+    live = (j.models || []).filter((m: any) => (m.supportedGenerationMethods || []).includes("bidiGenerateContent")).map((m: any) => String(m.name).replace("models/", ""));
   } catch {
     /* sotto */
   }
-  return (liveModel = "gemini-3.8-live");
+  const ver = (n: string) => parseFloat(n.match(/gemini-(\d+(?:\.\d+)?)/)?.[1] || "0");
+  const score = (n: string) => ver(n) * 10 + (/native-audio|live/.test(n) ? 3 : 0) + (/preview|exp/.test(n) ? -1 : 0) + (/flash/.test(n) ? 1 : 0);
+  live.sort((a, b) => score(b) - score(a));
+  if (!live.length) live = ["gemini-3.8-live"];
+  return (liveCache = env ? [env, ...live.filter((x) => x !== env)] : live);
 }
 
 /** Crea l'accesso temporaneo: prova i formati noti dell'API (cambiano tra le versioni). */
@@ -62,31 +63,27 @@ Deno.serve(async (req) => {
       const { data: sec } = await adm.from("app_secrets").select("value").eq("name", "cron").single();
       if (!sec || sec.value !== xc) return json({ error: "no" }, 401);
       const k = Deno.env.get("GEMINI_API_KEY")?.trim() || "";
-      const model = await pickModel(k);
-      const t = await makeToken(k, model, 2);
-      const out: Record<string, unknown> = { model, ok: !!t.token, via: t.via, errore: t.err, formato: t.token?.slice(0, 12) };
-      // prova completa della linea: setup, una frase, primi pacchetti audio
-      if (t.token) {
-        const setup = {
-          model: `models/${model}`,
-          generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Charon" } }, languageCode: "it-IT" } },
-          systemInstruction: { parts: [{ text: "Sei Alfred, un maggiordomo inglese. Rispondi in italiano in una frase." }] },
-          inputAudioTranscription: {},
-          outputAudioTranscription: {},
-        };
-        out.linea = await new Promise((resolve) => {
-          const log: Record<string, unknown> = { eventi: [] as string[] };
+      const all = await liveModels(k);
+      const out: Record<string, unknown> = { modelli: all };
+      const prove: Record<string, unknown> = {};
+      for (const model of all.slice(0, 6)) {
+        const t = await makeToken(k, model, 2);
+        if (!t.token) {
+          prove[model] = { token: t.err };
+          continue;
+        }
+        prove[model] = await new Promise((resolve) => {
+          const log: Record<string, unknown> = {};
           const ws = new WebSocket(`wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContentConstrained?access_token=${encodeURIComponent(t.token!)}`);
-          const done = () => {
+          const timer = setTimeout(() => {
             try {
               ws.close();
             } catch {
               /* */
             }
             resolve(log);
-          };
-          const timer = setTimeout(done, 15000);
-          ws.onopen = () => ws.send(JSON.stringify({ setup }));
+          }, 12000);
+          ws.onopen = () => ws.send(JSON.stringify({ setup: { model: `models/${model}`, generationConfig: { responseModalities: ["AUDIO"] } } }));
           ws.onmessage = async (ev) => {
             const txt = typeof ev.data === "string" ? ev.data : new TextDecoder().decode(ev.data instanceof Blob ? new Uint8Array(await ev.data.arrayBuffer()) : new Uint8Array(ev.data));
             let m;
@@ -95,17 +92,15 @@ Deno.serve(async (req) => {
             } catch {
               return;
             }
-            (log.eventi as string[]).push(Object.keys(m).join(","));
             if (m.setupComplete) {
               log.setup = "ok";
-              ws.send(JSON.stringify({ realtimeInput: { text: "Buonasera Alfred, come sta?" } }));
+              ws.send(JSON.stringify({ realtimeInput: { text: "Ciao" } }));
             }
-            const sc = m.serverContent;
-            if (sc?.modelTurn?.parts) for (const p of sc.modelTurn.parts) if (p.inlineData) { log.audio = ((log.audio as number) || 0) + 1; log.mime = p.inlineData.mimeType; }
-            if (sc?.outputTranscription?.text) log.testo = String(log.testo || "") + sc.outputTranscription.text;
-            if (sc?.turnComplete) {
+            if (m.serverContent?.modelTurn?.parts?.some((p: { inlineData?: unknown }) => p.inlineData)) {
+              log.audio = "ok";
               clearTimeout(timer);
-              done();
+              ws.close();
+              resolve(log);
             }
           };
           ws.onclose = (e) => {
@@ -113,9 +108,9 @@ Deno.serve(async (req) => {
             clearTimeout(timer);
             resolve(log);
           };
-          ws.onerror = () => (log.errore = "websocket error");
         });
       }
+      out.prove = prove;
       return json(out);
     }
     const auth = req.headers.get("Authorization") ?? "";
@@ -124,6 +119,7 @@ Deno.serve(async (req) => {
     if (!user) return json({ error: "Non autenticato" }, 401);
     const key = Deno.env.get("GEMINI_API_KEY")?.trim();
     if (!key) return json({ error: "Chiave AI non configurata" }, 503);
+    const b = await req.json().catch(() => ({}));
 
     const [{ data: prof }, { data: face }, { data: chat }, { data: people }] = await Promise.all([
       sb.from("profiles").select("nome, citta, style_guide, path, path_started_at, scheda, palette, alfred_voce").eq("id", user.id).maybeSingle(),
@@ -171,7 +167,10 @@ COSA SAI DI LUI
 - Ultimi messaggi scritti in chat (dal più recente): ${(chat || []).map((m) => `${m.role === "user" ? "lui" : "tu"}: ${String(m.text).slice(0, 200)}`).join(" | ") || "—"}`;
 
     const voce = VOCI.includes(prof?.alfred_voce || "") ? prof!.alfred_voce! : "Charon";
-    const model = await pickModel(key);
+    const esclusi: string[] = Array.isArray(b?.escludi) ? b.escludi : [];
+    const modelli = (await liveModels(key)).filter((m) => !esclusi.includes(m));
+    if (!modelli.length) return json({ error: "Tutte le linee di Alfred hanno esaurito la quota gratuita di oggi. Riprovi più tardi, oppure attivi la fatturazione su Google AI Studio." }, 429);
+    const model = modelli[0];
     const setup = {
       model: `models/${model}`,
       generationConfig: {
@@ -186,7 +185,7 @@ COSA SAI DI LUI
     // accesso temporaneo: un solo uso, 30 minuti, e deve iniziare entro 2 minuti
     const { token, err } = await makeToken(key, model);
     if (!token) return json({ error: `Non riesco ad aprire la linea con Alfred: ${err}` }, 502);
-    return json({ token, model, voce, setup });
+    return json({ token, model, voce, setup, altri: modelli.length - 1 });
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : String(e) }, 500);
   }
