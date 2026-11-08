@@ -90,6 +90,7 @@ export function AlfredCall({ open, onClose }: { open: boolean; onClose: () => vo
     model: string;
     escludi: string[];
     altri: number;
+    senzaStrumenti?: boolean;
   }>({ next: 0, sources: [], buf: [], bufLen: 0, muto: false, pronto: false, tIn: "", tOut: "", chiuso: false, riservata: false, model: "", escludi: [], altri: 0 });
   const [riservata, setRiservata] = useState(() => {
     try {
@@ -206,7 +207,7 @@ export function AlfredCall({ open, onClose }: { open: boolean; onClose: () => vo
       }
       await Promise.all([s.outCtx.resume(), s.inCtx.resume()]);
       s.stream = await prendiMicrofono();
-      const { token, setup, model, altri } = await fn<{ token: string; setup: unknown; model: string; altri: number }>("voce", "", { escludi: s.escludi });
+      const { token, setup, model, altri } = await fn<{ token: string; setup: unknown; model: string; altri: number }>("voce", "", { escludi: s.escludi, senza_strumenti: s.senzaStrumenti });
       s.model = model;
       s.altri = altri;
       if (s.chiuso) return;
@@ -257,6 +258,23 @@ export function AlfredCall({ open, onClose }: { open: boolean; onClose: () => vo
           ws.send(JSON.stringify({ realtimeInput: { text: "(Ti sta chiamando lui, il tuo Signore: lo riconosci subito. Rispondi salutandolo per nome.)" } }));
           return;
         }
+        // Alfred si affida un incarico durante la telefonata
+        if (m.toolCall?.functionCalls?.length) {
+          const risposte = [];
+          for (const c of m.toolCall.functionCalls) {
+            let result = "ok: incarico registrato, l'esito arriverà come notifica";
+            if (c.name === "affida_incarico") {
+              try {
+                await fn("incarichi", "", { action: "crea", testo: String(c.args?.descrizione || ""), quando: c.args?.quando || null, origine: "chiamata", riservato: s.riservata });
+              } catch (e) {
+                result = `errore: ${(e as Error).message}`;
+              }
+            }
+            risposte.push({ id: c.id, name: c.name, response: { result } });
+          }
+          ws.send(JSON.stringify({ toolResponse: { functionResponses: risposte } }));
+          return;
+        }
         const sc = m.serverContent;
         if (!sc) {
           if (m.goAway) setSottotitolo("La linea sta per chiudersi…");
@@ -283,6 +301,13 @@ export function AlfredCall({ open, onClose }: { open: boolean; onClose: () => vo
       ws.onclose = (e) => {
         if (s.chiuso) return;
         // quota finita su questa linea: si prova subito la successiva
+        // se la linea rifiuta lo strumento degli incarichi, si richiama senza (la chiamata conta più degli incarichi)
+        if (!s.pronto && !s.senzaStrumenti && /tool|function|declaration|invalid/i.test(e.reason || "")) {
+          s.senzaStrumenti = true;
+          chiudi();
+          setTimeout(() => avvia(true), 300);
+          return;
+        }
         if (!s.pronto && /exhaust|quota|RESOURCE|not found|not supported|unavailable/i.test(e.reason || "") && s.altri > 0) {
           s.escludi = [...s.escludi, s.model];
           chiudi();

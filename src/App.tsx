@@ -11,6 +11,7 @@ import { ProgressScreen } from "./screens/Progress";
 import { ContentsScreen } from "./screens/Contents";
 import { MaestroChat } from "./components/MaestroChat";
 import { BellButton, NotificationsSheet, useNotifications } from "./components/Notifications";
+import { NotifyBanner } from "./components/NotifyBanner";
 import { PullToRefresh } from "./components/PullToRefresh";
 import { GiftsScreen, LettersScreen, OutingsScreen, PeopleScreen } from "./screens/Life";
 import { supabase, useSignedUrl, learnMe } from "./lib/supabase";
@@ -359,7 +360,8 @@ function Shell() {
     if (vai === "revisione") {
       app.setTab("percorso");
       setTimeout(() => window.dispatchEvent(new CustomEvent("habitus:revisione")), 600);
-    } else if (vai && ["percorso", "linguaggio", "budget", "accademia", "fisico", "progressi", "armadio", "contenuti", "persone", "regali", "uscite", "lettere", "fisionomia", "profumi", "pelletteria"].includes(vai)) app.setTab(vai as Tab);
+    } else if (vai === "alfred") setTimeout(() => window.dispatchEvent(new CustomEvent("habitus:apri-alfred")), 800);
+    else if (vai && ["percorso", "linguaggio", "budget", "accademia", "fisico", "progressi", "armadio", "contenuti", "persone", "regali", "uscite", "lettere", "fisionomia", "profumi", "pelletteria", "outfit", "stile"].includes(vai)) app.setTab(vai as Tab);
     if (q.size) history.replaceState(null, "", window.location.pathname);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -418,6 +420,7 @@ function Shell() {
               Sei senza rete: vedi l'ultima copia salvata. Le modifiche torneranno possibili appena sei di nuovo online.
             </div>
           )}
+          <NotifyBanner />
           <SubTabs badges={badges} />
           {app.tab === "budget" && <BudgetScreen />}
           {app.tab === "progressi" && <ProgressScreen />}

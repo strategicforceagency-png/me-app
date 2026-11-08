@@ -185,6 +185,11 @@ Deno.serve(async (req) => {
         (globalThis as any).EdgeRuntime?.waitUntil(
           fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/armadio/cron`, { method: "POST", headers: { "Content-Type": "application/json", "x-cron": sec.value }, body: JSON.stringify({ user_id, tipo }) }).then((r) => r.text()).catch(() => null),
         );
+      // incarichi di Alfred arrivati all'ora stabilita (o rimasti bloccati)
+      // deno-lint-ignore no-explicit-any
+      (globalThis as any).EdgeRuntime?.waitUntil(
+        fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/incarichi/cron`, { method: "POST", headers: { "Content-Type": "application/json", "x-cron": sec.value }, body: "{}" }).then((r) => r.text()).catch(() => null),
+      );
       for (const p of profs || []) {
         const s = p.promemoria || {};
         {

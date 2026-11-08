@@ -192,7 +192,7 @@ export function NotificationsSheet({ open, onClose, n }: { open: boolean; onClos
     else if (vai === "revisione") {
       app.setTab("percorso");
       evento = "habitus:revisione";
-    }
+    } else if (vai === "alfred") evento = "habitus:apri-alfred";
     if (evento) setTimeout(() => window.dispatchEvent(new CustomEvent(evento!)), 450);
   };
   const aperte = n.stored.filter((s) => !s.fatta);

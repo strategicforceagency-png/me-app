@@ -72,7 +72,8 @@ Deno.serve(async (req) => {
       const sys = { parts: [{ text: "Sei Alfred, il maggiordomo inglese del Signor Manuel, che conosci da anni. Parli in italiano e gli dai del Lei." }] };
       const sc = { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Charon" } }, languageCode: "it-IT" };
       const mk = (voce: string) => ({ model: `models/${model}`, generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voce } }, languageCode: "it-IT" } }, systemInstruction: sys, outputAudioTranscription: {} });
-      const varianti: Record<string, unknown> = { D_Charon: mk("Charon"), E_Aoede_femminile: mk("Aoede"), F_Orus: mk("Orus") };
+      const strumenti = [{ functionDeclarations: [{ name: "affida_incarico", description: "Registra un compito da svolgere dopo", parameters: { type: "OBJECT", properties: { descrizione: { type: "STRING" }, quando: { type: "STRING" } }, required: ["descrizione"] } }] }];
+      const varianti: Record<string, unknown> = { D_Charon: mk("Charon"), G_con_incarichi: { ...mk("Charon"), tools: strumenti } };
       void sc;
       // altezza media della voce (autocorrelazione): maschile ~85-160 Hz, femminile ~165-260 Hz
       const pitch = (pcm: Int16Array, rate: number) => {
@@ -213,6 +214,9 @@ COME PARLI AL TELEFONO
 - Frasi brevi e naturali, come in una vera conversazione: di solito 2-4 frasi, poi lasci parlare lui. Niente elenchi, niente simboli, niente markdown.
 - Se ti chiede qualcosa di lungo, dai l'essenziale e chiedi se vuole i dettagli.
 - Se non capisci, chiedi gentilmente di ripetere.
+
+INCARICHI
+- Quando ti affida un compito che richiede ricerche, confronti, verifiche o di ricordargli qualcosa più tardi, e ogni volta che diresti "controllo e Le faccio sapere", non inventare il risultato: usa lo strumento affida_incarico (descrizione completa e autonoma; "quando" vuoto per subito o YYYY-MM-DDTHH:MM ora italiana, sapendo che ora è ${oggi}) e digli che Le arriverà una notifica con l'esito.
 - Chi chiama è SEMPRE il Signor ${nome}: lo conosci da anni e riconosci subito la sua voce. Non chiedere mai "chi parla", non presentarti come un'intelligenza artificiale e non dire di non avere informazioni su di lui: sai tutto quello che c'è qui sotto e lo usi con naturalezza, come un maggiordomo che conosce bene la casa.
 - Apri la chiamata salutandolo per nome con un saluto adatto all'ora (oggi è ${oggi}) e, se c'è, accenna con discrezione a qualcosa di attuale (una ricorrenza vicina, la settimana del percorso, un impegno).
 
@@ -245,6 +249,29 @@ COSA SAI DI LUI
       systemInstruction: { parts: [{ text: system }] },
       inputAudioTranscription: {},
       outputAudioTranscription: {},
+      // Alfred può affidarsi incarichi da svolgere dopo la chiamata (con notifica dell'esito)
+      ...(b?.senza_strumenti
+        ? {}
+        : {
+            tools: [
+              {
+                functionDeclarations: [
+                  {
+                    name: "affida_incarico",
+                    description: "Registra un compito da svolgere con calma dopo la risposta (ricerche, confronti, promemoria). L'esito gli arriverà come notifica.",
+                    parameters: {
+                      type: "OBJECT",
+                      properties: {
+                        descrizione: { type: "STRING", description: "L'incarico completo e comprensibile da solo: cosa fare, per chi, vincoli, budget" },
+                        quando: { type: "STRING", description: "Vuoto per subito, oppure YYYY-MM-DDTHH:MM in ora italiana" },
+                      },
+                      required: ["descrizione"],
+                    },
+                  },
+                ],
+              },
+            ],
+          }),
     };
 
     // accesso temporaneo: un solo uso, 30 minuti, e deve iniziare entro 2 minuti

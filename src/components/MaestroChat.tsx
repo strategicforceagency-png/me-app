@@ -95,12 +95,22 @@ export function MaestroChat() {
   const [call, setCall] = useState(false);
   useEffect(() => {
     const f = () => load();
+    // dalla notifica di un incarico svolto: si apre la chat con il resoconto
+    const apri = () => {
+      setOpen(true);
+      load();
+    };
     window.addEventListener("habitus:chat-ricarica", f);
-    return () => window.removeEventListener("habitus:chat-ricarica", f);
+    window.addEventListener("habitus:apri-alfred", apri);
+    return () => {
+      window.removeEventListener("habitus:chat-ricarica", f);
+      window.removeEventListener("habitus:apri-alfred", apri);
+    };
   }, [load]);
   useEffect(() => {
-    if (open && msgs === null) load();
-  }, [open, msgs, load]);
+    // a ogni apertura si ricarica: gli incarichi svolti in background scrivono nella chat
+    if (open) load();
+  }, [open, load]);
   useEffect(() => {
     end.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [msgs, busy, open]);
@@ -121,9 +131,13 @@ export function MaestroChat() {
     setBusy(true);
     supabase.from("maestro_messages").insert({ role: "user", text: question }).then(() => {});
     try {
-      const r = await fn<{ answer: string }>("coach", "", { question, history, context: `Schermata: ${SCREEN[app.tab] || app.tab}` });
-      setMsgs((m) => [...(m || []), { role: "model", text: r.answer }]);
-      await supabase.from("maestro_messages").insert({ role: "model", text: r.answer });
+      const r = await fn<{ answer: string; incarichi?: { id: string; testo: string; quando: string | null }[] }>("coach", "", { question, history, context: `Schermata: ${SCREEN[app.tab] || app.tab}` });
+      const inc = (r.incarichi || [])
+        .map((x) => `🕰️ _Incarico preso in carico${x.quando ? ` per ${new Date(x.quando).toLocaleString("it-IT", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}` : ""}: ${x.testo}. Le arriverà una notifica con l'esito._`)
+        .join("\n\n");
+      const testo = inc ? `${r.answer}\n\n${inc}` : r.answer;
+      setMsgs((m) => [...(m || []), { role: "model", text: testo }]);
+      await supabase.from("maestro_messages").insert({ role: "model", text: testo });
       if (voice) speak(r.answer);
       // ogni 6 domande Habitus aggiorna quello che sa di te
       if (((msgs || []).filter((x) => x.role === "user").length + 1) % 6 === 0) learnMe((sc) => app.setProfile({ scheda: sc }));
