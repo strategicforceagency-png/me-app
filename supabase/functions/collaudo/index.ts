@@ -104,7 +104,7 @@ Deno.serve(async (req) => {
       await admin.from("style_picks").insert([
         { user_id: TEST_ID, kind: "stile", key: "old-money", value: { nome: "Old money", descrizione: "classico discreto" } },
         { user_id: TEST_ID, kind: "capo", key: "blazer-navy", value: { nome: "Blazer navy", colore: "blu" } },
-        { user_id: TEST_ID, kind: "colore", key: "cammello", value: { nome: "Cammello", hex: "#C19A6B" } },
+        { user_id: TEST_ID, kind: "palette", key: "cammello", value: { nome: "Cammello", hex: "#C19A6B" } },
       ]);
       return json({ ok: true, persona: p?.id });
     }

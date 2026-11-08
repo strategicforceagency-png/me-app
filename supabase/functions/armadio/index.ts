@@ -285,7 +285,7 @@ Revisione precedente: ${JSON.stringify((p?.armadio_revisione?.capi || []).map((c
 
 Valuta OGNI capo con onestà: è ancora in linea con il suo stile e la sua armocromia? è fuori moda o datato (non "classico intramontabile", proprio datato)? sembra rovinato, sformato, scolorito? la taglia gli va ancora (se lo deduci dalla foto o dalle taglie)? è doppione di qualcosa di migliore? lo usa?
 Verdetti: "tieni" (va bene), "rivedi" (va sistemato: sarto, lavaggio, abbinamenti), "vendi" (ha valore sull'usato, es. Vinted), "regala" (poco valore o brutto, meglio donarlo o regalarlo).
-Scrivi come Alfred, il suo maggiordomo: gli dai del Lei (mai del tu), con garbo. Rispondi SOLO con JSON in italiano: {"sintesi":"3 frasi sullo stato dell'armadio","stagioni":{"primavera":"cosa ha e cosa manca","estate":"","autunno":"","inverno":""},"capi":[{"id":"","verdetto":"tieni | rivedi | vendi | regala","motivo":"1-2 frasi concrete","urgenza":"alta | media | bassa"}],"mancano":["capi che mancano davvero, in ordine di priorità"]}`,
+Scrivi come Alfred, il suo maggiordomo: gli dai del Lei (mai del tu), con garbo, e se lo nomini lo chiami "Signor ${(p?.nome || "").split(" ")[0]}" (col nome, mai col cognome). Rispondi SOLO con JSON in italiano: {"sintesi":"3 frasi sullo stato dell'armadio","stagioni":{"primavera":"cosa ha e cosa manca","estate":"","autunno":"","inverno":""},"capi":[{"id":"","verdetto":"tieni | rivedi | vendi | regala","motivo":"1-2 frasi concrete","urgenza":"alta | media | bassa"}],"mancano":["capi che mancano davvero, in ordine di priorità"]}`,
   });
   const { out } = await ask(parts, false, 70000);
   const ids = new Set(gar.map((g) => g.id));
@@ -333,7 +333,7 @@ Deno.serve(async (req) => {
       if (tipo === "revisione") {
         const r = await doRevisione(admin, user_id);
         const n = r.capi.filter((c) => c.verdetto !== "tieni").length;
-        await notifica("Alfred ha rivisto il suo armadio", n ? `${n} capi da rivedere, vendere o regalare, con i sostituti già cercati.` : "Tutto in ordine, Signore. Nessun capo da togliere.", "armadio", "armadio");
+        await notifica("Alfred ha rivisto il suo armadio", n ? `${n === 1 ? "Un capo" : `${n} capi`} da rivedere, vendere o regalare, con i sostituti già cercati.` : "Tutto in ordine, Signore. Nessun capo da togliere.", "armadio", "armadio");
         return json({ ok: true, capi: n });
       }
       if (tipo === "meteo") {
