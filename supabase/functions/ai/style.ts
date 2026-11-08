@@ -9,7 +9,7 @@ const imgPart = (i: Img) => ({ inline_data: { mime_type: i.mime, data: i.data } 
 
 function textOf(parts: unknown[]) {
   // deno-lint-ignore no-explicit-any
-  return (parts as any[]).map((p) => p.text || "").join("");
+  return (parts as any[]).filter((p) => !p.thought).map((p) => p.text || "").join("");
 }
 function parseJson<T>(t: string, fallback: T): T {
   try {

@@ -9,6 +9,20 @@ const cors = {
 const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36";
 const GEMINI = "https://generativelanguage.googleapis.com/v1beta/models";
+// un modello lento non deve bloccare tutto: dopo 45 s si passa al successivo, e quel modello va in fondo alla fila
+const lenti = new Set<string>();
+const gfetch = (u: string, o: RequestInit, ms = 45000) =>
+  fetch(u, { ...o, signal: AbortSignal.timeout(ms) }).catch(() => {
+    const m = u.match(/models\/([^:/?]+):generateContent/)?.[1];
+    if (m) lenti.add(m);
+    return new Response(JSON.stringify({ error: { message: "Il modello non ha risposto in tempo" } }), { status: 503 });
+  });
+/** Prima i modelli che rispondono in fretta (oggi 3.6 e 3.5 flash: i più nuovi sono spesso sovraccarichi), in fondo quelli che sono andati in timeout. */
+const ordina = (l: string[]) => {
+  const rapidi = l.filter((m) => /^gemini-3\.[56]-flash$/.test(m));
+  const resto = [...rapidi, ...l.filter((m) => !rapidi.includes(m))];
+  return [...resto.filter((m) => !lenti.has(m)), ...resto.filter((m) => lenti.has(m))];
+};
 // Models are discovered at runtime (Google retires names often) with automatic fallback.
 let modelCache: { text: string[]; image: string[]; all: string[] } | null = null;
 function ver(n: string) {
@@ -24,9 +38,10 @@ async function models() {
   const gen: string[] = (j.models || []).filter((m: any) => (m.supportedGenerationMethods || []).includes("generateContent")).map((m: any) => String(m.name).replace("models/", ""));
   const byVer = (a: string[]) => [...a].sort((x, y) => ver(y) - ver(x) || x.length - y.length);
   const text = [
-    ...byVer(gen.filter((n) => /^gemini-[\d.]+-flash$/.test(n))),
+    ...byVer(gen.filter((n) => /^gemini-[\d.]+-flash$/.test(n) && !/^gemini-[12]\./.test(n))),
     ...gen.filter((n) => n === "gemini-flash-latest"),
-    ...byVer(gen.filter((n) => /^gemini-[\d.]+-flash-lite$/.test(n))),
+    ...byVer(gen.filter((n) => /^gemini-[\d.]+-flash-lite$/.test(n) && !/^gemini-[12]\./.test(n))),
+    ...gen.filter((n) => n === "gemini-flash-lite-latest"),
   ];
   const image = [
     ...byVer(gen.filter((n) => /^gemini-[\d.]+-flash-image$/.test(n))),
@@ -37,7 +52,7 @@ async function models() {
   ];
   const envT = Deno.env.get("GEMINI_TEXT_MODEL"), envI = Deno.env.get("GEMINI_IMAGE_MODEL");
   modelCache = {
-    text: [...(envT ? [envT] : []), ...text].slice(0, 6),
+    text: [...(envT ? [envT] : []), ...text].slice(0, 9),
     image: [...(envI ? [envI] : []), ...image].slice(0, 6),
     all: gen,
   };
@@ -76,11 +91,11 @@ function geminiKey() {
 }
 
 async function geminiOnce(model: string, parts: unknown[], config: Record<string, unknown>) {
-  const r = await fetch(`${GEMINI}/${model}:generateContent?key=${geminiKey()}`, {
+  const r = await gfetch(`${GEMINI}/${model}:generateContent?key=${geminiKey()}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ contents: [{ role: "user", parts }], generationConfig: config }),
-  });
+  }, config.responseModalities ? 90000 : 45000); // le immagini richiedono più tempo
   const body = await r.json();
   if (!r.ok) {
     const e = new Error(body?.error?.message || `Errore AI ${r.status}`) as Error & { retry?: boolean };
@@ -90,7 +105,7 @@ async function geminiOnce(model: string, parts: unknown[], config: Record<string
   return body?.candidates?.[0]?.content?.parts ?? [];
 }
 async function gemini(kind: "text" | "image", parts: unknown[], config: Record<string, unknown> = {}) {
-  const list = (await models())[kind];
+  const list = kind === "text" ? ordina((await models()).text) : (await models()).image;
   let last: unknown = new Error("Nessun modello AI disponibile");
   for (const m of list) {
     try {
@@ -168,7 +183,7 @@ async function analyze(img: Img) {
     { responseMimeType: "application/json", temperature: 0.2 },
   );
   // deno-lint-ignore no-explicit-any
-  const txt = out.map((p: any) => p.text || "").join("");
+  const txt = out.filter((p: any) => !p.thought).map((p: any) => p.text || "").join("");
   try {
     const j = JSON.parse(txt);
     if (!CATEGORIE.includes(j.categoria)) j.categoria = "Maglie";
@@ -183,7 +198,7 @@ async function cutout(img: Img): Promise<Img> {
     imgPart(img),
     {
       text:
-        "Estrai SOLO il capo di abbigliamento principale da questa foto e restituiscilo come foto prodotto da catalogo e-commerce: capo isolato, disteso/ghost mannequin, vista frontale, centrato, interamente visibile, su sfondo BIANCO PURO uniforme (#FFFFFF), nessuna persona, nessun manichino visibile, nessuna ombra marcata, nessun testo. Mantieni fedelmente colore, tessuto, stampe e dettagli originali.",
+        "Estrai SOLO il capo di abbigliamento principale da questa foto e restituiscilo come foto prodotto da catalogo e-commerce di alta qualità. Riadattalo come farebbe un fotografo di still life: raddrizzalo (dritto e simmetrico, non storto né in prospettiva), distendilo e stiralo (niente pieghe casuali, maniche e colletto in posizione naturale), effetto ghost mannequin con il volume del capo indossato, vista frontale, centrato, interamente visibile con un piccolo margine, luce morbida e uniforme. Sfondo BIANCO PURO uniforme (#FFFFFF), nessuna persona, nessun manichino visibile, nessuna gruccia, nessuna ombra marcata, nessun testo. Mantieni fedelmente colore reale, tessuto, trama, stampe, bottoni, cuciture, loghi e tutti i dettagli originali: non inventare e non cambiare il modello.",
     },
   ]);
 }

@@ -51,7 +51,9 @@ const Chips = ({ opts, value, onChange, small }: { opts: { id: string; label: st
     ))}
   </div>
 );
-function Fonti({ fonti }: { fonti?: Fonte[] }) {
+function Fonti({ fonti, senza }: { fonti?: Fonte[]; senza?: boolean }) {
+  if (senza)
+    return <div className="mt-3 rounded-2xl bg-gold-tint px-3.5 py-2.5 text-[12.5px] text-ink/80">Ricerca web non disponibile al momento (quota gratuita di Google esaurita): consigli dalle conoscenze dell'AI, verifichi prezzi e disponibilità.</div>;
   if (!fonti?.length) return null;
   return (
     <div className="mt-3 flex flex-wrap gap-1.5">
@@ -350,7 +352,7 @@ export function FragrancesScreen() {
               <p className="text-[14px] leading-relaxed italic">{an.consiglio}</p>
             </div>
           )}
-          <Fonti fonti={an.fonti} />
+          <Fonti fonti={an.fonti} senza={(an as { senza_ricerca?: boolean }).senza_ricerca} />
         </div>
       )}
     </div>
@@ -531,7 +533,7 @@ export function LeatherScreen() {
               <p className="text-[14px] leading-relaxed italic">{an.consiglio}</p>
             </div>
           )}
-          <Fonti fonti={an.fonti} />
+          <Fonti fonti={an.fonti} senza={(an as { senza_ricerca?: boolean }).senza_ricerca} />
         </div>
       )}
     </div>

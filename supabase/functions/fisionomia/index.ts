@@ -13,6 +13,20 @@ const cors = {
 };
 const json = (d: unknown, s = 200) => new Response(JSON.stringify(d), { status: s, headers: { ...cors, "Content-Type": "application/json" } });
 const GEM = "https://generativelanguage.googleapis.com/v1beta";
+// un modello lento non deve bloccare tutto: dopo 45 s si passa al successivo, e quel modello va in fondo alla fila
+const lenti = new Set<string>();
+const gfetch = (u: string, o: RequestInit, ms = 45000) =>
+  fetch(u, { ...o, signal: AbortSignal.timeout(ms) }).catch(() => {
+    const m = u.match(/models\/([^:/?]+):generateContent/)?.[1];
+    if (m) lenti.add(m);
+    return new Response(JSON.stringify({ error: { message: "Il modello non ha risposto in tempo" } }), { status: 503 });
+  });
+/** Prima i modelli che rispondono in fretta (oggi 3.6 e 3.5 flash: i più nuovi sono spesso sovraccarichi), in fondo quelli che sono andati in timeout. */
+const ordina = (l: string[]) => {
+  const rapidi = l.filter((m) => /^gemini-3\.[56]-flash$/.test(m));
+  const resto = [...rapidi, ...l.filter((m) => !rapidi.includes(m))];
+  return [...resto.filter((m) => !lenti.has(m)), ...resto.filter((m) => lenti.has(m))];
+};
 let textModels: string[] | null = null;
 async function models(key: string) {
   if (textModels) return textModels;
@@ -21,7 +35,9 @@ async function models(key: string) {
   const gen: string[] = (j.models || []).filter((m: any) => (m.supportedGenerationMethods || []).includes("generateContent")).map((m: any) => String(m.name).replace("models/", ""));
   const ver = (n: string) => parseFloat(n.match(/gemini-(\d+(?:\.\d+)?)/)?.[1] || "0");
   const by = (a: string[]) => [...a].sort((x, y) => ver(y) - ver(x));
-  textModels = [...by(gen.filter((n) => /^gemini-[\d.]+-flash$/.test(n))), ...gen.filter((n) => n === "gemini-flash-latest"), ...by(gen.filter((n) => /^gemini-[\d.]+-pro$/.test(n)))].slice(0, 5);
+  // i modelli 1.x e 2.x sono ritirati per i nuovi account: si usano solo i 3.x e gli alias "latest"
+  const vivo = (n: string) => !/^gemini-[12]\./.test(n);
+  textModels = [...by(gen.filter((n) => /^gemini-[\d.]+-flash$/.test(n) && vivo(n))), ...gen.filter((n) => n === "gemini-flash-latest"), ...by(gen.filter((n) => /^gemini-[\d.]+-pro$/.test(n) && vivo(n))), ...gen.filter((n) => n === "gemini-flash-lite-latest")].slice(0, 9);
   return textModels;
 }
 function parseJson(t: string) {
@@ -99,12 +115,12 @@ Proponi 3 tagli, il più adatto per primo. Palette: 8-12 colori, 4-6 neutri, 3-5
     });
 
     let last = "Nessun modello AI disponibile";
-    for (const m of await models(key)) {
-      const r = await fetch(`${GEM}/models/${m}:generateContent?key=${key}`, {
+    for (const m of ordina(await models(key))) {
+      const r = await gfetch(`${GEM}/models/${m}:generateContent?key=${key}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ contents: [{ role: "user", parts }], generationConfig: { temperature: 0.35, responseMimeType: "application/json", maxOutputTokens: 14000 } }),
-      });
+      }, 90000); // analisi lunga con le foto: più tempo prima di cambiare modello
       const j = await r.json().catch(() => ({}));
       if (!r.ok) {
         last = j?.error?.message || `Errore ${r.status}`;
@@ -112,7 +128,7 @@ Proponi 3 tagli, il più adatto per primo. Palette: 8-12 colori, 4-6 neutri, 3-5
         break;
       }
       // deno-lint-ignore no-explicit-any
-      const out = parseJson((j.candidates?.[0]?.content?.parts || []).map((p: any) => p.text || "").join(""));
+      const out = parseJson((j.candidates?.[0]?.content?.parts || []).filter((p: any) => !p.thought).map((p: any) => p.text || "").join(""));
       if (!out?.forma || !Array.isArray(out.tagli)) {
         last = "Risposta non valida, riprova";
         continue;
@@ -123,7 +139,7 @@ Proponi 3 tagli, il più adatto per primo. Palette: 8-12 colori, 4-6 neutri, 3-5
       if (out.palette?.colori?.length) await sb.from("profiles").update({ palette: { ...out.palette, aggiornata: new Date().toISOString() } }).eq("id", user.id);
       return json({ analisi: out });
     }
-    return json({ error: /quota|demand|overloaded/i.test(last) ? "L'AI è occupata, riprova tra un minuto" : last }, 502);
+    return json({ error: /quota|exceeded|demand|overloaded|no longer available/i.test(last) ? "L'AI ha esaurito per ora la quota gratuita di Google: riprova tra qualche minuto (con la fatturazione attiva su Google AI Studio non ci sono limiti)" : last }, 502);
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : String(e) }, 500);
   }

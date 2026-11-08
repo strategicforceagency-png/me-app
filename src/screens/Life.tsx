@@ -210,7 +210,13 @@ function Chips({ opts, value, onChange, small }: { opts: string[]; value?: strin
   );
 }
 const Label = ({ children }: { children: ReactNode }) => <div className="text-[13px] font-semibold mb-1.5 mt-4">{children}</div>;
-function Fonti({ fonti }: { fonti: Fonte[] }) {
+function Fonti({ fonti, senza }: { fonti: Fonte[]; senza?: boolean }) {
+  if (senza)
+    return (
+      <div className="mt-4 rounded-2xl bg-gold-tint px-3.5 py-2.5 text-[12.5px] text-ink/80">
+        La ricerca web di Google ha finito per oggi la quota gratuita: queste proposte vengono dalle conoscenze dell'AI. Verifichi orari, prezzi e disponibilità prima di prenotare o comprare.
+      </div>
+    );
   if (!fonti.length) return null;
   return (
     <div className="mt-4">
@@ -569,7 +575,7 @@ export function GiftsScreen() {
   const [budget, setBudget] = useState("30-80 €");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
-  const [res, setRes] = useState<{ idee: Idea[]; biglietto: string; consiglio: string; fonti: Fonte[] } | null>(null);
+  const [res, setRes] = useState<{ idee: Idea[]; biglietto: string; consiglio: string; fonti: Fonte[]; senza_ricerca?: boolean } | null>(null);
   const [saved, setSaved] = useState<GiftRow[]>([]);
   useEffect(() => {
     preset = {};
@@ -689,7 +695,7 @@ export function GiftsScreen() {
             </div>
           )}
           {res.consiglio && <div className="mt-3 rounded-[16px] bg-card p-4 text-[14px]"><b>Galateo:</b> {res.consiglio}</div>}
-          <Fonti fonti={res.fonti} />
+          <Fonti fonti={res.fonti} senza={res.senza_ricerca} />
         </>
       )}
 
@@ -1010,7 +1016,7 @@ export function OutingsScreen() {
   const [budget, setBudget] = useState("Medio");
   const [pref, setPref] = useState("");
   const [busy, setBusy] = useState(false);
-  const [res, setRes] = useState<{ proposte: Place[]; nota: string; fonti: Fonte[] } | null>(null);
+  const [res, setRes] = useState<{ proposte: Place[]; nota: string; fonti: Fonte[]; senza_ricerca?: boolean } | null>(null);
   const [list, setList] = useState<Outing[]>([]);
   const [open, setOpen] = useState<Outing | null>(null);
   useEffect(() => {
@@ -1134,7 +1140,7 @@ export function OutingsScreen() {
             ))}
           </div>
           {res.nota && <div className="mt-3 rounded-[16px] bg-card p-4 text-[14px]">{res.nota}</div>}
-          <Fonti fonti={res.fonti} />
+          <Fonti fonti={res.fonti} senza={res.senza_ricerca} />
         </>
       )}
 

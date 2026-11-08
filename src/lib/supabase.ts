@@ -49,7 +49,54 @@ export type Garment = {
   source_url: string | null;
   note: string | null;
   created_at: string;
+  utilizzi?: number | null;
+  stato?: "attivo" | "venduto" | "regalato" | "in_vendita" | null;
+  etichetta?: Etichetta | null;
+  etichetta_path?: string | null;
+  valutazione?: { verdetto: "tieni" | "rivedi" | "vendi" | "regala"; motivo: string; data: string } | null;
+  online?: { trovato?: boolean; certezza?: string; nome?: string; marca?: string; codice?: string | null; link?: string | null; prezzo?: string | null; descrizione?: string; nota?: string; immagine?: string | null; data?: string } | null;
 };
+export type Etichetta = {
+  composizione?: string;
+  made_in?: string | null;
+  peso?: string;
+  simboli?: { simbolo: string; significato: string }[];
+  lavaggio?: string;
+  asciugatura?: string;
+  stiro?: string;
+  da_evitare?: string[];
+  stagioni?: string[];
+  temperature?: string;
+  quando?: string[];
+  come?: string;
+  conservazione?: string;
+  frequenza?: string;
+  data?: string;
+};
+export const STAGIONI = ["primavera", "estate", "autunno", "inverno"] as const;
+export type Stagione = (typeof STAGIONI)[number];
+/** In quali stagioni va il capo: prima dall'etichetta letta dall'AI, poi dalla stagione indicata. */
+export function stagioniDi(g: Garment): Stagione[] {
+  const e = (g.etichetta?.stagioni || []).map((x) => x.toLowerCase()).filter((x): x is Stagione => (STAGIONI as readonly string[]).includes(x));
+  if (e.length) return e;
+  const s = (g.stagione || "").toLowerCase();
+  if (!s || /tutte/.test(s)) return [...STAGIONI];
+  const out: Stagione[] = [];
+  if (/primavera/.test(s)) out.push("primavera");
+  if (/estate/.test(s)) out.push("estate");
+  if (/autunno/.test(s)) out.push("autunno");
+  if (/inverno/.test(s)) out.push("inverno");
+  if (/mezza/.test(s)) out.push("primavera", "autunno");
+  return out.length ? out : [...STAGIONI];
+}
+export function stagioneOggi(d = new Date()): Stagione {
+  const m = d.getMonth() + 1, g = d.getDate();
+  const v = m * 100 + g;
+  if (v >= 321 && v < 621) return "primavera";
+  if (v >= 621 && v < 923) return "estate";
+  if (v >= 923 && v < 1221) return "autunno";
+  return "inverno";
+}
 export type Profile = {
   id: string;
   nome: string | null;
@@ -74,6 +121,8 @@ export type Profile = {
   promemoria?: Reminders | null;
   citta?: string | null;
   scheda?: unknown;
+  armadio_revisione?: Revisione | null;
+  posizione?: { lat: number; lon: number; luogo?: string | null } | null;
   palette?: unknown;
   alfred_foto?: string | null;
   alfred_voce?: string | null;
@@ -89,6 +138,23 @@ export type Outfit = {
   preview_path: string | null;
   created_at: string;
   outfit_items: OutfitItem[];
+  giorno?: string | null;
+  meteo?: MeteoOggi | null;
+};
+export type MeteoOggi = {
+  luogo: string | null;
+  meteo: { min: number; max: number; pioggia_max: number; pioggia_tot: number; ore_pioggia: string[]; ore: { ora: string; temp: number; percepita: number; pioggia_prob: number; cielo: string }[] };
+  outfit_id: string | null;
+  outfit_nome: string | null;
+  sintesi: string;
+  verdetto: "va_bene" | "piccoli_ritocchi" | "da_cambiare" | "proposta";
+  messaggio: string;
+  modifiche: { togli: string | null; metti: string | null; perche: string }[];
+  proposta: string[];
+  accessori: string[];
+  strati: string | null;
+  data: string;
+  giorno: string;
 };
 
 /* ---------- signed URLs with cache ---------- */
@@ -302,3 +368,22 @@ export function learnMe(onDone?: (scheda: unknown) => void) {
     .then((r) => onDone?.(r.scheda))
     .catch(() => {});
 }
+
+export type Revisione = {
+  data: string;
+  sintesi: string;
+  stagioni: Partial<Record<"primavera" | "estate" | "autunno" | "inverno", string>>;
+  mancano: string[];
+  capi: {
+    id: string;
+    nome?: string;
+    verdetto: "tieni" | "rivedi" | "vendi" | "regala";
+    motivo: string;
+    urgenza?: string;
+    vinted?: { titolo: string; descrizione: string; prezzo: string; prezzo_minimo?: string; categoria?: string; condizione?: string; simili?: string; consigli?: string } | null;
+    cosa_fare?: string | null;
+    sostituto?: { cosa: string; perche: string; opzioni: { nome: string; marca?: string; dove?: string; tipo?: string; prezzo?: string; link?: string | null; ricerca?: string }[] } | null;
+    fonti?: { titolo: string; url: string }[];
+    errore?: string;
+  }[];
+};

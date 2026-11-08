@@ -13,6 +13,20 @@ const cors = {
 };
 const json = (d: unknown, s = 200) => new Response(JSON.stringify(d), { status: s, headers: { ...cors, "Content-Type": "application/json" } });
 const GEM = "https://generativelanguage.googleapis.com/v1beta";
+// un modello lento non deve bloccare tutto: dopo 45 s si passa al successivo, e quel modello va in fondo alla fila
+const lenti = new Set<string>();
+const gfetch = (u: string, o: RequestInit, ms = 45000) =>
+  fetch(u, { ...o, signal: AbortSignal.timeout(ms) }).catch(() => {
+    const m = u.match(/models\/([^:/?]+):generateContent/)?.[1];
+    if (m) lenti.add(m);
+    return new Response(JSON.stringify({ error: { message: "Il modello non ha risposto in tempo" } }), { status: 503 });
+  });
+/** Prima i modelli che rispondono in fretta (oggi 3.6 e 3.5 flash: i più nuovi sono spesso sovraccarichi), in fondo quelli che sono andati in timeout. */
+const ordina = (l: string[]) => {
+  const rapidi = l.filter((m) => /^gemini-3\.[56]-flash$/.test(m));
+  const resto = [...rapidi, ...l.filter((m) => !rapidi.includes(m))];
+  return [...resto.filter((m) => !lenti.has(m)), ...resto.filter((m) => lenti.has(m))];
+};
 const key = () => {
   const k = Deno.env.get("GEMINI_API_KEY")?.trim();
   if (!k) throw new Error("Chiave AI non configurata");
@@ -26,7 +40,9 @@ async function models() {
   const gen: string[] = (j.models || []).filter((m: any) => (m.supportedGenerationMethods || []).includes("generateContent")).map((m: any) => String(m.name).replace("models/", ""));
   const ver = (n: string) => parseFloat(n.match(/gemini-(\d+(?:\.\d+)?)/)?.[1] || "0");
   const by = (a: string[]) => [...a].sort((x, y) => ver(y) - ver(x));
-  textModels = [...by(gen.filter((n) => /^gemini-[\d.]+-flash$/.test(n))), ...gen.filter((n) => n === "gemini-flash-latest"), ...by(gen.filter((n) => /^gemini-[\d.]+-flash-lite$/.test(n)))].slice(0, 5);
+  // i modelli 1.x e 2.x sono ritirati per i nuovi account: si usano solo i 3.x e gli alias "latest"
+  const vivo = (n: string) => !/^gemini-[12]\./.test(n);
+  textModels = [...by(gen.filter((n) => /^gemini-[\d.]+-flash$/.test(n) && vivo(n))), ...gen.filter((n) => n === "gemini-flash-latest"), ...by(gen.filter((n) => /^gemini-[\d.]+-flash-lite$/.test(n) && vivo(n))), ...gen.filter((n) => n === "gemini-flash-lite-latest")].slice(0, 9);
   return textModels;
 }
 function parseJson(t: string) {
@@ -43,11 +59,21 @@ function parseJson(t: string) {
     }
   }
 }
+/** Se la ricerca Google ha finito la quota gratuita, si risponde comunque senza ricerca. */
 // deno-lint-ignore no-explicit-any
 async function gemini(parts: any[], search = false) {
+  try {
+    return await gemini0(parts, search);
+  } catch (e) {
+    if (search && /quota|tempo/i.test(String(e))) return await gemini0(parts, false);
+    throw e;
+  }
+}
+// deno-lint-ignore no-explicit-any
+async function gemini0(parts: any[], search = false) {
   let last = "Nessun modello AI disponibile";
-  for (const m of await models()) {
-    const r = await fetch(`${GEM}/models/${m}:generateContent?key=${key()}`, {
+  for (const m of ordina(await models())) {
+    const r = await gfetch(`${GEM}/models/${m}:generateContent?key=${key()}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -63,11 +89,11 @@ async function gemini(parts: any[], search = false) {
       throw new Error(last);
     }
     // deno-lint-ignore no-explicit-any
-    const out = parseJson((j.candidates?.[0]?.content?.parts || []).map((p: any) => p.text || "").join(""));
+    const out = parseJson((j.candidates?.[0]?.content?.parts || []).filter((p: any) => !p.thought).map((p: any) => p.text || "").join(""));
     if (out) return out;
     last = "Risposta non valida, riprova";
   }
-  throw new Error(/quota|demand|overloaded/i.test(last) ? "L'AI è occupata, riprova tra un minuto" : last);
+  throw new Error(/quota|exceeded|demand|overloaded|no longer available/i.test(last) ? "L'AI ha esaurito per ora la quota gratuita di Google: riprova tra qualche minuto (con la fatturazione attiva su Google AI Studio non ci sono limiti)" : last);
 }
 
 const decode = (s: string) => s.replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;|&#x27;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&nbsp;/g, " ");

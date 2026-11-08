@@ -1,17 +1,24 @@
 import { motion } from "framer-motion";
-import { Camera, Check, ChevronRight, Globe, ImagePlus, Link2, Loader2, Plus, Search, Sparkles, Trash2, X } from "lucide-react";
+import { Camera, Check, ChevronRight, Globe, ImagePlus, Link2, Loader2, Plus, Search, Sparkles, Tag, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { EtichettaCard, nomeStagione, OnlineCard, RevisioneCard, RevisioneSheet, ValutazioneBadge } from "../components/Armadio";
 import { Chip, Field, GarmentImg, inputCls, PrimaryButton, Sheet } from "../components/ui";
 import { importFiles, importUrls } from "../lib/importer";
 import { useApp } from "../lib/store";
-import { ai, CATEGORIE, Garment, supabase } from "../lib/supabase";
+import { ai, CATEGORIE, Garment, STAGIONI, Stagione, stagioneOggi, stagioniDi, supabase } from "../lib/supabase";
 
 export function Wardrobe() {
   const app = useApp();
   const [cat, setCat] = useState("Tutto");
   const [q, setQ] = useState("");
   const [searching, setSearching] = useState(false);
-  const [detail, setDetail] = useState<Garment | null>(null);
+  const [detailId, setDetailId] = useState<string | null>(null);
+  const detail = app.garments.find((g) => g.id === detailId) || null;
+  const setDetail = (g: Garment | null) => setDetailId(g?.id ?? null);
+  const [stag, setStag] = useState<Stagione | "tutte" | "rivedere">("tutte");
+  const [revOpen, setRevOpen] = useState(false);
+  const daRivedere = app.garments.filter((g) => g.valutazione && g.valutazione.verdetto !== "tieni").length;
+  const oggi = stagioneOggi();
 
   const cats = useMemo(() => {
     const present = new Set(app.garments.map((g) => g.categoria));
@@ -21,6 +28,7 @@ export function Wardrobe() {
   const list = app.garments.filter(
     (g) =>
       (cat === "Tutto" || g.categoria === cat) &&
+      (stag === "tutte" || (stag === "rivedere" ? !!g.valutazione && g.valutazione.verdetto !== "tieni" : stagioniDi(g).includes(stag))) &&
       (!q || `${g.nome} ${g.colore ?? ""} ${g.brand ?? ""}`.toLowerCase().includes(q.toLowerCase())),
   );
 
@@ -53,6 +61,25 @@ export function Wardrobe() {
           className={`${inputCls} mt-3`}
         />
       )}
+
+      <RevisioneCard onOpen={() => setRevOpen(true)} />
+
+      <div className="mt-4 -mx-5 px-5 lg:-mx-10 lg:px-10 flex gap-2 overflow-x-auto no-scrollbar">
+        {[
+          { k: "tutte" as const, l: "Tutte le stagioni" },
+          ...[oggi, ...STAGIONI.filter((x) => x !== oggi)].map((x) => ({ k: x, l: `${nomeStagione(x)}${x === oggi ? " · ora" : ""}`, n: app.garments.filter((g) => stagioniDi(g).includes(x)).length })),
+          ...(daRivedere > 0 ? [{ k: "rivedere" as const, l: "Da rivedere", n: daRivedere }] : []),
+        ].map((c) => (
+          <button
+            key={c.k}
+            onClick={() => setStag(c.k)}
+            className={`shrink-0 whitespace-nowrap h-9 px-3.5 rounded-full text-[14px] font-medium border transition ${stag === c.k ? "bg-brand text-brand-fg border-gold" : "bg-surface text-ink border-line"}`}
+          >
+            {c.l}
+            {"n" in c && <span className="ml-1.5 opacity-60">{c.n}</span>}
+          </button>
+        ))}
+      </div>
 
       <div className="mt-4 -mx-5 px-5 lg:-mx-10 lg:px-10 flex gap-6 overflow-x-auto no-scrollbar border-b border-line">
         {cats.map((c) => (
@@ -92,8 +119,19 @@ export function Wardrobe() {
               onClick={() => setDetail(g)}
               className="text-left rounded-[20px] bg-surface shadow-soft p-2.5 active:scale-[.98] transition"
             >
-              <div className="aspect-[4/5] rounded-2xl bg-card p-3">
+              <div className="relative aspect-[4/5] rounded-2xl bg-card p-3">
                 <GarmentImg g={g} className="w-full h-full" />
+                {g.valutazione && g.valutazione.verdetto !== "tieni" && (
+                  <span className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-brand text-brand-fg text-[11px] font-semibold">
+                    {g.valutazione.verdetto === "vendi" ? "Vendere" : g.valutazione.verdetto === "regala" ? "Regalare" : "Rivedere"}
+                  </span>
+                )}
+                {g.stato === "in_vendita" && <span className="absolute top-2 right-2 px-2 py-0.5 rounded-full bg-gold-tint text-gold text-[11px] font-semibold">In vendita</span>}
+                {!g.etichetta && (
+                  <span className="absolute bottom-2 right-2 h-6 w-6 rounded-full bg-surface/90 text-muted grid place-items-center" title="Manca l'etichetta">
+                    <Tag size={12} />
+                  </span>
+                )}
               </div>
               <div className="pt-2.5 px-1">
                 <div className="text-[15px] font-semibold leading-tight line-clamp-1">{g.nome}</div>
@@ -106,6 +144,7 @@ export function Wardrobe() {
 
       <AddGarmentSheet open={app.addOpen} onClose={() => app.setAddOpen(false)} />
       <GarmentDetail g={detail} onClose={() => setDetail(null)} />
+      <RevisioneSheet open={revOpen} onClose={() => setRevOpen(false)} />
     </div>
   );
 }
@@ -135,6 +174,9 @@ export function AddGarmentSheet({ open, onClose }: { open: boolean; onClose: () 
   const cam = useRef<HTMLInputElement>(null);
   const gal = useRef<HTMLInputElement>(null);
   const [files, setFiles] = useState<File[]>([]);
+  const [label, setLabel] = useState<File | null>(null);
+  const [senzaLabel, setSenzaLabel] = useState(false);
+  const lab = useRef<HTMLInputElement>(null);
   const [nome, setNome] = useState("");
   const [categoria, setCategoria] = useState<string>("");
   const [web, setWeb] = useState(false);
@@ -142,6 +184,8 @@ export function AddGarmentSheet({ open, onClose }: { open: boolean; onClose: () 
 
   const reset = () => {
     setFiles([]);
+    setLabel(null);
+    setSenzaLabel(false);
     setNome("");
     setCategoria("");
   };
@@ -151,7 +195,7 @@ export function AddGarmentSheet({ open, onClose }: { open: boolean; onClose: () 
   };
   const pick = (fl: FileList | null) => fl && setFiles((f) => [...f, ...Array.from(fl)]);
   const save = () => {
-    importFiles(app, files, { nome: files.length === 1 ? nome || undefined : undefined, categoria: categoria || undefined }, "foto");
+    importFiles(app, files, { nome: files.length === 1 ? nome || undefined : undefined, categoria: categoria || undefined, etichetta: files.length === 1 && label ? label : undefined }, "foto");
     app.setTab("armadio");
     close();
   };
@@ -210,7 +254,35 @@ export function AddGarmentSheet({ open, onClose }: { open: boolean; onClose: () 
                 ))}
               </div>
             </div>
-            <PrimaryButton className="w-full" onClick={save}>
+            {files.length === 1 ? (
+              <div className="rounded-2xl bg-card p-3.5">
+                <div className="flex items-center gap-3">
+                  {label ? (
+                    <img src={URL.createObjectURL(label)} className="h-14 w-14 rounded-xl object-cover" />
+                  ) : (
+                    <div className="h-14 w-14 rounded-xl bg-surface grid place-items-center text-gold">
+                      <Tag size={20} />
+                    </div>
+                  )}
+                  <div className="flex-1 text-[14px]">
+                    <div className="font-semibold">Foto dell'etichetta</div>
+                    <div className="text-muted text-[13px]">Per capire tessuto, stagione, come indossarlo e come lavarlo.</div>
+                  </div>
+                  <button onClick={() => lab.current?.click()} className="h-9 px-3 rounded-full bg-brand text-brand-fg text-[13px] font-semibold">
+                    {label ? "Cambia" : "Scatta"}
+                  </button>
+                </div>
+                <input ref={lab} type="file" accept="image/*" capture="environment" hidden onChange={(e) => e.target.files?.[0] && setLabel(e.target.files[0])} />
+                {!label && (
+                  <label className="mt-2.5 flex items-center gap-2 text-[13px] text-muted">
+                    <input type="checkbox" checked={senzaLabel} onChange={(e) => setSenzaLabel(e.target.checked)} /> Non ha l'etichetta o la aggiungo dopo
+                  </label>
+                )}
+              </div>
+            ) : (
+              <p className="text-[13px] text-muted">Con più capi insieme le etichette le aggiunge poi dal dettaglio di ciascuno (le segno con l'icona dell'etichetta).</p>
+            )}
+            <PrimaryButton className="w-full" onClick={save} disabled={files.length === 1 && !label && !senzaLabel}>
               <Sparkles size={18} /> Aggiungi {files.length > 1 ? `${files.length} capi` : "all'armadio"}
             </PrimaryButton>
           </div>
@@ -461,6 +533,7 @@ function GarmentDetail({ g, onClose }: { g: Garment | null; onClose: () => void 
           <div className="aspect-[4/3] rounded-[22px] bg-card p-5">
             <GarmentImg g={g} className="w-full h-full" />
           </div>
+          <ValutazioneBadge g={g} />
           <div className="flex flex-wrap gap-2 text-[13px]">
             {[cur.colore, cur.stagione, cur.formalita, cur.brand, cur.prezzo].filter(Boolean).map((t) => (
               <span key={t} className="px-3 py-1 rounded-full bg-card">
@@ -468,6 +541,8 @@ function GarmentDetail({ g, onClose }: { g: Garment | null; onClose: () => void 
               </span>
             ))}
           </div>
+          <EtichettaCard g={g} />
+          <OnlineCard g={g} />
           <Field label="Nome">
             <input className={inputCls} value={cur.nome} onChange={(e) => setEdit({ ...edit, nome: e.target.value })} />
           </Field>
@@ -499,7 +574,7 @@ function GarmentDetail({ g, onClose }: { g: Garment | null; onClose: () => void 
           </PrimaryButton>
           <div className="flex gap-2">
             <button onClick={recut} disabled={busy} className="flex-1 h-11 rounded-full bg-card text-[14px] font-medium flex items-center justify-center gap-2">
-              {busy ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />} Rifai scontorno
+              {busy ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />} Rifai la foto con l'AI
             </button>
             <button onClick={del} className="flex-1 h-11 rounded-full bg-danger-tint text-danger text-[14px] font-medium flex items-center justify-center gap-2">
               <Trash2 size={16} /> Elimina

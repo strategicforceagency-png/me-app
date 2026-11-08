@@ -11,6 +11,20 @@ const cors = {
 };
 const json = (d: unknown, s = 200) => new Response(JSON.stringify(d), { status: s, headers: { ...cors, "Content-Type": "application/json" } });
 const GEMINI = "https://generativelanguage.googleapis.com/v1beta/models";
+// un modello lento non deve bloccare tutto: dopo 45 s si passa al successivo, e quel modello va in fondo alla fila
+const lenti = new Set<string>();
+const gfetch = (u: string, o: RequestInit, ms = 45000) =>
+  fetch(u, { ...o, signal: AbortSignal.timeout(ms) }).catch(() => {
+    const m = u.match(/models\/([^:/?]+):generateContent/)?.[1];
+    if (m) lenti.add(m);
+    return new Response(JSON.stringify({ error: { message: "Il modello non ha risposto in tempo" } }), { status: 503 });
+  });
+/** Prima i modelli che rispondono in fretta (oggi 3.6 e 3.5 flash: i più nuovi sono spesso sovraccarichi), in fondo quelli che sono andati in timeout. */
+const ordina = (l: string[]) => {
+  const rapidi = l.filter((m) => /^gemini-3\.[56]-flash$/.test(m));
+  const resto = [...rapidi, ...l.filter((m) => !rapidi.includes(m))];
+  return [...resto.filter((m) => !lenti.has(m)), ...resto.filter((m) => lenti.has(m))];
+};
 
 let textModels: string[] | null = null;
 async function models(key: string) {
@@ -21,7 +35,9 @@ async function models(key: string) {
   const gen: string[] = (j.models || []).filter((m: any) => (m.supportedGenerationMethods || []).includes("generateContent")).map((m: any) => String(m.name).replace("models/", ""));
   const ver = (n: string) => parseFloat(n.match(/gemini-(\d+(?:\.\d+)?)/)?.[1] || "0");
   const by = (a: string[]) => [...a].sort((x, y) => ver(y) - ver(x));
-  textModels = [...by(gen.filter((n) => /^gemini-[\d.]+-flash$/.test(n))), ...gen.filter((n) => n === "gemini-flash-latest"), ...by(gen.filter((n) => /^gemini-[\d.]+-flash-lite$/.test(n)))].slice(0, 5);
+  // i modelli 1.x e 2.x sono ritirati per i nuovi account: si usano solo i 3.x e gli alias "latest"
+  const vivo = (n: string) => !/^gemini-[12]\./.test(n);
+  textModels = [...by(gen.filter((n) => /^gemini-[\d.]+-flash$/.test(n) && vivo(n))), ...gen.filter((n) => n === "gemini-flash-latest"), ...by(gen.filter((n) => /^gemini-[\d.]+-flash-lite$/.test(n) && vivo(n))), ...gen.filter((n) => n === "gemini-flash-lite-latest")].slice(0, 9);
   return textModels;
 }
 
@@ -45,7 +61,7 @@ Deno.serve(async (req) => {
 
     const [{ data: prof }, { data: wardrobe }, { data: notes }, { data: face }] = await Promise.all([
       sb.from("profiles").select("nome, altezza, peso, taglia_top, taglia_pantaloni, taglia_scarpe, style_guide, path, path_started_at, budget, scheda, palette").eq("id", user.id).maybeSingle(),
-      sb.from("garments").select("nome, categoria, colore").limit(150),
+      sb.from("garments").select("nome, categoria, colore, stagione, valutazione").not("stato", "in", "(venduto,regalato)").limit(150),
       sb.from("knowledge").select("tema, titolo, affermazione, versione_corretta, verdetto").eq("stato", "approvata").limit(80),
       sb.from("fisionomia").select("analisi, scelto, scelto_barba").not("analisi", "is", null).order("created_at", { ascending: false }).limit(1).maybeSingle(),
     ]);
@@ -92,7 +108,7 @@ Utente: ${prof?.nome || "—"}, ${prof?.altezza ?? "?"} cm, ${prof?.peso ?? "?"}
 La sua fisionomia: ${faceInfo}
 La sua palette di colori (usala SEMPRE quando consigli colori di abiti, camicie, cravatte e abbinamenti): ${palInfo}
 Il suo stile: ${guide?.nome_stile ? `${guide.nome_stile} — ${(guide.parole_chiave || []).join(", ")}` : "non ancora definito"}.
-Il suo armadio (${wardrobe?.length || 0} capi): ${(wardrobe || []).map((g) => `${g.nome} (${g.categoria}${g.colore ? ", " + g.colore : ""})`).join("; ").slice(0, 3000) || "vuoto"}.
+Il suo armadio (${wardrobe?.length || 0} capi): ${(wardrobe || []).map((g) => `${g.nome} (${g.categoria}${g.colore ? ", " + g.colore : ""}${g.stagione ? ", " + g.stagione : ""}${g.valutazione && g.valutazione.verdetto !== "tieni" ? ", da " + g.valutazione.verdetto : ""})`).join("; ").slice(0, 3500) || "vuoto"}. Siamo in ${["inverno", "inverno", "primavera", "primavera", "primavera", "estate", "estate", "estate", "autunno", "autunno", "autunno", "inverno"][new Date().getMonth()]}: consiglia capi di stagione.
 Il suo quaderno (insegnamenti che ha raccolto da contenuti esterni, verificati e approvati da lui; tienine conto e citali quando pertinenti, segnalando se un'opinione è solo gusto): ${(notes || []).map((n) => `[${n.tema}] ${n.titolo}: ${n.versione_corretta || n.affermazione}${n.verdetto === "opinione" ? " (opinione)" : ""}`).join(" | ").slice(0, 5000) || "vuoto"}.`;
 
     const contents = [
@@ -104,24 +120,34 @@ Il suo quaderno (insegnamenti che ha raccolto da contenuti esterni, verificati e
     while (contents.length > 1 && contents[0].role !== "user") contents.shift();
 
     let last = "Nessun modello AI disponibile";
-    for (const m of await models(key)) {
-      const r = await fetch(`${GEMINI}/${m}:generateContent?key=${key}`, {
+    let riserva = "";
+    for (const m of ordina(await models(key))) {
+      const r = await gfetch(`${GEMINI}/${m}:generateContent?key=${key}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ systemInstruction: { parts: [{ text: system }] }, contents, generationConfig: { temperature: 0.6, maxOutputTokens: 1400 } }),
+        body: JSON.stringify({ systemInstruction: { parts: [{ text: system }] }, contents, generationConfig: { temperature: 0.6, maxOutputTokens: 6000 } }),
       });
       const j = await r.json().catch(() => ({}));
       if (r.ok) {
         // deno-lint-ignore no-explicit-any
-        const text = (j.candidates?.[0]?.content?.parts || []).map((p: any) => p.text || "").join("").trim();
-        if (text) return json({ answer: text });
+        const text = (j.candidates?.[0]?.content?.parts || []).filter((p: any) => !p.thought).map((p: any) => p.text || "").join("").trim();
+        // risposta troncata o con il "ragionamento" del modello in chiaro: si prova il modello successivo
+        const sporca = j.candidates?.[0]?.finishReason === "MAX_TOKENS" || /word count|^\s*\*\s+(No|Used|Check)\b|\? Yes\b/im.test(text);
+        if (text && !sporca) return json({ answer: text });
+        if (sporca) {
+          // si tiene da parte una risposta troncata ma pulita, nel caso nessun modello faccia di meglio
+          if (!/word count|\? Yes\b/i.test(text)) riserva ||= text;
+          last = "Risposta incompleta, riprova";
+          continue;
+        }
         last = "Risposta vuota, riprova";
         continue;
       }
       last = j?.error?.message || `Errore ${r.status}`;
       if (![429, 404, 500, 503].includes(r.status)) break;
     }
-    return json({ error: /quota|demand|overloaded/i.test(last) ? "Alfred è momentaneamente occupato, riprovi tra poco" : last }, 502);
+    if (riserva) return json({ answer: riserva });
+    return json({ error: /quota|exceeded|demand|overloaded|no longer available/i.test(last) ? "Alfred è momentaneamente occupato, riprovi tra poco" : last }, 502);
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : String(e) }, 500);
   }

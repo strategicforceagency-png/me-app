@@ -1,4 +1,4 @@
-import { ai, AiError, friendly, supabase, uploadImage } from "./supabase";
+import { ai, AiError, fn, friendly, supabase, uploadImage } from "./supabase";
 
 type Deps = {
   uid: string;
@@ -7,7 +7,7 @@ type Deps = {
   reload: () => Promise<void>;
   toast: (m: string) => void;
 };
-type Extra = { nome?: string; categoria?: string; prezzo?: string; brand?: string; source_url?: string };
+type Extra = { nome?: string; categoria?: string; prezzo?: string; brand?: string; source_url?: string; etichetta?: File };
 
 let warnedNoKey = false;
 let warnedCut = false;
@@ -19,10 +19,20 @@ async function runImport(d: Deps, label: string, preview: string | undefined, jo
   try {
     const src = await job();
     path = src.path;
-    const r = await ai<{ ai_error?: string | null; cutout_ok?: boolean }>({ action: "import", path: src.path, url: src.url, source, extra });
+    const { etichetta, ...rest } = extra;
+    const r = await ai<{ ai_error?: string | null; cutout_ok?: boolean; garment?: { id: string } }>({ action: "import", path: src.path, url: src.url, source, extra: rest });
     if (r.ai_error && !warnedCut) {
       warnedCut = true;
       d.toast(friendly(r.ai_error)!.slice(0, 80));
+    }
+    // l'etichetta: lavaggio, composizione, stagioni, come indossarlo
+    if (etichetta && r.garment?.id) {
+      try {
+        const lp = await uploadImage("garments", d.uid, etichetta, "etichetta");
+        await fn("armadio", "", { action: "etichetta", id: r.garment.id, path: lp });
+      } catch (e) {
+        d.toast("Etichetta: " + ((e as Error).message || "non letta").slice(0, 70));
+      }
     }
   } catch (e) {
     if (e instanceof AiError && e.code === "NO_KEY") {

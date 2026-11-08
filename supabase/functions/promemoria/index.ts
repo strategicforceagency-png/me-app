@@ -163,13 +163,46 @@ Deno.serve(async (req) => {
       return json({ key: b64u(vapidPublicRaw(v)) });
     }
 
+    if (route === "invia") {
+      // usato dalle altre funzioni (armadio) per mandare una notifica: area notifiche + push
+      const { data: sec } = await sb.from("app_secrets").select("value").eq("name", "cron").single();
+      if (!sec || req.headers.get("x-cron") !== sec.value) return json({ error: "no" }, 401);
+      const b = await req.json();
+      const msg = { title: String(b.title || "Habitus"), body: String(b.body || ""), url: b.url, tag: b.tag };
+      await store(sb, b.user_id, msg);
+      const { data: pr } = await sb.from("profiles").select("promemoria").eq("id", b.user_id).maybeSingle();
+      const r = pr?.promemoria?.attivi ? await deliver(sb, b.user_id, { ...msg, count: await unread(sb, b.user_id) }) : { ok: 0, total: 0 };
+      return json(r);
+    }
+
     if (route === "tick") {
       const { data: sec } = await sb.from("app_secrets").select("value").eq("name", "cron").single();
       if (!sec || req.headers.get("x-cron") !== sec.value) return json({ error: "no" }, 401);
-      const { data: profs } = await sb.from("profiles").select("id, nome, path, path_started_at, promemoria");
+      const { data: profs } = await sb.from("profiles").select("id, nome, path, path_started_at, promemoria, armadio_revisione");
       let sent = 0;
+      const avvia = (user_id: string, tipo: string) =>
+        // deno-lint-ignore no-explicit-any
+        (globalThis as any).EdgeRuntime?.waitUntil(
+          fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/armadio/cron`, { method: "POST", headers: { "Content-Type": "application/json", "x-cron": sec.value }, body: JSON.stringify({ user_id, tipo }) }).then((r) => r.text()).catch(() => null),
+        );
       for (const p of profs || []) {
         const s = p.promemoria || {};
+        {
+          // armadio: meteo del mattino (adatta l'outfit pianificato) e revisione ogni 15 giorni
+          const now = localNow(s.tz || "Europe/Rome");
+          const at = toMin(s.meteo || "07:00");
+          if (s.meteo_on !== false && now.min - at >= 0 && now.min - at < 15) {
+            const { count: pian } = await sb.from("outfits").select("id", { count: "exact", head: true }).eq("user_id", p.id).eq("giorno", now.day);
+            const { error } = pian ? await sb.from("push_log").insert({ user_id: p.id, kind: "meteo", day: now.day }) : { error: true };
+            if (!error) avvia(p.id, "meteo");
+          }
+          const rev = p.armadio_revisione?.data ? new Date(p.armadio_revisione.data).getTime() : 0;
+          if (s.armadio_on !== false && Date.now() - rev > 15 * 86400000 && now.min >= toMin("10:00") && now.min < toMin("10:15")) {
+            const { count } = await sb.from("garments").select("id", { count: "exact", head: true }).eq("user_id", p.id).eq("stato", "attivo");
+            const { error } = count ? await sb.from("push_log").insert({ user_id: p.id, kind: "armadio", day: now.day }) : { error: true };
+            if (!error) avvia(p.id, "revisione");
+          }
+        }
         const pushOn = !!s.attivi;
         const now = localNow(s.tz || "Europe/Rome");
         const slots: [string, string | undefined, boolean][] = [

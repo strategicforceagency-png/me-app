@@ -14,6 +14,20 @@ const cors = {
 };
 const json = (d: unknown, s = 200) => new Response(JSON.stringify(d), { status: s, headers: { ...cors, "Content-Type": "application/json" } });
 const GEM = "https://generativelanguage.googleapis.com/v1beta";
+// un modello lento non deve bloccare tutto: dopo 45 s si passa al successivo, e quel modello va in fondo alla fila
+const lenti = new Set<string>();
+const gfetch = (u: string, o: RequestInit, ms = 45000) =>
+  fetch(u, { ...o, signal: AbortSignal.timeout(ms) }).catch(() => {
+    const m = u.match(/models\/([^:/?]+):generateContent/)?.[1];
+    if (m) lenti.add(m);
+    return new Response(JSON.stringify({ error: { message: "Il modello non ha risposto in tempo" } }), { status: 503 });
+  });
+/** Prima i modelli che rispondono in fretta (oggi 3.6 e 3.5 flash: i più nuovi sono spesso sovraccarichi), in fondo quelli che sono andati in timeout. */
+const ordina = (l: string[]) => {
+  const rapidi = l.filter((m) => /^gemini-3\.[56]-flash$/.test(m));
+  const resto = [...rapidi, ...l.filter((m) => !rapidi.includes(m))];
+  return [...resto.filter((m) => !lenti.has(m)), ...resto.filter((m) => lenti.has(m))];
+};
 
 const key = () => {
   const k = Deno.env.get("GEMINI_API_KEY")?.trim();
@@ -28,7 +42,9 @@ async function models() {
   const gen: string[] = (j.models || []).filter((m: any) => (m.supportedGenerationMethods || []).includes("generateContent")).map((m: any) => String(m.name).replace("models/", ""));
   const ver = (n: string) => parseFloat(n.match(/gemini-(\d+(?:\.\d+)?)/)?.[1] || "0");
   const by = (a: string[]) => [...a].sort((x, y) => ver(y) - ver(x));
-  textModels = [...by(gen.filter((n) => /^gemini-[\d.]+-flash$/.test(n))), ...gen.filter((n) => n === "gemini-flash-latest"), ...by(gen.filter((n) => /^gemini-[\d.]+-flash-lite$/.test(n)))].slice(0, 5);
+  // i modelli 1.x e 2.x sono ritirati per i nuovi account: si usano solo i 3.x e gli alias "latest"
+  const vivo = (n: string) => !/^gemini-[12]\./.test(n);
+  textModels = [...by(gen.filter((n) => /^gemini-[\d.]+-flash$/.test(n) && vivo(n))), ...gen.filter((n) => n === "gemini-flash-latest"), ...by(gen.filter((n) => /^gemini-[\d.]+-flash-lite$/.test(n) && vivo(n))), ...gen.filter((n) => n === "gemini-flash-lite-latest")].slice(0, 9);
   return textModels;
 }
 function parseJson(t: string) {
@@ -46,10 +62,25 @@ function parseJson(t: string) {
   }
 }
 /** Gemini con ricerca Google: restituisce JSON + fonti consultate. */
-async function searchAsk(prompt: string) {
+// deno-lint-ignore no-explicit-any
+async function searchAsk(prompt: string): Promise<{ out: any; fonti: { titolo: string; url: string }[]; senza_ricerca?: boolean }> {
+  try {
+    return await searchAsk0(prompt);
+  } catch (e) {
+    // ricerca Google esaurita o lenta: si risponde comunque, senza fonti web
+    if (/quota|tempo/i.test(String(e)))
+      return {
+        out: await ask(`${prompt}\n\nATTENZIONE: in questo momento NON hai accesso alla ricerca web. Proponi solo posti, marchi e prodotti molto noti e affermati che conosci con certezza; metti "link": null e "voto": null, non inventare indirizzi o prezzi precisi (usa fasce indicative).`, 0.6),
+        fonti: [] as { titolo: string; url: string }[],
+        senza_ricerca: true,
+      };
+    throw e;
+  }
+}
+async function searchAsk0(prompt: string) {
   let last = "Nessun modello AI disponibile";
-  for (const m of await models()) {
-    const r = await fetch(`${GEM}/models/${m}:generateContent?key=${key()}`, {
+  for (const m of ordina(await models())) {
+    const r = await gfetch(`${GEM}/models/${m}:generateContent?key=${key()}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }], tools: [{ google_search: {} }], generationConfig: { temperature: 0.5, maxOutputTokens: 12000 } }),
@@ -62,7 +93,7 @@ async function searchAsk(prompt: string) {
     }
     const c = j.candidates?.[0];
     // deno-lint-ignore no-explicit-any
-    const text = (c?.content?.parts || []).map((p: any) => p.text || "").join("");
+    const text = (c?.content?.parts || []).filter((p: any) => !p.thought).map((p: any) => p.text || "").join("");
     const out = parseJson(text);
     if (!out) {
       last = "Risposta non valida, riprova";
@@ -76,13 +107,13 @@ async function searchAsk(prompt: string) {
       .slice(0, 10);
     return { out, fonti };
   }
-  throw new Error(/quota|demand|overloaded/i.test(last) ? "L'AI è occupata, riprova tra un minuto" : last);
+  throw new Error(/quota|exceeded|demand|overloaded|no longer available/i.test(last) ? "L'AI ha esaurito per ora la quota gratuita di Google: riprova tra qualche minuto (con la fatturazione attiva su Google AI Studio non ci sono limiti)" : last);
 }
 /** Gemini senza ricerca, risposta JSON. */
 async function ask(prompt: string, temperature = 0.8) {
   let last = "Nessun modello AI disponibile";
-  for (const m of await models()) {
-    const r = await fetch(`${GEM}/models/${m}:generateContent?key=${key()}`, {
+  for (const m of ordina(await models())) {
+    const r = await gfetch(`${GEM}/models/${m}:generateContent?key=${key()}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { temperature, responseMimeType: "application/json", maxOutputTokens: 8000 } }),
@@ -94,11 +125,11 @@ async function ask(prompt: string, temperature = 0.8) {
       throw new Error(last);
     }
     // deno-lint-ignore no-explicit-any
-    const out = parseJson((j.candidates?.[0]?.content?.parts || []).map((p: any) => p.text || "").join(""));
+    const out = parseJson((j.candidates?.[0]?.content?.parts || []).filter((p: any) => !p.thought).map((p: any) => p.text || "").join(""));
     if (out) return out;
     last = "Risposta non valida, riprova";
   }
-  throw new Error(/quota|demand|overloaded/i.test(last) ? "L'AI è occupata, riprova tra un minuto" : last);
+  throw new Error(/quota|exceeded|demand|overloaded|no longer available/i.test(last) ? "L'AI ha esaurito per ora la quota gratuita di Google: riprova tra qualche minuto (con la fatturazione attiva su Google AI Studio non ci sono limiti)" : last);
 }
 
 // i link inventati sono il rischio maggiore: si tengono solo URL plausibili
@@ -143,10 +174,10 @@ ${/figli/i.test(person.relazione || "") ? `È ${person.relazione === "Figlia" ? 
 Rispondi SOLO con JSON valido in italiano:
 {"idee":[{"titolo":"nome preciso del regalo","categoria":"oggetto | esperienza | personalizzato | fiori | gastronomia | libro | gioiello | moda | casa","perche":"perché è giusto per lei e per questa ricorrenza (2 frasi)","prezzo":"es. 80-120 €","dove":"negozio, marca o artigiano","link":"URL di una pagina trovata nella ricerca, altrimenti null","ricerca":"query Google per trovarlo","tocco":"il dettaglio da gentleman: biglietto scritto a mano, confezione, consegna, momento"}],"biglietto":"una bozza breve (2-3 righe), elegante e sincera, per il biglietto scritto a mano","consiglio":"un consiglio di galateo sul come e quando darlo"}
 Da 6 a 8 idee. Non inventare link: se non sei sicuro metti null.`;
-      const { out, fonti } = await searchAsk(prompt);
+      const { out, fonti, senza_ricerca } = await searchAsk(prompt);
       // deno-lint-ignore no-explicit-any
       const idee = (out.idee || []).slice(0, 8).map((i: any) => ({ ...i, link: cleanUrl(i.link), ricerca: i.ricerca || i.titolo }));
-      return json({ idee, biglietto: out.biglietto || "", consiglio: out.consiglio || "", fonti });
+      return json({ idee, biglietto: out.biglietto || "", consiglio: out.consiglio || "", fonti, senza_ricerca: !!senza_ricerca });
     }
 
     if (b.action === "uscite") {
@@ -162,10 +193,10 @@ Cerca sul web ${viaggio ? "destinazioni e strutture (hotel, dimore, agriturismi 
 Rispondi SOLO con JSON valido in italiano:
 {"proposte":[{"nome":"","tipo":"es. ristorante di pesce, enoteca, hotel boutique","zona":"quartiere o località","indirizzo":"se trovato","prezzo":"es. 70-90 € a persona, oppure €€€","voto":"es. 4,6 su Google (1.240 recensioni); 4,5 TripAdvisor","perche":"perché è perfetto per questa occasione (2 frasi)","punti_forti":["dalle recensioni"],"punti_deboli":["dalle recensioni, onestamente"],"atmosfera":"","dress_code":"cosa indossare","prenotazione":"come prenotare e con quanto anticipo","link":"sito ufficiale o pagina trovata nella ricerca, altrimenti null","ricerca":"query Google per trovarlo",${viaggio ? '"itinerario":[{"giorno":"Giorno 1","piano":"mattina, pomeriggio, sera in 2-3 frasi"}],' : ""}"tocco":"un consiglio da gentleman per rendere la serata/il viaggio speciale"}],"nota":"consiglio generale (orari, stagione, cosa evitare)"}
 Da 3 a 5 proposte, la migliore per prima. Non inventare indirizzi, voti o link: se non li trovi metti null.`;
-      const { out, fonti } = await searchAsk(prompt);
+      const { out, fonti, senza_ricerca } = await searchAsk(prompt);
       // deno-lint-ignore no-explicit-any
       const proposte = (out.proposte || []).slice(0, 5).map((p: any) => ({ ...p, link: cleanUrl(p.link), ricerca: p.ricerca || `${p.nome} ${p.zona || ""}` }));
-      return json({ proposte, nota: out.nota || "", fonti });
+      return json({ proposte, nota: out.nota || "", fonti, senza_ricerca: !!senza_ricerca });
     }
 
     if (b.action === "lettera") {

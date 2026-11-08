@@ -74,7 +74,7 @@ export function AppProvider({ uid, email, children }: { uid: string; email: stri
   const reload = useCallback(async () => {
     const [p, g, o] = await Promise.all([
       supabase.from("profiles").select("*").eq("id", uid).maybeSingle(),
-      supabase.from("garments").select("*").order("created_at", { ascending: false }),
+      supabase.from("garments").select("*").not("stato", "in", "(venduto,regalato)").order("created_at", { ascending: false }),
       supabase.from("outfits").select("*, outfit_items(garment_id, slot, layer)").order("created_at", { ascending: false }),
     ]);
     // senza rete: si riparte dall'ultima copia salvata sul telefono

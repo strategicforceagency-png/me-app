@@ -2,6 +2,7 @@ import { AnimatePresence, motion, PanInfo } from "framer-motion";
 import { Heart, Loader2, Plus, Search, Sparkles, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { DEFAULT_MEASURES, DressedMannequin } from "../components/Mannequin";
+import { MeteoCard } from "../components/Meteo";
 import { Chip, Field, GarmentImg, inputCls, PrimaryButton, Sheet } from "../components/ui";
 import { useApp } from "../lib/store";
 import { ai, Garment, Slot, SLOT_LABEL, SLOT_OF, STILI, supabase, useSignedUrl } from "../lib/supabase";
@@ -132,6 +133,8 @@ export function OutfitBuilder() {
           </button>
         </div>
       </header>
+
+      <MeteoCard />
 
       {/* layers */}
       <div className="px-5 mt-3 flex gap-5 overflow-x-auto no-scrollbar min-h-[44px]">
@@ -319,11 +322,15 @@ function SaveSheet(props: {
   const [nome, setNome] = useState("");
   const [stile, setStile] = useState("Weekend");
   const [busy, setBusy] = useState(false);
+  const giornoDa = (d: number) => new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Rome" }).format(new Date(Date.now() + d * 86400000));
+  const [giorno, setGiorno] = useState<string>("");
   const save = async () => {
     setBusy(true);
+    // un solo outfit pianificato per giorno
+    if (giorno) await supabase.from("outfits").update({ giorno: null }).eq("giorno", giorno);
     const { data: o, error } = await supabase
       .from("outfits")
-      .insert({ user_id: app.uid, nome: nome || stile, stile, preferito: true, preview_path: props.preview })
+      .insert({ user_id: app.uid, nome: nome || stile, stile, preferito: true, preview_path: props.preview, giorno: giorno || null })
       .select()
       .single();
     if (!error && o) {
@@ -334,8 +341,14 @@ function SaveSheet(props: {
       ];
       await supabase.from("outfit_items").insert(items);
       await app.reload();
-      app.toast("Aggiunto ai preferiti");
+      app.toast(giorno ? "Pianificato: la mattina controllo il meteo" : "Aggiunto ai preferiti");
+      try {
+        sessionStorage.removeItem("habitus-meteo");
+      } catch {
+        /* niente */
+      }
       setNome("");
+      setGiorno("");
       props.onClose();
     } else app.toast(error?.message || "Errore");
     setBusy(false);
@@ -359,8 +372,23 @@ function SaveSheet(props: {
             ))}
           </div>
         </div>
+        <div>
+          <div className="text-[13px] text-muted mb-2">Quando lo indossa? (la mattina Alfred lo adatta al meteo)</div>
+          <div className="flex flex-wrap gap-2 items-center">
+            <Chip active={!giorno} onClick={() => setGiorno("")}>
+              Nessun giorno
+            </Chip>
+            <Chip active={giorno === giornoDa(0)} onClick={() => setGiorno(giornoDa(0))}>
+              Oggi
+            </Chip>
+            <Chip active={giorno === giornoDa(1)} onClick={() => setGiorno(giornoDa(1))}>
+              Domani
+            </Chip>
+            <input type="date" value={giorno} min={giornoDa(0)} onChange={(e) => setGiorno(e.target.value)} className="h-9 px-3 rounded-full bg-card text-[14px]" />
+          </div>
+        </div>
         <PrimaryButton className="w-full" onClick={save} disabled={busy}>
-          {busy ? <Loader2 size={18} className="animate-spin" /> : <Heart size={18} />} Salva
+          {busy ? <Loader2 size={18} className="animate-spin" /> : <Heart size={18} />} {giorno ? "Salva e pianifica" : "Salva"}
         </PrimaryButton>
       </div>
       <div className="h-4" />

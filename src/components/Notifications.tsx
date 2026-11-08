@@ -1,4 +1,4 @@
-import { Bell, BookOpen, Briefcase, CalendarHeart, CheckCheck, ChevronRight, ClipboardCheck, Compass, Inbox, ListChecks, Trash2 } from "lucide-react";
+import { Bell, BookOpen, Briefcase, CalendarHeart, Check, CheckCheck, ChevronDown, ChevronRight, ClipboardCheck, Compass, Inbox, ListChecks, Trash2 } from "lucide-react";
 import { ReactNode, useCallback, useEffect, useState } from "react";
 import { activeHabits, currentWeek, todayISO, type Path } from "../gentleman/types";
 import { useApp, type Tab } from "../lib/store";
@@ -7,9 +7,20 @@ import { dueReview, dueTrials } from "../screens/Progress";
 import { Sheet } from "./ui";
 
 /** Una cosa da fare adesso: si calcola dai dati e sparisce da sola quando è fatta. */
-type Live = { id: string; icon: ReactNode; titolo: string; testo: string; vai: Tab; evento?: string };
+type Live = { id: string; icon: ReactNode; titolo: string; testo: string; vai: Tab; evento?: string; scade?: string };
+/** Le cose "da fare" spuntate: id → giorno fino a cui restano nascoste. */
+const FATTE_KEY = "habitus-fatte";
+function leggiFatte(): Record<string, string> {
+  try {
+    const all = JSON.parse(localStorage.getItem(FATTE_KEY) || "{}") as Record<string, string>;
+    const oggi = todayISO();
+    return Object.fromEntries(Object.entries(all).filter(([, d]) => d >= oggi));
+  } catch {
+    return {};
+  }
+}
 /** Un promemoria arrivato (ricorrenze, controllo della settimana…): resta finché non lo leggi o lo cancelli. */
-type Stored = { id: string; kind: string; titolo: string; testo: string | null; vai: string | null; letta: boolean; created_at: string };
+type Stored = { id: string; kind: string; titolo: string; testo: string | null; vai: string | null; letta: boolean; fatta?: boolean; created_at: string };
 
 const TABS: Tab[] = ["percorso", "linguaggio", "budget", "accademia", "fisico", "progressi", "armadio", "contenuti", "persone", "regali", "uscite", "lettere", "stile", "salute", "outfit", "fisionomia", "profumi", "pelletteria"];
 
@@ -28,7 +39,7 @@ export function useNotifications() {
       supabase.from("knowledge").select("id", { count: "exact", head: true }).eq("stato", "proposta"),
       supabase.from("tutorials").select("id", { count: "exact", head: true }).eq("stato", "proposta"),
       supabase.from("people").select("nome, date"),
-      supabase.from("notifications").select("id, kind, titolo, testo, vai, letta, created_at").order("created_at", { ascending: false }).limit(40),
+      supabase.from("notifications").select("id, kind, titolo, testo, vai, letta, fatta, created_at").order("created_at", { ascending: false }).limit(40),
       path ? supabase.from("path_reviews").select("week, data, created_at") : Promise.resolve({ data: [] }),
       path ? supabase.from("field_trials").select("key, voto, note, done_at") : Promise.resolve({ data: [] }),
       path ? supabase.from("path_checks").select("key").eq("day", today) : Promise.resolve({ data: [] }),
@@ -39,7 +50,7 @@ export function useNotifications() {
     // ricorrenze entro 7 giorni
     const now = new Date();
     const t0 = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-    const soon: { n: number; txt: string }[] = [];
+    const soon: { n: number; txt: string; key: string; giorno: string }[] = [];
     for (const x of (people.data as { nome: string; date: { tipo: string; data: string }[] }[]) || [])
       for (const d of x.date || []) {
         const mmdd = String(d.data || "").slice(-5);
@@ -47,11 +58,11 @@ export function useNotifications() {
         let n = new Date(`${now.getFullYear()}-${mmdd}T00:00:00`).getTime();
         if (n < t0) n = new Date(`${now.getFullYear() + 1}-${mmdd}T00:00:00`).getTime();
         const days = Math.round((n - t0) / 86400000);
-        if (days <= 7) soon.push({ n: days, txt: `${d.tipo || "Ricorrenza"} di ${x.nome} ${days === 0 ? "oggi" : days === 1 ? "domani" : `tra ${days} giorni`}` });
+        const giorno = new Date(n + 12 * 3600000).toISOString().slice(0, 10);
+        if (days <= 7) soon.push({ n: days, txt: `${d.tipo || "Ricorrenza"} di ${x.nome} ${days === 0 ? "oggi" : days === 1 ? "domani" : `tra ${days} giorni`}`, key: `ric:${x.nome}:${d.tipo}:${giorno}`, giorno });
       }
     soon.sort((a, b) => a.n - b.n);
-    for (const [i, s] of soon.entries())
-      out.push({ id: `ric-${i}`, icon: <CalendarHeart size={18} />, titolo: s.n === 0 ? "È oggi" : "Si avvicina", testo: s.txt, vai: "persone" });
+    for (const s of soon) out.push({ id: s.key, icon: <CalendarHeart size={18} />, titolo: s.n === 0 ? "È oggi" : "Si avvicina", testo: s.txt, vai: "persone", scade: s.giorno });
 
     // pelle da nutrire (ogni 4 mesi circa)
     const daNutrire = ((pelle.data as { nome: string; ultima_cura: string | null; created_at: string }[]) || []).filter((x) => (Date.now() - Date.parse(x.ultima_cura || x.created_at)) / 86400000 >= 120);
@@ -86,7 +97,8 @@ export function useNotifications() {
       if (left) out.push({ id: "abitudini", icon: <ListChecks size={18} />, titolo: left === 1 ? "Ti manca un'abitudine" : `Ti mancano ${left} abitudini`, testo: `${habits.length - left} di ${habits.length} fatte oggi`, vai: "percorso" });
     } else out.push({ id: "questionario", icon: <BookOpen size={18} />, titolo: "Il tuo percorso", testo: "Completa il questionario d'ingresso", vai: "percorso" });
 
-    setLive(out);
+    const fatte = leggiFatte();
+    setLive(out.filter((x) => !fatte[x.id]));
     setStored((notes.data as Stored[]) || []);
   }, [path, start]);
 
@@ -104,7 +116,7 @@ export function useNotifications() {
     };
   }, [load]);
 
-  const unread = stored.filter((s) => !s.letta).length;
+  const unread = stored.filter((s) => !s.letta && !s.fatta).length;
   const count = live.length + unread;
 
   // numerino sull'icona dell'app = quante notifiche ci sono
@@ -124,11 +136,32 @@ export function useNotifications() {
     await supabase.from("notifications").delete().eq("id", id);
   };
   const clearRead = async () => {
-    const ids = stored.filter((s) => s.letta).map((s) => s.id);
-    setStored((s) => s.filter((x) => !x.letta));
+    const ids = stored.filter((s) => s.letta && !s.fatta).map((s) => s.id);
+    setStored((s) => s.filter((x) => !x.letta || x.fatta));
     if (ids.length) await supabase.from("notifications").delete().in("id", ids);
   };
-  return { live, stored, count, unread, markRead, remove, clearRead, reload: load };
+  /** spunta una notifica arrivata come fatta (o la riapre) */
+  const markDone = async (id: string, fatta = true) => {
+    setStored((s) => s.map((x) => (x.id === id ? { ...x, fatta, letta: true } : x)));
+    await supabase.from("notifications").update({ fatta, letta: true }).eq("id", id);
+  };
+  /** spunta una cosa da fare: sparisce fino a domani (le ricorrenze fino al giorno dell'evento) */
+  const doneLive = async (x: Live) => {
+    const all = leggiFatte();
+    all[x.id] = x.scade || todayISO();
+    try {
+      localStorage.setItem(FATTE_KEY, JSON.stringify(all));
+    } catch {
+      /* niente */
+    }
+    setLive((l) => l.filter((y) => y.id !== x.id));
+    // la pelle nutrita si registra davvero: il prossimo promemoria tra 4 mesi
+    if (x.id === "pelle") {
+      const lim = new Date(Date.now() - 120 * 86400000).toISOString();
+      await supabase.from("collezione").update({ ultima_cura: new Date().toISOString() }).eq("tipo", "pelle").eq("stato", "mio").or(`ultima_cura.is.null,ultima_cura.lt.${lim}`);
+    }
+  };
+  return { live, stored, count, unread, markRead, markDone, doneLive, remove, clearRead, reload: load };
 }
 
 export function BellButton({ count, onClick, className = "" }: { count: number; onClick: () => void; className?: string }) {
@@ -162,7 +195,10 @@ export function NotificationsSheet({ open, onClose, n }: { open: boolean; onClos
     }
     if (evento) setTimeout(() => window.dispatchEvent(new CustomEvent(evento!)), 450);
   };
-  const unreadIds = n.stored.filter((s) => !s.letta).map((s) => s.id);
+  const aperte = n.stored.filter((s) => !s.fatta);
+  const fatte = n.stored.filter((s) => s.fatta);
+  const [vediFatte, setVediFatte] = useState(false);
+  const unreadIds = aperte.filter((s) => !s.letta).map((s) => s.id);
   return (
     <Sheet open={open} onClose={onClose} title="Notifiche">
       {n.live.length > 0 && (
@@ -170,14 +206,17 @@ export function NotificationsSheet({ open, onClose, n }: { open: boolean; onClos
           <div className="text-[12px] font-semibold uppercase tracking-[.08em] text-muted mb-2">Da fare</div>
           <div className="rounded-[16px] bg-card overflow-hidden divide-y divide-line mb-5">
             {n.live.map((x) => (
-              <button key={x.id} onClick={() => go(x.vai, x.evento)} className="w-full flex items-center gap-3 px-3.5 py-3 text-left active:bg-surface/60">
-                <span className="h-9 w-9 shrink-0 rounded-full bg-gold/15 text-gold grid place-items-center">{x.icon}</span>
-                <span className="flex-1 min-w-0">
-                  <span className="block text-[15px] font-medium">{x.titolo}</span>
-                  <span className="block text-[13px] text-muted">{x.testo}</span>
-                </span>
-                <ChevronRight size={16} className="text-muted shrink-0" />
-              </button>
+              <div key={x.id} className="flex items-center gap-1 pl-3.5 pr-2">
+                <button onClick={() => go(x.vai, x.evento)} className="flex-1 min-w-0 flex items-center gap-3 py-3 text-left active:bg-surface/60">
+                  <span className="h-9 w-9 shrink-0 rounded-full bg-gold/15 text-gold grid place-items-center">{x.icon}</span>
+                  <span className="flex-1 min-w-0">
+                    <span className="block text-[15px] font-medium">{x.titolo}</span>
+                    <span className="block text-[13px] text-muted">{x.testo}</span>
+                  </span>
+                  <ChevronRight size={16} className="text-muted shrink-0" />
+                </button>
+                <Spunta onClick={() => n.doneLive(x)} label="Segna come fatto" />
+              </div>
             ))}
           </div>
         </>
@@ -191,16 +230,16 @@ export function NotificationsSheet({ open, onClose, n }: { open: boolean; onClos
               <CheckCheck size={14} /> Segna tutte lette
             </button>
           )}
-          {!unreadIds.length && n.stored.length > 0 && (
+          {!unreadIds.length && aperte.some((s) => s.letta) && (
             <button onClick={n.clearRead} className="text-[12.5px] font-semibold text-muted">
               Svuota
             </button>
           )}
         </div>
       </div>
-      {n.stored.length ? (
+      {aperte.length ? (
         <div className="rounded-[16px] bg-card overflow-hidden divide-y divide-line">
-          {n.stored.map((x) => (
+          {aperte.map((x) => (
             <div key={x.id} className="flex items-start gap-3 px-3.5 py-3">
               <span className={`mt-1.5 h-2 w-2 rounded-full shrink-0 ${x.letta ? "bg-transparent" : "bg-[#d64545]"}`} />
               <button
@@ -214,17 +253,62 @@ export function NotificationsSheet({ open, onClose, n }: { open: boolean; onClos
                 {x.testo && <span className="block text-[13px] text-muted">{x.testo}</span>}
                 <span className="block text-[11.5px] text-muted/80 mt-0.5">{when(x.created_at)}</span>
               </button>
+              <Spunta onClick={() => n.markDone(x.id)} label="Segna come fatta" />
               <button onClick={() => n.remove(x.id)} className="h-8 w-8 -mr-1 grid place-items-center text-muted shrink-0" aria-label="Elimina">
                 <Trash2 size={15} />
               </button>
             </div>
           ))}
         </div>
+      ) : fatte.length ? (
+        <div className="rounded-[16px] bg-card px-4 py-4 text-[13.5px] text-muted text-center">Tutto fatto. Bravo, Signore.</div>
       ) : (
         <div className="rounded-[16px] bg-card px-4 py-5 text-[13.5px] text-muted text-center">
-          Qui arrivano i promemoria di ricorrenze, pensierini e controlli settimanali. Toccane uno per andare dritto alla sezione.
+          Qui arrivano i promemoria di ricorrenze, pensierini e controlli settimanali. Toccane uno per andare dritto alla sezione, spuntalo quando è fatto.
+        </div>
+      )}
+      {fatte.length > 0 && (
+        <div className="mt-4">
+          <button onClick={() => setVediFatte((v) => !v)} className="text-[12px] font-semibold uppercase tracking-[.08em] text-muted flex items-center gap-1">
+            Fatte ({fatte.length}) <ChevronDown size={14} className={`transition ${vediFatte ? "rotate-180" : ""}`} />
+          </button>
+          {vediFatte && (
+            <div className="mt-2 rounded-[16px] bg-card overflow-hidden divide-y divide-line">
+              {fatte.map((x) => (
+                <div key={x.id} className="flex items-center gap-3 px-3.5 py-2.5">
+                  <button onClick={() => n.markDone(x.id, false)} className="h-6 w-6 rounded-full bg-brand text-brand-fg grid place-items-center shrink-0" aria-label="Riapri">
+                    <Check size={13} strokeWidth={3} />
+                  </button>
+                  <span className="flex-1 min-w-0 text-[14px] text-muted line-through truncate">{x.titolo}</span>
+                  <button onClick={() => n.remove(x.id)} className="h-8 w-8 -mr-1 grid place-items-center text-muted shrink-0" aria-label="Elimina">
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </Sheet>
+  );
+}
+
+function Spunta({ onClick, label }: { onClick: () => void; label: string }) {
+  const [on, setOn] = useState(false);
+  return (
+    <button
+      onClick={() => {
+        setOn(true);
+        navigator.vibrate?.(12);
+        setTimeout(onClick, 260);
+      }}
+      className="h-8 w-8 grid place-items-center shrink-0"
+      aria-label={label}
+      title={label}
+    >
+      <span className={`h-6 w-6 rounded-full border-2 grid place-items-center transition ${on ? "bg-brand border-gold text-brand-fg scale-110" : "border-line text-transparent"}`}>
+        <Check size={13} strokeWidth={3} />
+      </span>
+    </button>
   );
 }

@@ -14,6 +14,20 @@ const cors = {
 };
 const json = (d: unknown, s = 200) => new Response(JSON.stringify(d), { status: s, headers: { ...cors, "Content-Type": "application/json" } });
 const GEM = "https://generativelanguage.googleapis.com/v1beta";
+// un modello lento non deve bloccare tutto: dopo 45 s si passa al successivo, e quel modello va in fondo alla fila
+const lenti = new Set<string>();
+const gfetch = (u: string, o: RequestInit, ms = 45000) =>
+  fetch(u, { ...o, signal: AbortSignal.timeout(ms) }).catch(() => {
+    const m = u.match(/models\/([^:/?]+):generateContent/)?.[1];
+    if (m) lenti.add(m);
+    return new Response(JSON.stringify({ error: { message: "Il modello non ha risposto in tempo" } }), { status: 503 });
+  });
+/** Prima i modelli che rispondono in fretta (oggi 3.6 e 3.5 flash: i più nuovi sono spesso sovraccarichi), in fondo quelli che sono andati in timeout. */
+const ordina = (l: string[]) => {
+  const rapidi = l.filter((m) => /^gemini-3\.[56]-flash$/.test(m));
+  const resto = [...rapidi, ...l.filter((m) => !rapidi.includes(m))];
+  return [...resto.filter((m) => !lenti.has(m)), ...resto.filter((m) => lenti.has(m))];
+};
 const key = () => {
   const k = Deno.env.get("GEMINI_API_KEY")?.trim();
   if (!k) throw new Error("Chiave AI non configurata");
@@ -27,7 +41,9 @@ async function models() {
   const gen: string[] = (j.models || []).filter((m: any) => (m.supportedGenerationMethods || []).includes("generateContent")).map((m: any) => String(m.name).replace("models/", ""));
   const ver = (n: string) => parseFloat(n.match(/gemini-(\d+(?:\.\d+)?)/)?.[1] || "0");
   const by = (a: string[]) => [...a].sort((x, y) => ver(y) - ver(x));
-  textModels = [...by(gen.filter((n) => /^gemini-[\d.]+-flash$/.test(n))), ...gen.filter((n) => n === "gemini-flash-latest"), ...by(gen.filter((n) => /^gemini-[\d.]+-flash-lite$/.test(n)))].slice(0, 5);
+  // i modelli 1.x e 2.x sono ritirati per i nuovi account: si usano solo i 3.x e gli alias "latest"
+  const vivo = (n: string) => !/^gemini-[12]\./.test(n);
+  textModels = [...by(gen.filter((n) => /^gemini-[\d.]+-flash$/.test(n) && vivo(n))), ...gen.filter((n) => n === "gemini-flash-latest"), ...by(gen.filter((n) => /^gemini-[\d.]+-flash-lite$/.test(n) && vivo(n))), ...gen.filter((n) => n === "gemini-flash-lite-latest")].slice(0, 9);
   return textModels;
 }
 function parseJson(t: string) {
@@ -43,11 +59,25 @@ function parseJson(t: string) {
     }
   }
 }
+/** Se la ricerca Google ha finito la quota gratuita, si risponde comunque senza ricerca. */
 // deno-lint-ignore no-explicit-any
-async function ask(parts: any[], search: boolean) {
+async function ask(parts: any[], search: boolean): Promise<{ out: any; fonti: { titolo: string; url: string }[]; senza_ricerca?: boolean }> {
+  try {
+    return await ask0(parts, search);
+  } catch (e) {
+    if (search && /quota|tempo/i.test(String(e))) {
+      // senza ricerca web: niente link inventati, solo nomi noti e fasce di prezzo
+      const nota = { text: "ATTENZIONE: in questo momento NON hai accesso alla ricerca web. Cita solo prodotti, marchi e negozi molto noti che conosci con certezza; metti i link a null e usa fasce di prezzo indicative." };
+      return { ...(await ask0([...parts, nota], false)), senza_ricerca: true };
+    }
+    throw e;
+  }
+}
+// deno-lint-ignore no-explicit-any
+async function ask0(parts: any[], search: boolean) {
   let last = "Nessun modello AI disponibile";
-  for (const m of await models()) {
-    const r = await fetch(`${GEM}/models/${m}:generateContent?key=${key()}`, {
+  for (const m of ordina(await models())) {
+    const r = await gfetch(`${GEM}/models/${m}:generateContent?key=${key()}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -64,7 +94,7 @@ async function ask(parts: any[], search: boolean) {
     }
     const c = j.candidates?.[0];
     // deno-lint-ignore no-explicit-any
-    const out = parseJson((c?.content?.parts || []).map((p: any) => p.text || "").join(""));
+    const out = parseJson((c?.content?.parts || []).filter((p: any) => !p.thought).map((p: any) => p.text || "").join(""));
     if (!out) {
       last = "Risposta non valida, riprova";
       continue;
@@ -77,7 +107,7 @@ async function ask(parts: any[], search: boolean) {
       .slice(0, 8);
     return { out, fonti };
   }
-  throw new Error(/quota|demand|overloaded/i.test(last) ? "L'AI è occupata, riprova tra un minuto" : last);
+  throw new Error(/quota|exceeded|demand|overloaded|no longer available/i.test(last) ? "L'AI ha esaurito per ora la quota gratuita di Google: riprova tra qualche minuto (con la fatturazione attiva su Google AI Studio non ci sono limiti)" : last);
 }
 const cleanUrl = (u: unknown) => {
   const s = String(u || "").trim();
@@ -136,9 +166,9 @@ ${b.note ? `Indicazioni: ${b.note}` : ""}
 2) Organizza il guardaroba olfattivo con quello che POSSIEDE: firma, fresco/estate, ufficio, sera/inverno. Se manca un ruolo, dillo.
 3) Cerca sul web 5 profumi reali da provare che coprono i ruoli mancanti o ampliano con coerenza, disponibili in Italia, con fascia di prezzo realistica, rispettando il budget. Includi almeno un'opzione accessibile e un classico delle case storiche.
 Rispondi SOLO con JSON in italiano: {"profilo":"3 frasi","famiglie":["…"],"guardaroba":[{"ruolo":"Firma | Fresco | Ufficio | Sera","profumo":"nome di uno dei suoi o null","nota":"perché, oppure cosa cercare"}],"da_provare":[{"nome":"","marca":"","perche":"","famiglia":"","prezzo":"","dove":"","ricerca":"query Google","link":"pagina trovata o null"}],"consiglio":"un consiglio da maggiordomo inglese"}`;
-      const { out, fonti } = await ask([{ text: prompt }], true);
+      const { out, fonti, senza_ricerca } = await ask([{ text: prompt }], true);
       out.da_provare = (out.da_provare || []).slice(0, 6).map((x: Record<string, unknown>) => ({ ...x, link: cleanUrl(x.link) }));
-      const res = { ...out, fonti, data: new Date().toISOString() };
+      const res = { ...out, fonti, senza_ricerca: !!senza_ricerca, data: new Date().toISOString() };
       await sb.from("profiles").update({ profumi_analisi: res }).eq("id", user.id);
       return json(res);
     }
@@ -168,9 +198,9 @@ ${b.note ? `Indicazioni: ${b.note}` : ""}
 2) Colori e pelli più adatti a lui, coerenti con scarpe, armocromia e metalli.
 3) Cerca sul web 4-5 acquisti prioritari reali in Italia (anche artigiani, usato di qualità, marchi onesti), con prezzi realistici e coerenti con il budget.
 Rispondi SOLO con JSON in italiano: {"valutazione":"2-3 frasi","set":[{"pezzo":"","ce_l_ha":true,"nota":""}],"colori":"quali toni di pelle e metalli scegliere e perché","priorita":[{"nome":"","categoria":"","perche":"","prezzo":"","dove":"","ricerca":"query Google","link":"o null"}],"cura":"il prossimo gesto di cura da fare sui suoi pezzi","consiglio":"un consiglio da maggiordomo inglese"}`;
-      const { out, fonti } = await ask([{ text: prompt }], true);
+      const { out, fonti, senza_ricerca } = await ask([{ text: prompt }], true);
       out.priorita = (out.priorita || []).slice(0, 6).map((x: Record<string, unknown>) => ({ ...x, link: cleanUrl(x.link) }));
-      const res = { ...out, fonti, data: new Date().toISOString() };
+      const res = { ...out, fonti, senza_ricerca: !!senza_ricerca, data: new Date().toISOString() };
       await sb.from("profiles").update({ pelle_analisi: res }).eq("id", user.id);
       return json(res);
     }

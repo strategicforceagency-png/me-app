@@ -13,6 +13,20 @@ const cors = {
 const json = (d: unknown, s = 200) => new Response(JSON.stringify(d), { status: s, headers: { ...cors, "Content-Type": "application/json" } });
 const UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1";
 const GEM = "https://generativelanguage.googleapis.com";
+// un modello lento non deve bloccare tutto: dopo 45 s si passa al successivo, e quel modello va in fondo alla fila
+const lenti = new Set<string>();
+const gfetch = (u: string, o: RequestInit, ms = 45000) =>
+  fetch(u, { ...o, signal: AbortSignal.timeout(ms) }).catch(() => {
+    const m = u.match(/models\/([^:/?]+):generateContent/)?.[1];
+    if (m) lenti.add(m);
+    return new Response(JSON.stringify({ error: { message: "Il modello non ha risposto in tempo" } }), { status: 503 });
+  });
+/** Prima i modelli che rispondono in fretta (oggi 3.6 e 3.5 flash: i più nuovi sono spesso sovraccarichi), in fondo quelli che sono andati in timeout. */
+const ordina = (l: string[]) => {
+  const rapidi = l.filter((m) => /^gemini-3\.[56]-flash$/.test(m));
+  const resto = [...rapidi, ...l.filter((m) => !rapidi.includes(m))];
+  return [...resto.filter((m) => !lenti.has(m)), ...resto.filter((m) => lenti.has(m))];
+};
 const GRAPH = "https://graph.facebook.com/v23.0";
 const MAX_IMG = 20, MAX_VID = 3, MAX_VID_BYTES = 45 * 1024 * 1024;
 
@@ -55,7 +69,9 @@ async function models() {
   const gen: string[] = (j.models || []).filter((m: any) => (m.supportedGenerationMethods || []).includes("generateContent")).map((m: any) => String(m.name).replace("models/", ""));
   const ver = (n: string) => parseFloat(n.match(/gemini-(\d+(?:\.\d+)?)/)?.[1] || "0");
   const by = (a: string[]) => [...a].sort((x, y) => ver(y) - ver(x));
-  textModels = [...by(gen.filter((n) => /^gemini-[\d.]+-flash$/.test(n))), ...gen.filter((n) => n === "gemini-flash-latest"), ...by(gen.filter((n) => /^gemini-[\d.]+-flash-lite$/.test(n)))].slice(0, 5);
+  // i modelli 1.x e 2.x sono ritirati per i nuovi account: si usano solo i 3.x e gli alias "latest"
+  const vivo = (n: string) => !/^gemini-[12]\./.test(n);
+  textModels = [...by(gen.filter((n) => /^gemini-[\d.]+-flash$/.test(n) && vivo(n))), ...gen.filter((n) => n === "gemini-flash-latest"), ...by(gen.filter((n) => /^gemini-[\d.]+-flash-lite$/.test(n) && vivo(n))), ...gen.filter((n) => n === "gemini-flash-lite-latest")].slice(0, 9);
   return textModels;
 }
 let imageModels: string[] | null = null;
@@ -79,11 +95,11 @@ async function drawImage(parts: unknown[]): Promise<{ mime: string; data: string
   let last = "Nessun modello di immagini disponibile";
   let quota = false;
   for (const m of await imgModels()) {
-    const r = await fetch(`${GEM}/v1beta/models/${m}:generateContent?key=${key()}`, {
+    const r = await gfetch(`${GEM}/v1beta/models/${m}:generateContent?key=${key()}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ contents: [{ role: "user", parts }], generationConfig: { responseModalities: ["IMAGE", "TEXT"] } }),
-    });
+    }, 90000);
     const j = await r.json().catch(() => ({}));
     if (!r.ok) {
       last = j?.error?.message || `Errore ${r.status}`;
@@ -106,15 +122,25 @@ function fromB64(b64: string) {
 }
 
 // deno-lint-ignore no-explicit-any
-async function gemini(parts: unknown[], opts: { json?: boolean; search?: boolean; temperature?: number } = {}): Promise<{ text: string; grounding: any }> {
+async function gemini(parts: unknown[], opts: { json?: boolean; search?: boolean; temperature?: number; ms?: number } = {}): Promise<{ text: string; grounding: any }> {
+  try {
+    return await gemini0(parts, opts);
+  } catch (e) {
+    // ricerca Google esaurita: si verifica con le conoscenze del modello, senza fonti web
+    if (opts.search && /quota|tempo/i.test(String(e))) return await gemini0(parts, { ...opts, search: false });
+    throw e;
+  }
+}
+// deno-lint-ignore no-explicit-any
+async function gemini0(parts: unknown[], opts: { json?: boolean; search?: boolean; temperature?: number; ms?: number } = {}): Promise<{ text: string; grounding: any }> {
   let last = "Nessun modello AI disponibile";
-  for (const m of await models()) {
+  for (const m of ordina(await models())) {
     const body: Record<string, unknown> = {
       contents: [{ role: "user", parts }],
       generationConfig: { temperature: opts.temperature ?? 0.3, ...(opts.json ? { responseMimeType: "application/json" } : {}), maxOutputTokens: 16000 },
     };
     if (opts.search) body.tools = [{ google_search: {} }];
-    const r = await fetch(`${GEM}/v1beta/models/${m}:generateContent?key=${key()}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const r = await gfetch(`${GEM}/v1beta/models/${m}:generateContent?key=${key()}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }, opts.ms || 60000);
     const j = await r.json().catch(() => ({}));
     if (!r.ok) {
       last = j?.error?.message || `Errore AI ${r.status}`;
@@ -123,11 +149,11 @@ async function gemini(parts: unknown[], opts: { json?: boolean; search?: boolean
     }
     const c = j.candidates?.[0];
     // deno-lint-ignore no-explicit-any
-    const text = (c?.content?.parts || []).map((p: any) => p.text || "").join("");
+    const text = (c?.content?.parts || []).filter((p: any) => !p.thought).map((p: any) => p.text || "").join("");
     if (text) return { text, grounding: c?.groundingMetadata };
     last = "Risposta AI vuota";
   }
-  throw new Error(/quota|demand|overloaded/i.test(last) ? "L'AI è occupata, riprova tra un minuto" : last);
+  throw new Error(/quota|exceeded|demand|overloaded|no longer available/i.test(last) ? "L'AI ha esaurito per ora la quota gratuita di Google: riprova tra qualche minuto (con la fatturazione attiva su Google AI Studio non ci sono limiti)" : last);
 }
 async function geminiUpload(bytes: ArrayBuffer, mime: string, name: string) {
   const start = await fetch(`${GEM}/upload/v1beta/files?key=${key()}`, {
@@ -435,7 +461,7 @@ Regole:
       });
       let out;
       try {
-        out = parseJson((await gemini(parts, { json: true, temperature: 0.3 })).text);
+        out = parseJson((await gemini(parts, { json: true, temperature: 0.3, ms: 110000 })).text);
       } finally {
         vids.forEach((v) => geminiDelete(v.name));
       }
