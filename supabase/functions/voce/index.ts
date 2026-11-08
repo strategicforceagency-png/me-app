@@ -23,7 +23,7 @@ async function liveModels(key: string) {
   try {
     const j = await (await fetch(`${GEM}/v1beta/models?key=${key}&pageSize=1000`)).json();
     // deno-lint-ignore no-explicit-any
-    live = (j.models || []).filter((m: any) => (m.supportedGenerationMethods || []).includes("bidiGenerateContent")).map((m: any) => String(m.name).replace("models/", ""));
+    live = (j.models || []).filter((m: any) => (m.supportedGenerationMethods || []).includes("bidiGenerateContent")).map((m: any) => String(m.name).replace("models/", "")).filter((n: string) => !/transcribe|translate|robotics|thinking|embedding/.test(n));
   } catch {
     /* sotto */
   }
