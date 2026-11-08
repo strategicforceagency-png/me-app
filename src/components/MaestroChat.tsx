@@ -6,7 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useApp } from "../lib/store";
 import { fn, supabase, learnMe, uploadImage } from "../lib/supabase";
 import { RichText } from "../screens/Academy";
-import { ChevronDown, ClipboardList } from "lucide-react";
+import { ChevronDown, ClipboardList, Clock3 } from "lucide-react";
 
 const SEGNO = "📋 **Incarico svolto**";
 /** Un incarico svolto: la frase detta da Alfred resta visibile, il resoconto completo va in un riquadro da aprire. */
@@ -18,7 +18,42 @@ function dividi(text: string) {
   const a = resto.indexOf("\n\n");
   return { voce: text.slice(0, i).trim(), compito: (a < 0 ? resto : resto.slice(0, a)).trim(), dettaglio: a < 0 ? "" : resto.slice(a + 2).trim() };
 }
+const PRESO = /\n*🕰️\s*_?Incarico preso in carico( per [^:]+)?: ([\s\S]*?)\.? Le arriverà una notifica con l'esito\._?/g;
+/** "Incarico preso in carico": una riga chiusa, si apre solo se interessa. */
+function Preso({ quando, testo }: { quando: string; testo: string }) {
+  const [aperto, setAperto] = useState(false);
+  return (
+    <div className="mt-2">
+      <button onClick={() => setAperto(!aperto)} className="w-full flex items-center gap-2 rounded-[12px] bg-card px-3 py-2 text-left text-[12.5px] text-muted">
+        <Clock3 size={14} className="text-gold shrink-0" />
+        <span className="flex-1 min-w-0 truncate">Incarico preso in carico{quando} · {testo}</span>
+        <ChevronDown size={15} className={`shrink-0 transition-transform ${aperto ? "rotate-180" : ""}`} />
+      </button>
+      {aperto && (
+        <div className="mt-2 border-l-2 border-gold/40 pl-3 text-[13.5px]">
+          {testo}
+          <div className="text-[12px] text-muted mt-1">L'esito comparirà qui in chat, e Le arriverà anche una notifica.</div>
+        </div>
+      )}
+    </div>
+  );
+}
 function AlfredText({ text }: { text: string }) {
+  const presi = [...text.matchAll(PRESO)].map((m) => ({ quando: m[1] || "", testo: m[2].trim() }));
+  if (presi.length) {
+    const resto = text.replace(PRESO, "").trim();
+    return (
+      <div>
+        {resto && <AlfredText text={resto} />}
+        {presi.map((x, i) => (
+          <Preso key={i} quando={x.quando} testo={x.testo} />
+        ))}
+      </div>
+    );
+  }
+  return <Svolto text={text} />;
+}
+function Svolto({ text }: { text: string }) {
   const [aperto, setAperto] = useState(false);
   const d = dividi(text);
   if (!d.compito) return <RichText text={text} />;
@@ -185,6 +220,21 @@ export function MaestroChat() {
     // a ogni apertura si ricarica: gli incarichi svolti in background scrivono nella chat
     if (open) load();
   }, [open, load]);
+  // mentre la chat è aperta, gli esiti degli incarichi compaiono da soli (controllo leggero ogni 8 secondi)
+  const ultimo = useRef<string | undefined>(undefined);
+  const occupato = useRef(false);
+  ultimo.current = msgs?.length ? msgs[msgs.length - 1].id : undefined;
+  occupato.current = busy;
+  useEffect(() => {
+    if (!open) return;
+    const t = setInterval(async () => {
+      if (document.visibilityState !== "visible" || occupato.current) return;
+      const { data } = await supabase.from("maestro_messages").select("id").order("created_at", { ascending: false }).limit(1);
+      const id = (data as { id: string }[] | null)?.[0]?.id;
+      if (id && id !== ultimo.current) load();
+    }, 8000);
+    return () => clearInterval(t);
+  }, [open, load]);
   useEffect(() => {
     end.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [msgs, busy, open]);
@@ -345,7 +395,7 @@ export function MaestroChat() {
                     <AlfredAvatar size={28} className="shrink-0 mt-0.5" />
                     <div className="max-w-[88%] rounded-[18px] rounded-tl-[6px] bg-surface shadow-soft px-3.5 py-2.5 text-[14.5px] leading-relaxed">
                       <AlfredText text={m.text} />
-                      <Ascolta id={m.id || String(i)} text={dividi(m.text).voce || m.text} />
+                      <Ascolta id={m.id || String(i)} text={(dividi(m.text).voce || m.text).replace(PRESO, "").trim() || m.text} />
                     </div>
                   </div>
                 ),
