@@ -156,7 +156,8 @@ Cosa sai di lui:
 ${ctx.testo}
 
 Rispondi SOLO con JSON valido in italiano:
-{"esito":"quello che gli diresti tornando da lui, come parleresti a voce: discorsivo e naturale, di solito 3-6 frasi, senza elenchi, senza grassetto e senza titoli; nomi, prezzi e dove trovarli li dici dentro le frasi; dai la tua scelta e il perché in poche parole. Solo se l'incarico chiedeva espressamente una lista o un piano dettagliato puoi usare un elenco con -. Inizia in modo naturale, es. \\"Signor ${ctx.nome}, ho controllato…\\"",
+{"esito":"i dettagli, che lui apre solo se vuole approfondire: discorsivo e naturale, senza grassetto e senza titoli; nomi, prezzi, orari e dove trovarli; la tua scelta e il perché. Se ci sono più opzioni puoi usare un breve elenco con -. Non ripetere il saluto né la sintesi.",
+"sintesi":"quello che gli dici a voce appena torni da lui: 1-2 frasi brevi e naturali con la conclusione, es. \\"Signor ${ctx.nome}, lasci perdere quel locale: la domenica a pranzo è chiuso. Ho trovato di meglio a due passi, i dettagli sono qui sotto.\\"",
 "titolo":"titolo della notifica, max 45 caratteri, es. \\"Fatto: i fiori per Emanuela\\"",
 "breve":"testo della notifica, max 140 caratteri, con la cosa più importante",
 "vai":"la sezione dell'app più utile per proseguire, una tra ${VAI.join(", ")}",
@@ -165,7 +166,7 @@ Rispondi SOLO con JSON valido in italiano:
     const vai = VAI.includes(out.vai) ? out.vai : "alfred";
     const esito = String(out.esito || "").trim() + (senza_ricerca ? "\n\n_La ricerca web di Google oggi non era disponibile: ho usato ciò che so, verifichi prezzi e disponibilità._" : "");
     await admin.from("incarichi").update({ stato: "fatto", esito, breve: String(out.breve || "").slice(0, 200), vai, fonti, fatto_at: new Date().toISOString() }).eq("id", id);
-    if (!t.riservato) await admin.from("maestro_messages").insert({ user_id: t.user_id, role: "model", text: `📋 **Incarico svolto** — ${t.testo}\n\n${esito}` });
+    if (!t.riservato) await admin.from("maestro_messages").insert({ user_id: t.user_id, role: "model", text: `${String(out.sintesi || out.breve || "").trim()}\n\n📋 **Incarico svolto** — ${t.testo}\n\n${esito}` });
     if (out.seguito?.testo) {
       const quando = daRoma(out.seguito.quando);
       if (quando && new Date(quando).getTime() > Date.now()) await admin.from("incarichi").insert({ user_id: t.user_id, testo: String(out.seguito.testo), quando, origine: "seguito", riservato: t.riservato });

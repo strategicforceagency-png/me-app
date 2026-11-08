@@ -337,7 +337,7 @@ export function CourseTutorials({ corso }: { corso: string }) {
   return (
     <div className="mt-8">
       <h2 className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted flex items-center gap-2 mb-3">
-        <BookOpen size={13} className="text-gold" /> I tuoi tutorial
+        <BookOpen size={13} className="text-gold" /> Tutorial illustrati
       </h2>
       <div className="space-y-2.5">
         {list.map((t) => (
@@ -347,4 +347,58 @@ export function CourseTutorials({ corso }: { corso: string }) {
       <TutorialView t={list.find((x) => x.id === open) || null} onClose={() => setOpen(null)} />
     </div>
   );
+}
+
+/** Nella lezione: la guida illustrata passo passo, se c'è. */
+export function LessonTutorial({ lezione }: { lezione: string }) {
+  const [t, setT] = useState<Tutorial | null>(null);
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    let vivo = true;
+    supabase
+      .from("tutorials")
+      .select("*")
+      .eq("lezione", lezione)
+      .eq("stato", "approvato")
+      .maybeSingle()
+      .then(({ data }) => vivo && setT((data as Tutorial) || null));
+    return () => {
+      vivo = false;
+    };
+  }, [lezione]);
+  if (!t) return null;
+  return (
+    <div className="mt-6">
+      <TutorialRow t={t} onOpen={() => setOpen(true)} />
+      <TutorialView t={open ? t : null} onClose={() => setOpen(false)} />
+    </div>
+  );
+}
+
+/** Una volta per dispositivo: chiede al server di creare (in background) i tutorial illustrati delle lezioni pratiche. */
+export function avviaLibreria() {
+  const K = "habitus-libreria-tutorial-v1";
+  try {
+    if (localStorage.getItem(K)) return;
+    localStorage.setItem(K, String(Date.now()));
+  } catch {
+    return;
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const txt = (b: any): string =>
+    b.t === "p" || b.t === "h" || b.t === "tip" ? b.text
+    : b.t === "list" ? b.items.map((x: string) => "- " + x).join("\n")
+    : b.t === "steps" ? b.items.map((x: { titolo?: string; text: string }, i: number) => `${i + 1}. ${x.titolo ? x.titolo + ": " : ""}${x.text}`).join("\n")
+    : b.t === "dodont" ? "Sì: " + b.si.join("; ") + "\nNo: " + b.no.join("; ")
+    : b.t === "table" ? [b.head, ...b.rows].map((r: string[]) => r.join(" | ")).join("\n")
+    : b.t === "fig" ? b.fig.caption || ""
+    : "";
+  const lezioni = CORSI.flatMap((c) => c.lezioni.map((l) => ({ corso: c.id, id: l.id, titolo: l.titolo, testo: (l.intro + "\n" + l.blocks.map(txt).join("\n")).slice(0, 5000) })));
+  fn("tutorial", "", { action: "libreria", lezioni }).catch(() => {
+    try {
+      localStorage.removeItem(K);
+    } catch {
+      /* */
+    }
+  });
 }

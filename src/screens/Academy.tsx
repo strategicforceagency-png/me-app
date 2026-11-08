@@ -1,5 +1,5 @@
 import { CourseNotes } from "./Contents";
-import { CourseTutorials } from "./Tutorials";
+import { avviaLibreria, CourseTutorials, LessonTutorial } from "./Tutorials";
 import { motion } from "framer-motion";
 import { ArrowLeft, ArrowRight, Check, CheckCircle2, ChevronRight, Clock, Feather, Footprints, GraduationCap, Heart, Lightbulb, Loader2, Scissors, Send, Shirt, Sparkles, Umbrella, Watch, X, SprayCan, Briefcase } from "lucide-react";
 import { Fragment, ReactNode, useEffect, useMemo, useRef, useState } from "react";
@@ -84,6 +84,7 @@ export function AcademyScreen() {
     const [c, l] = (app?.lessonTarget || "").split("/");
     return c ? { c, l } : {};
   });
+  useEffect(() => avviaLibreria(), []);
   useEffect(() => {
     if (!app?.lessonTarget) return;
     const [c, l] = app.lessonTarget.split("/");
@@ -385,6 +386,7 @@ function LessonView({ course, lesson, done, onToggle, go, doneSet }: { course: C
       </div>
       <h1 className="font-display text-[34px] lg:text-[44px] font-semibold leading-[1.05] mt-1.5">{lesson.titolo}</h1>
       <p className="text-[16px] leading-relaxed text-muted mt-3">{lesson.intro}</p>
+      <LessonTutorial lezione={`${course.id}/${lesson.id}`} />
 
       <div className="mt-6 space-y-5">
         {lesson.blocks.map((b, i) => (

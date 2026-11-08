@@ -6,6 +6,38 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useApp } from "../lib/store";
 import { fn, supabase, learnMe, uploadImage } from "../lib/supabase";
 import { RichText } from "../screens/Academy";
+import { ChevronDown, ClipboardList } from "lucide-react";
+
+const SEGNO = "📋 **Incarico svolto**";
+/** Un incarico svolto: la frase detta da Alfred resta visibile, il resoconto completo va in un riquadro da aprire. */
+function dividi(text: string) {
+  const i = text.indexOf(SEGNO);
+  if (i < 0) return { voce: text, compito: "", dettaglio: "" };
+  const resto = text.slice(i + SEGNO.length).replace(/^\s*—\s*/, "");
+  const a = resto.indexOf("\n\n");
+  return { voce: text.slice(0, i).trim(), compito: (a < 0 ? resto : resto.slice(0, a)).trim(), dettaglio: a < 0 ? "" : resto.slice(a + 2).trim() };
+}
+function AlfredText({ text }: { text: string }) {
+  const [aperto, setAperto] = useState(false);
+  const d = dividi(text);
+  if (!d.compito) return <RichText text={text} />;
+  return (
+    <div>
+      {d.voce ? <RichText text={d.voce} /> : <p className="text-[14.5px]">Ho finito quello che mi aveva chiesto, signore.</p>}
+      <button onClick={() => setAperto(!aperto)} className="mt-2 w-full flex items-center gap-2 rounded-[12px] bg-card px-3 py-2 text-left text-[12.5px] text-muted">
+        <ClipboardList size={14} className="text-gold shrink-0" />
+        <span className="flex-1 min-w-0 truncate">Incarico svolto · {d.compito}</span>
+        <ChevronDown size={15} className={`shrink-0 transition-transform ${aperto ? "rotate-180" : ""}`} />
+      </button>
+      {aperto && (
+        <div className="mt-2 border-l-2 border-gold/40 pl-3 text-[14px]">
+          <div className="text-[12px] text-muted mb-1.5">{d.compito}</div>
+          <RichText text={d.dettaglio} />
+        </div>
+      )}
+    </div>
+  );
+}
 
 type Msg = { id?: string; role: "user" | "model"; text: string };
 
@@ -286,9 +318,9 @@ export function MaestroChat() {
                   <div key={m.id || i} className="flex gap-2">
                     <AlfredAvatar size={28} className="shrink-0 mt-0.5" />
                     <div className="max-w-[88%] rounded-[18px] rounded-tl-[6px] bg-surface shadow-soft px-3.5 py-2.5 text-[14.5px] leading-relaxed">
-                      <RichText text={m.text} />
+                      <AlfredText text={m.text} />
                       {"speechSynthesis" in window && (
-                        <button onClick={() => speak(m.text)} className="mt-1.5 text-[11.5px] text-muted flex items-center gap-1 hover:text-gold">
+                        <button onClick={() => speak(dividi(m.text).voce || m.text)} className="mt-1.5 text-[11.5px] text-muted flex items-center gap-1 hover:text-gold">
                           <Volume2 size={12} /> Ascolta
                         </button>
                       )}

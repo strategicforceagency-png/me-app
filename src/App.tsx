@@ -325,6 +325,10 @@ function Shell() {
     if (!sc?.aggiornata || Date.now() - Date.parse(sc.aggiornata) > 3 * 86400000) learnMe((x) => app.setProfile({ scheda: x }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [!!app.profile]);
+  // tutorial illustrati delle lezioni pratiche: si creano una volta, in background
+  useEffect(() => {
+    if (app.profile) import("./screens/Tutorials").then((m) => m.avviaLibreria());
+  }, [!!app.profile]);
   const [bellOpen, setBellOpen] = useState(false);
   const [addMenu, setAddMenu] = useState(false);
   const [last, setLast] = useState<Record<string, Tab>>({});
