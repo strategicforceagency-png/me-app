@@ -198,7 +198,7 @@ Rispondi SOLO con JSON valido in italiano:
 "seguito":null oppure {"testo":"un eventuale incarico successivo che lui ha chiesto (es. ricordarglielo più avanti)","quando":"YYYY-MM-DDTHH:MM ora italiana"}}`;
     const { out, fonti, senza_ricerca } = await ask(prompt, t.testo);
     const vai = VAI.includes(out.vai) ? out.vai : "alfred";
-    const esito = String(out.esito || "").trim() + (fonti.length ? `\n\nFonti consultate: ${fonti.map((f) => `[${f.titolo}](${f.url})`).join(", ")}` : "") + (senza_ricerca ? "\n\n_La ricerca web di Google oggi non era disponibile: ho usato ciò che so, verifichi prezzi e disponibilità._" : "");
+    const esito = String(out.esito || "").trim() + (senza_ricerca ? "\n\n_La ricerca web di Google oggi non era disponibile: ho usato ciò che so, verifichi prezzi e disponibilità._" : "");
     await admin.from("incarichi").update({ stato: "fatto", esito, breve: String(out.breve || "").slice(0, 200), vai, fonti, fatto_at: new Date().toISOString() }).eq("id", id);
     if (!t.riservato) await admin.from("maestro_messages").insert({ user_id: t.user_id, role: "model", text: `${String(out.sintesi || out.breve || "").trim()}\n\n📋 **Incarico svolto** — ${t.testo}\n\n${esito}` });
     if (out.seguito?.testo) {

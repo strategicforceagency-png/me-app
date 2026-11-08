@@ -11,6 +11,7 @@ import { ChevronDown, ClipboardList } from "lucide-react";
 const SEGNO = "📋 **Incarico svolto**";
 /** Un incarico svolto: la frase detta da Alfred resta visibile, il resoconto completo va in un riquadro da aprire. */
 function dividi(text: string) {
+  text = text.replace(/\n*Fonti consultate:[\s\S]*?(?=\n\n_|$)/, "");
   const i = text.indexOf(SEGNO);
   if (i < 0) return { voce: text, compito: "", dettaglio: "" };
   const resto = text.slice(i + SEGNO.length).replace(/^\s*—\s*/, "");
