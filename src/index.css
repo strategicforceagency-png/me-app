@@ -57,7 +57,8 @@ html, body { background: rgb(var(--bg)); color: rgb(var(--fg)); -webkit-font-smo
 body { overscroll-behavior-y: none; }
 button, a, [role="button"] { -webkit-user-select: none; user-select: none; touch-action: manipulation; }
 img { -webkit-touch-callout: none; }
-@media (display-mode: standalone) { body { -webkit-user-select: none; user-select: none; } input, textarea, [contenteditable] { -webkit-user-select: text; user-select: text; } }
+/* niente user-select:none sul body: su iPhone spegne i suggerimenti di parole della tastiera anche nei campi di testo */
+@media (display-mode: standalone) { nav, header, [data-noselect] { -webkit-user-select: none; user-select: none; } }
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { scrollbar-width: none; }
 img { -webkit-user-drag: none; -webkit-touch-callout: none; }

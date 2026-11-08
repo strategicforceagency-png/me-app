@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Prova tastiera</title>
+<style>body{font-family:-apple-system,system-ui,sans-serif;background:#f4efe4;color:#1b2a22;margin:0;padding:16px}h1{font-size:20px}label{display:block;margin:18px 0 6px;font-weight:600;font-size:15px}
+textarea,input,[contenteditable]{box-sizing:border-box;width:100%;font-size:16px;padding:12px;border:1px solid #c8b58a;border-radius:14px;background:#fff;min-height:48px}
+.ns{-webkit-user-select:none;user-select:none;padding:8px;border:1px dashed #999;border-radius:16px}.ns textarea{-webkit-user-select:text;user-select:text}p{font-size:14px;color:#555}</style></head>
+<body>
+<h1>Prova suggerimenti tastiera</h1>
+<p>Tocchi ogni campo, scriva "Ciao come" e guardi la barra sopra la tastiera: compaiono parole suggerite o solo il Suo nome? Mi dica le lettere dei campi che funzionano.</p>
+<label>A · campo semplice</label><textarea rows="2"></textarea>
+<label>B · autocomplete spento</label><textarea rows="2" autocomplete="off" autocorrect="on" spellcheck="true" name="messaggio"></textarea>
+<label>C · dentro un blocco non selezionabile (come prima l'app)</label><div class="ns"><textarea rows="2" autocomplete="off"></textarea></div>
+<label>D · riga singola</label><input type="text" autocomplete="off">
+<label>E · campo ricerca</label><input type="search">
+<label>F · area modificabile</label><div contenteditable="true"></div>
+</body></html>
