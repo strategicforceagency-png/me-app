@@ -156,7 +156,7 @@ Cosa sai di lui:
 ${ctx.testo}
 
 Rispondi SOLO con JSON valido in italiano:
-{"esito":"il resoconto per lui, completo e ordinato (Markdown semplice: **grassetto**, elenchi con -), al massimo ~250 parole, che inizi in modo naturale, es. \\"Signor ${ctx.nome}, ho controllato…\\"",
+{"esito":"quello che gli diresti tornando da lui, come parleresti a voce: discorsivo e naturale, di solito 3-6 frasi, senza elenchi, senza grassetto e senza titoli; nomi, prezzi e dove trovarli li dici dentro le frasi; dai la tua scelta e il perché in poche parole. Solo se l'incarico chiedeva espressamente una lista o un piano dettagliato puoi usare un elenco con -. Inizia in modo naturale, es. \\"Signor ${ctx.nome}, ho controllato…\\"",
 "titolo":"titolo della notifica, max 45 caratteri, es. \\"Fatto: i fiori per Emanuela\\"",
 "breve":"testo della notifica, max 140 caratteri, con la cosa più importante",
 "vai":"la sezione dell'app più utile per proseguire, una tra ${VAI.join(", ")}",
