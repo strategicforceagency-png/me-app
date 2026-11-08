@@ -265,7 +265,7 @@ export function AlfredCall({ open, onClose }: { open: boolean; onClose: () => vo
             let result = "ok: incarico registrato, l'esito arriverà come notifica";
             if (c.name === "affida_incarico") {
               try {
-                await fn("incarichi", "", { action: "crea", testo: String(c.args?.descrizione || ""), quando: c.args?.quando || null, origine: "chiamata", riservato: s.riservata });
+                await fn("incarichi", "", { action: "crea", testo: String(c.args?.descrizione || ""), quando: c.args?.quando || null, origine: "chiamata", confermato: true, riservato: s.riservata });
               } catch (e) {
                 result = `errore: ${(e as Error).message}`;
               }

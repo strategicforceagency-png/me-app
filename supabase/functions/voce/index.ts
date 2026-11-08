@@ -58,118 +58,6 @@ const schedaText = (s: any) => (s?.ritratto || s?.fatti?.length ? `${s.ritratto 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   try {
-    // diagnostica interna (solo con il segreto del cron): modello scelto e prova dell'accesso temporaneo, senza restituirlo
-    const xc = req.headers.get("x-cron");
-    if (xc) {
-      const adm = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-      const { data: sec } = await adm.from("app_secrets").select("value").eq("name", "cron").single();
-      if (!sec || sec.value !== xc) return json({ error: "no" }, 401);
-      const k = Deno.env.get("GEMINI_API_KEY")?.trim() || "";
-      const all = await liveModels(k);
-      const model = all[0];
-      const out: Record<string, unknown> = { modelli: all, model };
-      const prove: Record<string, unknown> = {};
-      const sys = { parts: [{ text: "Sei Alfred, il maggiordomo inglese del Signor Manuel, che conosci da anni. Parli in italiano e gli dai del Lei." }] };
-      const sc = { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Charon" } }, languageCode: "it-IT" };
-      const mk = (voce: string) => ({ model: `models/${model}`, generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voce } }, languageCode: "it-IT" } }, systemInstruction: sys, outputAudioTranscription: {} });
-      const strumenti = [{ functionDeclarations: [{ name: "affida_incarico", description: "Registra un compito da svolgere dopo", parameters: { type: "OBJECT", properties: { descrizione: { type: "STRING" }, quando: { type: "STRING" } }, required: ["descrizione"] } }] }];
-      const varianti: Record<string, unknown> = { D_Charon: mk("Charon"), G_con_incarichi: { ...mk("Charon"), tools: strumenti } };
-      void sc;
-      // altezza media della voce (autocorrelazione): maschile ~85-160 Hz, femminile ~165-260 Hz
-      const pitch = (pcm: Int16Array, rate: number) => {
-        const f0s: number[] = [];
-        const N = 1024;
-        for (let o = 0; o + N + 400 < pcm.length; o += N) {
-          let e = 0;
-          for (let i = 0; i < N; i++) e += pcm[o + i] * pcm[o + i];
-          if (e / N < 1e6) continue;
-          let best = 0, lag = 0;
-          for (let l = Math.floor(rate / 400); l <= Math.floor(rate / 60); l++) {
-            let c = 0;
-            for (let i = 0; i < N; i++) c += pcm[o + i] * pcm[o + i + l];
-            if (c > best) {
-              best = c;
-              lag = l;
-            }
-          }
-          if (lag) f0s.push(rate / lag);
-        }
-        f0s.sort((a, b) => a - b);
-        return f0s.length ? Math.round(f0s[Math.floor(f0s.length / 2)]) : null;
-      };
-      for (const [nomeV, setup] of Object.entries(varianti)) {
-        const t = await makeToken(k, model, 2, setup);
-        if (!t.token) {
-          prove[nomeV] = { token: t.err };
-          continue;
-        }
-        prove[nomeV] = await new Promise((resolve) => {
-          const log: Record<string, unknown> = {};
-          const chunks: Uint8Array[] = [];
-          let rate = 24000;
-          const ws = new WebSocket(`wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContentConstrained?access_token=${encodeURIComponent(t.token!)}`);
-          const finish = () => {
-            const len = chunks.reduce((n, c) => n + c.length, 0);
-            const all8 = new Uint8Array(len);
-            let o = 0;
-            for (const c of chunks) {
-              all8.set(c, o);
-              o += c.length;
-            }
-            log.hz = pitch(new Int16Array(all8.buffer, 0, Math.floor(len / 2)), rate);
-            log.secondi = Math.round((len / 2 / rate) * 10) / 10;
-            resolve(log);
-          };
-          const timer = setTimeout(() => {
-            try {
-              ws.close();
-            } catch {
-              /* */
-            }
-            finish();
-          }, 15000);
-          ws.onopen = () => ws.send(JSON.stringify({ setup }));
-          ws.onmessage = async (ev) => {
-            const txt = typeof ev.data === "string" ? ev.data : new TextDecoder().decode(ev.data instanceof Blob ? new Uint8Array(await ev.data.arrayBuffer()) : new Uint8Array(ev.data));
-            let m;
-            try {
-              m = JSON.parse(txt);
-            } catch {
-              return;
-            }
-            if (m.setupComplete) {
-              log.setup = "ok";
-              ws.send(JSON.stringify({ realtimeInput: { text: "Come mi chiamo, e lei chi è?" } }));
-            }
-            const s2 = m.serverContent;
-            for (const p of s2?.modelTurn?.parts || []) {
-              if (p.inlineData?.data) {
-                rate = Number(String(p.inlineData.mimeType || "").match(/rate=(\d+)/)?.[1] || 24000);
-                const bin = atob(p.inlineData.data);
-                const u = new Uint8Array(bin.length);
-                for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
-                chunks.push(u);
-              }
-            }
-            if (s2?.outputTranscription?.text) log.testo = String(log.testo || "") + s2.outputTranscription.text;
-            if (s2?.turnComplete) {
-              clearTimeout(timer);
-              try {
-                ws.close();
-              } catch {
-                /* */
-              }
-              finish();
-            }
-          };
-          ws.onclose = (e) => {
-            log.chiusura = `${e.code} ${e.reason}`;
-          };
-        });
-      }
-      out.prove = prove;
-      return json(out);
-    }
     const auth = req.headers.get("Authorization") ?? "";
     const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: auth } } });
     const { data: { user } } = await sb.auth.getUser(auth.replace("Bearer ", ""));
@@ -216,7 +104,7 @@ COME PARLI AL TELEFONO
 - Se non capisci, chiedi gentilmente di ripetere.
 
 INCARICHI
-- Quando ti affida un compito che richiede ricerche, confronti, verifiche o di ricordargli qualcosa più tardi, e ogni volta che diresti "controllo e Le faccio sapere", non inventare il risultato: usa lo strumento affida_incarico (descrizione completa e autonoma; "quando" vuoto per subito o YYYY-MM-DDTHH:MM ora italiana, sapendo che ora è ${oggi}) e digli che Le arriverà una notifica con l'esito.
+- Quando ti affida un compito che richiede ricerche, confronti, verifiche o di ricordargli qualcosa più tardi, e ogni volta che diresti "controllo e Le faccio sapere", non inventare il risultato e non partire da solo: le ricerche consumano credito, quindi prima chiediglielo ("Vuole che me ne occupi?"). Solo dopo il suo sì usa lo strumento affida_incarico (descrizione completa e autonoma; "quando" vuoto per subito o YYYY-MM-DDTHH:MM ora italiana, sapendo che ora è ${oggi}) e digli che l'esito comparirà in chat e Le arriverà una notifica. Puoi solo cercare sul web e ragionare: non puoi telefonare, scrivere o prenotare per lui.
 - Chi chiama è SEMPRE il Signor ${nome}: lo conosci da anni e riconosci subito la sua voce. Non chiedere mai "chi parla", non presentarti come un'intelligenza artificiale e non dire di non avere informazioni su di lui: sai tutto quello che c'è qui sotto e lo usi con naturalezza, come un maggiordomo che conosce bene la casa.
 - Apri la chiamata salutandolo per nome con un saluto adatto all'ora (oggi è ${oggi}) e, se c'è, accenna con discrezione a qualcosa di attuale (una ricorrenza vicina, la settimana del percorso, un impegno).
 
@@ -258,7 +146,7 @@ COSA SAI DI LUI
                 functionDeclarations: [
                   {
                     name: "affida_incarico",
-                    description: "Registra un compito da svolgere con calma dopo la risposta (ricerche, confronti, promemoria). L'esito gli arriverà come notifica.",
+                    description: "Registra un compito da svolgere con calma dopo la risposta (ricerche, confronti, promemoria). Da usare SOLO dopo che lui ha confermato a voce. L'esito gli arriverà in chat e come notifica.",
                     parameters: {
                       type: "OBJECT",
                       properties: {

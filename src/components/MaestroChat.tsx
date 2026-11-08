@@ -76,6 +76,7 @@ function Svolto({ text }: { text: string }) {
 }
 
 type Msg = { id?: string; role: "user" | "model"; text: string };
+type DaConf = { id: string; testo: string; quando: string | null };
 
 const SCREEN: Record<string, string> = {
   percorso: "Oggi (il suo percorso del giorno)",
@@ -195,13 +196,32 @@ export function MaestroChat() {
 
   const load = useCallback(async () => {
     try {
-      const { data } = await supabase.from("maestro_messages").select("id, role, text").order("created_at", { ascending: false }).limit(60);
+      const [{ data }, { data: dc }] = await Promise.all([
+        supabase.from("maestro_messages").select("id, role, text").order("created_at", { ascending: false }).limit(60),
+        supabase.from("incarichi").select("id, testo, quando").eq("stato", "da_confermare").order("created_at"),
+      ]);
       setMsgs(((data as Msg[]) || []).reverse());
+      setDaConf((dc as DaConf[]) || []);
     } catch {
       setMsgs([]);
     }
   }, []);
   const [call, setCall] = useState(false);
+  const [daConf, setDaConf] = useState<DaConf[]>([]);
+  const decidi = async (x: DaConf, si: boolean) => {
+    setDaConf((l) => l.filter((y) => y.id !== x.id));
+    try {
+      await fn("incarichi", "", { action: si ? "conferma" : "annulla", id: x.id });
+      if (si) {
+        const riga = `🕰️ _Incarico preso in carico${x.quando ? ` per ${new Date(x.quando).toLocaleString("it-IT", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}` : ""}: ${x.testo}. Le arriverà una notifica con l'esito._`;
+        setMsgs((m) => [...(m || []), { role: "model", text: riga }]);
+        await supabase.from("maestro_messages").insert({ role: "model", text: riga });
+      }
+    } catch (e) {
+      app.toast((e as Error).message);
+      load();
+    }
+  };
   useEffect(() => {
     const f = () => load();
     // dalla notifica di un incarico svolto: si apre la chat con il resoconto
@@ -237,7 +257,7 @@ export function MaestroChat() {
   }, [open, load]);
   useEffect(() => {
     end.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [msgs, busy, open]);
+  }, [msgs, busy, open, daConf.length]);
   useEffect(() => {
     if (!open) {
       rec.current?.stop();
@@ -256,10 +276,8 @@ export function MaestroChat() {
     supabase.from("maestro_messages").insert({ role: "user", text: question }).then(() => {});
     try {
       const r = await fn<{ answer: string; incarichi?: { id: string; testo: string; quando: string | null }[] }>("coach", "", { question, history, context: `Schermata: ${SCREEN[app.tab] || app.tab}` });
-      const inc = (r.incarichi || [])
-        .map((x) => `🕰️ _Incarico preso in carico${x.quando ? ` per ${new Date(x.quando).toLocaleString("it-IT", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}` : ""}: ${x.testo}. Le arriverà una notifica con l'esito._`)
-        .join("\n\n");
-      const testo = inc ? `${r.answer}\n\n${inc}` : r.answer;
+      const testo = r.answer;
+      if (r.incarichi?.length) setDaConf((l) => [...l, ...r.incarichi!.filter((x) => !l.some((y) => y.id === x.id))]);
       setMsgs((m) => [...(m || []), { role: "model", text: testo }]);
       await supabase.from("maestro_messages").insert({ role: "model", text: testo });
       // ogni 6 domande Habitus aggiorna quello che sa di te
@@ -410,6 +428,23 @@ export function MaestroChat() {
                   </span>
                 </div>
               )}
+              {daConf.map((x) => (
+                <div key={x.id} className="ml-9 rounded-[16px] border border-gold/40 bg-surface p-3">
+                  <div className="flex items-center gap-1.5 text-[12px] text-gold font-semibold">
+                    <Clock3 size={13} /> Incarico da confermare{x.quando ? ` · ${new Date(x.quando).toLocaleString("it-IT", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}` : ""}
+                  </div>
+                  <div className="text-[13.5px] mt-1 leading-snug">{x.testo}</div>
+                  <div className="text-[11.5px] text-muted mt-1">Usa la ricerca web e consuma un po' di credito.</div>
+                  <div className="flex gap-2 mt-2.5">
+                    <button onClick={() => decidi(x, true)} className="h-9 px-4 rounded-full bg-gold text-ongold text-[13px] font-semibold">
+                      Avvia
+                    </button>
+                    <button onClick={() => decidi(x, false)} className="h-9 px-4 rounded-full bg-card text-[13px]">
+                      Lascia stare
+                    </button>
+                  </div>
+                </div>
+              ))}
               <div ref={end} />
             </div>
 

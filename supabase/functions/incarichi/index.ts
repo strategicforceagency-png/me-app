@@ -177,7 +177,7 @@ const VAI = ["armadio", "outfit", "stile", "profumi", "pelletteria", "persone", 
 
 async function esegui(admin: SupabaseClient, id: string, secret: string) {
   const { data: t } = await admin.from("incarichi").select("*").eq("id", id).maybeSingle();
-  if (!t || ["fatto", "annullato"].includes(t.stato)) return { ok: false, motivo: "non da fare" };
+  if (!t || ["fatto", "annullato", "da_confermare"].includes(t.stato)) return { ok: false, motivo: "non da fare" };
   if (t.stato === "in_corso" && t.iniziato_at && Date.now() - new Date(t.iniziato_at).getTime() < 4 * 60000) return { ok: false, motivo: "già in corso" };
   await admin.from("incarichi").update({ stato: "in_corso", iniziato_at: new Date().toISOString(), tentativi: (t.tentativi || 0) + 1 }).eq("id", id);
   try {
@@ -256,13 +256,19 @@ Deno.serve(async (req) => {
       const testo = String(b.testo || "").trim().slice(0, 1500);
       if (!testo) return json({ error: "Incarico vuoto" }, 400);
       const quando = b.quando ? daRoma(String(b.quando)) || (isNaN(Date.parse(b.quando)) ? null : new Date(b.quando).toISOString()) : null;
-      const { data: row, error } = await sb.from("incarichi").insert({ testo, quando, origine: b.origine || "chat", riservato: !!b.riservato }).select("*").single();
+      // ogni incarico aspetta la conferma di lui prima di consumare credito (salvo conferma già data)
+      const { data: row, error } = await sb.from("incarichi").insert({ testo, quando, origine: b.origine || "chat", riservato: !!b.riservato, stato: b.confermato ? "in_attesa" : "da_confermare" }).select("*").single();
       if (error) throw new Error(error.message);
-      if (!quando || new Date(quando).getTime() <= Date.now() + 60000) avvia(row.id);
+      if (b.confermato && (!quando || new Date(quando).getTime() <= Date.now() + 60000)) avvia(row.id);
+      return json({ incarico: row });
+    }
+    if (b.action === "conferma") {
+      const { data: row } = await sb.from("incarichi").update({ stato: "in_attesa" }).eq("id", b.id).eq("stato", "da_confermare").select("*").maybeSingle();
+      if (row && (!row.quando || new Date(row.quando).getTime() <= Date.now() + 60000)) avvia(row.id);
       return json({ incarico: row });
     }
     if (b.action === "annulla") {
-      await sb.from("incarichi").update({ stato: "annullato" }).eq("id", b.id).in("stato", ["in_attesa", "errore"]);
+      await sb.from("incarichi").update({ stato: "annullato" }).eq("id", b.id).in("stato", ["da_confermare", "in_attesa", "errore"]);
       return json({ ok: true });
     }
     return json({ error: "Azione sconosciuta" }, 400);
