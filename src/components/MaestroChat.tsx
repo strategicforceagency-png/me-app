@@ -1,7 +1,7 @@
 import { AlfredAvatar } from "./AlfredIcon";
 import { AlfredCall } from "./AlfredCall";
 import { AnimatePresence, motion } from "framer-motion";
-import { Eraser, Loader2, Mic, Phone, SendHorizontal, Volume2, VolumeX, X } from "lucide-react";
+import { Eraser, Loader2, Mic, Phone, SendHorizontal, Square, Volume2, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useApp } from "../lib/store";
 import { fn, supabase, learnMe, uploadImage } from "../lib/supabase";
@@ -68,27 +68,69 @@ const SUGGESTIONS = [
 /* ---------- voce ---------- */
 type SR = { lang: string; interimResults: boolean; continuous: boolean; start: () => void; stop: () => void; onresult: (e: { results: ArrayLike<ArrayLike<{ transcript: string }> & { isFinal: boolean }> }) => void; onend: () => void; onerror: () => void };
 const SpeechRec = (window as unknown as { SpeechRecognition?: new () => SR; webkitSpeechRecognition?: new () => SR }).SpeechRecognition || (window as unknown as { webkitSpeechRecognition?: new () => SR }).webkitSpeechRecognition;
-const plain = (t: string) => t.replace(/\*\*/g, "").replace(/^[-*]\s+/gm, "").replace(/^\d+\.\s+/gm, "").replace(/#+\s/g, "");
-function speak(text: string) {
-  if (!("speechSynthesis" in window)) return;
-  window.speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(plain(text));
-  u.lang = "it-IT";
-  const v = window.speechSynthesis.getVoices().filter((x) => x.lang.startsWith("it"));
-  // Alfred ha una voce maschile, pacata
-  const male = /luca|paolo|cosimo|diego|giorgio|roberto|marco|andrea|riccardo|male|uomo/i;
-  u.voice = v.find((x) => male.test(x.name) && /enhanced|premium|neural/i.test(x.name)) || v.find((x) => male.test(x.name)) || v.find((x) => /enhanced|premium/i.test(x.name)) || v[0] || null;
-  u.rate = 0.96;
-  u.pitch = 0.9;
-  window.speechSynthesis.speak(u);
+/* Lettura ad alta voce SOLO su richiesta, con la stessa voce maschile delle chiamate (Gemini TTS). */
+let lettore: HTMLAudioElement | null = null;
+const cache = new Map<string, string>();
+const voceSubs = new Set<(k: string | null, carica: boolean) => void>();
+let inLettura: string | null = null;
+const avvisa = (k: string | null, carica = false) => voceSubs.forEach((f) => f(k, carica));
+function wav(pcm: Uint8Array, rate = 24000) {
+  const h = new DataView(new ArrayBuffer(44));
+  const w = (o: number, t: string) => [...t].forEach((c, i) => h.setUint8(o + i, c.charCodeAt(0)));
+  w(0, "RIFF"); h.setUint32(4, 36 + pcm.length, true); w(8, "WAVE"); w(12, "fmt "); h.setUint32(16, 16, true); h.setUint16(20, 1, true); h.setUint16(22, 1, true);
+  h.setUint32(24, rate, true); h.setUint32(28, rate * 2, true); h.setUint16(32, 2, true); h.setUint16(34, 16, true); w(36, "data"); h.setUint32(40, pcm.length, true);
+  return new Blob([h.buffer, pcm], { type: "audio/wav" });
 }
-const getVoice = () => {
+function ferma() {
+  lettore?.pause();
+  inLettura = null;
+  avvisa(null);
+}
+async function speak(key: string, text: string, toast: (m: string) => void) {
+  if (inLettura === key) return ferma();
+  // il lettore si crea dentro il tocco, così iPhone permette la riproduzione anche dopo l'attesa
+  if (!lettore) lettore = new Audio();
+  lettore.pause();
+  lettore.src = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=";
+  lettore.play().catch(() => {});
+  inLettura = key;
+  avvisa(key, !cache.has(key));
   try {
-    return localStorage.getItem("habitus-maestro-voce") === "1";
-  } catch {
-    return false;
+    let url = cache.get(key);
+    if (!url) {
+      const r = await fn<{ mime: string; data: string }>("leggi", "", { testo: text });
+      const bin = Uint8Array.from(atob(r.data), (c) => c.charCodeAt(0));
+      const blob = /wav/i.test(r.mime) ? new Blob([bin], { type: "audio/wav" }) : wav(bin, Number(r.mime.match(/rate=(\d+)/)?.[1]) || 24000);
+      url = URL.createObjectURL(blob);
+      cache.set(key, url);
+    }
+    if (inLettura !== key) return;
+    lettore.src = url;
+    lettore.onended = () => ferma();
+    avvisa(key, false);
+    await lettore.play();
+  } catch (e) {
+    ferma();
+    toast((e as Error).message || "Alfred non riesce a leggere adesso");
   }
-};
+}
+function Ascolta({ id, text }: { id: string; text: string }) {
+  const app = useApp();
+  const [stato, setStato] = useState<{ k: string | null; carica: boolean }>({ k: inLettura, carica: false });
+  useEffect(() => {
+    const f = (k: string | null, carica: boolean) => setStato({ k, carica });
+    voceSubs.add(f);
+    return () => {
+      voceSubs.delete(f);
+    };
+  }, []);
+  const mio = stato.k === id;
+  return (
+    <button onClick={() => speak(id, text, app.toast)} className="mt-1.5 text-[11.5px] text-muted flex items-center gap-1 hover:text-gold">
+      {mio && stato.carica ? <Loader2 size={12} className="animate-spin" /> : mio ? <Square size={11} /> : <Volume2 size={12} />} {mio ? (stato.carica ? "Un attimo…" : "Ferma") : "Ascolta"}
+    </button>
+  );
+}
 
 export function MaestroChat() {
   const app = useApp();
@@ -96,7 +138,6 @@ export function MaestroChat() {
   const [msgs, setMsgs] = useState<Msg[] | null>(null);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
-  const [voice, setVoice] = useState(getVoice);
   const [listening, setListening] = useState(false);
   const [armed, setArmed] = useState(0);
   const faceRef = useRef<HTMLInputElement>(null);
@@ -149,7 +190,7 @@ export function MaestroChat() {
   useEffect(() => {
     if (!open) {
       rec.current?.stop();
-      window.speechSynthesis?.cancel();
+      ferma();
     }
   }, [open]);
 
@@ -170,7 +211,6 @@ export function MaestroChat() {
       const testo = inc ? `${r.answer}\n\n${inc}` : r.answer;
       setMsgs((m) => [...(m || []), { role: "model", text: testo }]);
       await supabase.from("maestro_messages").insert({ role: "model", text: testo });
-      if (voice) speak(r.answer);
       // ogni 6 domande Habitus aggiorna quello che sa di te
       if (((msgs || []).filter((x) => x.role === "user").length + 1) % 6 === 0) learnMe((sc) => app.setProfile({ scheda: sc }));
     } catch (e) {
@@ -185,7 +225,7 @@ export function MaestroChat() {
       rec.current?.stop();
       return;
     }
-    window.speechSynthesis?.cancel();
+    ferma();
     const r = new SpeechRec();
     r.lang = "it-IT";
     r.interimResults = true;
@@ -211,18 +251,6 @@ export function MaestroChat() {
     await supabase.from("maestro_messages").delete().gte("created_at", "1970-01-01");
     setMsgs([]);
     setArmed(0);
-  };
-
-  const toggleVoice = () => {
-    const v = !voice;
-    setVoice(v);
-    try {
-      localStorage.setItem("habitus-maestro-voce", v ? "1" : "0");
-    } catch {
-      /* */
-    }
-    if (!v) window.speechSynthesis?.cancel();
-    app.toast(v ? "Alfred leggerà le risposte ad alta voce" : "Lettura ad alta voce disattivata");
   };
 
   if (app.quizOpen) return null;
@@ -266,9 +294,6 @@ export function MaestroChat() {
               </div>
               <button onClick={() => setCall(true)} className="h-9 w-9 grid place-items-center rounded-full bg-gold/20 text-gold hover:bg-gold/30" aria-label="Chiama Alfred" title="Chiama Alfred">
                 <Phone size={17} />
-              </button>
-              <button onClick={toggleVoice} className="h-9 w-9 grid place-items-center rounded-full hover:bg-white/10" aria-label="Lettura ad alta voce">
-                {voice ? <Volume2 size={18} className="text-gold" /> : <VolumeX size={18} className="opacity-70" />}
               </button>
               {!!msgs?.length && (
                 <button onClick={clear} className="h-9 w-9 grid place-items-center rounded-full hover:bg-white/10" aria-label="Cancella conversazione">
@@ -319,11 +344,7 @@ export function MaestroChat() {
                     <AlfredAvatar size={28} className="shrink-0 mt-0.5" />
                     <div className="max-w-[88%] rounded-[18px] rounded-tl-[6px] bg-surface shadow-soft px-3.5 py-2.5 text-[14.5px] leading-relaxed">
                       <AlfredText text={m.text} />
-                      {"speechSynthesis" in window && (
-                        <button onClick={() => speak(dividi(m.text).voce || m.text)} className="mt-1.5 text-[11.5px] text-muted flex items-center gap-1 hover:text-gold">
-                          <Volume2 size={12} /> Ascolta
-                        </button>
-                      )}
+                      <Ascolta id={m.id || String(i)} text={dividi(m.text).voce || m.text} />
                     </div>
                   </div>
                 ),
