@@ -14,6 +14,33 @@ const WS = "wss://generativelanguage.googleapis.com/ws/google.ai.generativelangu
 
 const WORKLET = `class Mic extends AudioWorkletProcessor{process(i){const c=i[0]&&i[0][0];if(c)this.port.postMessage(c.slice(0));return true}}registerProcessor('habitus-mic',Mic)`;
 
+/**
+ * Il microfono resta "in attesa" qualche minuto dopo la chiamata: sull'iPhone le app web
+ * richiedono il permesso ogni volta che il microfono viene spento del tutto.
+ */
+let micStream: MediaStream | null = null;
+let micTimer: ReturnType<typeof setTimeout> | null = null;
+const MIC_ATTESA = 5 * 60000;
+async function prendiMicrofono() {
+  if (micTimer) clearTimeout(micTimer);
+  micTimer = null;
+  if (micStream && micStream.getAudioTracks().some((t) => t.readyState === "live")) {
+    micStream.getAudioTracks().forEach((t) => (t.enabled = true));
+    return micStream;
+  }
+  micStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 } });
+  return micStream;
+}
+function rilasciaMicrofono() {
+  if (!micStream) return;
+  micStream.getAudioTracks().forEach((t) => (t.enabled = false));
+  if (micTimer) clearTimeout(micTimer);
+  micTimer = setTimeout(() => {
+    micStream?.getTracks().forEach((t) => t.stop());
+    micStream = null;
+  }, MIC_ATTESA);
+}
+
 function toB64(bytes: Uint8Array) {
   let s = "";
   for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
@@ -108,7 +135,8 @@ export function AlfredCall({ open, onClose }: { open: boolean; onClose: () => vo
     } catch {
       /* */
     }
-    s.stream?.getTracks().forEach((t) => t.stop());
+    if (s.stream) rilasciaMicrofono();
+    s.stream = undefined;
     s.node?.disconnect();
     s.sources.forEach((x) => {
       try {
@@ -177,7 +205,7 @@ export function AlfredCall({ open, onClose }: { open: boolean; onClose: () => vo
         s.inCtx = new AC();
       }
       await Promise.all([s.outCtx.resume(), s.inCtx.resume()]);
-      s.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 } });
+      s.stream = await prendiMicrofono();
       const { token, setup, model, altri } = await fn<{ token: string; setup: unknown; model: string; altri: number }>("voce", "", { escludi: s.escludi });
       s.model = model;
       s.altri = altri;
@@ -226,7 +254,7 @@ export function AlfredCall({ open, onClose }: { open: boolean; onClose: () => vo
           s.pronto = true;
           setStato("linea");
           // Alfred risponde per primo, come al telefono
-          ws.send(JSON.stringify({ realtimeInput: { text: "(Il Signore ha appena chiamato. Rispondi al telefono.)" } }));
+          ws.send(JSON.stringify({ realtimeInput: { text: "(Ti sta chiamando lui, il tuo Signore: lo riconosci subito. Rispondi salutandolo per nome.)" } }));
           return;
         }
         const sc = m.serverContent;

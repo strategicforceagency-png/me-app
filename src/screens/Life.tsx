@@ -240,6 +240,9 @@ function PersonSheet({ person, onClose, onSaved }: { person: Partial<Person> | n
   const [idea, setIdea] = useState("");
   useEffect(() => setP(person ? { date: [], idee: [], relazione: "Partner", ...person, dettagli: person.dettagli || {} } : {}), [person]);
   const setD = (k: string, v: string) => setP((x) => ({ ...x, dettagli: { ...(x.dettagli || {}), [k]: v } }));
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [foto, setFoto] = useState<File | null>(null);
+  const [busyIdea, setBusyIdea] = useState(false);
   if (!person) return <Sheet open={false} onClose={onClose}>{null}</Sheet>;
   const set = (x: Partial<Person>) => setP((v) => ({ ...v, ...x }));
   const row = () => ({ nome: (p.nome || "").trim(), relazione: p.relazione || "Partner", date: (p.date || []).filter((d) => d.data), gusti: p.gusti || null, non_piace: p.non_piace || null, taglie: p.taglie || null, dettagli: p.dettagli || {}, idee: p.idee || [], note: p.note || null, pensierino_ogni: p.pensierino_ogni || null, ultimo_pensierino: p.ultimo_pensierino || null, serata_ogni: p.serata_ogni || null, ultima_serata: p.ultima_serata || null });
@@ -264,9 +267,6 @@ function PersonSheet({ person, onClose, onSaved }: { person: Partial<Person> | n
     onSaved();
     onClose();
   };
-  const fileRef = useRef<HTMLInputElement>(null);
-  const [foto, setFoto] = useState<File | null>(null);
-  const [busyIdea, setBusyIdea] = useState(false);
   const addIdea = async () => {
     const txt = idea.trim();
     const link = txt.match(/https?:\/\/\S+/)?.[0] || null;
