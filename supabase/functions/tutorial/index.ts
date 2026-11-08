@@ -184,7 +184,7 @@ async function disegna(parts: unknown[]) {
     const j = await r.json().catch(() => ({}));
     if (!r.ok) {
       last = j?.error?.message || `Errore ${r.status}`;
-      if (r.status === 429 || /quota|billing|free tier/i.test(last)) quota = true;
+      if (r.status === 429 || r.status === 402 || /quota|billing|free tier|credits/i.test(last)) quota = true;
       continue;
     }
     // deno-lint-ignore no-explicit-any
@@ -193,7 +193,7 @@ async function disegna(parts: unknown[]) {
     if (d?.data) return { mime: (d.mime_type || d.mimeType || "image/png") as string, data: d.data as string };
     last = "Il modello non ha restituito un'immagine";
   }
-  throw Object.assign(new Error(quota ? "Le illustrazioni richiedono la fatturazione attiva su Google AI Studio." : last), { code: quota ? "QUOTA" : "ERR" });
+  throw Object.assign(new Error(quota ? "Le illustrazioni richiedono credito attivo su Google AI Studio." : last), { code: quota ? "QUOTA" : "ERR" });
 }
 
 // deno-lint-ignore no-explicit-any
@@ -249,6 +249,8 @@ async function passo(admin: SupabaseClient, secret: string, c: Catena) {
   c.creati ||= 0;
   c.errori ||= 0;
   if (c.errori > 8) return { stop: "troppi errori" };
+  // segnale "catena attiva": evita che due aperture dell'app ne avviino due in parallelo
+  await admin.from("app_secrets").upsert({ name: `catena:${c.user_id}`, value: new Date().toISOString() });
   // 0) guide appena scritte: verifica online prima di pubblicarle
   const { data: daVer } = await admin.from("tutorials").select("*").eq("user_id", c.user_id).not("lezione", "is", null).eq("stato", "proposta").order("created_at").limit(5);
   const v = (daVer || []).find((x) => (x.verifica?.tentativi || 0) < 3);
@@ -337,10 +339,14 @@ Deno.serve(async (req) => {
     const { data: { user } } = await sb.auth.getUser(auth.replace("Bearer ", ""));
     if (!user || !sec) return new Response(JSON.stringify({ error: "Non autenticato" }), { status: 401, headers: { ...CORS, "Content-Type": "application/json" } });
     const b = await req.json().catch(() => ({}));
+    const { data: lock } = await admin.from("app_secrets").select("value").eq("name", `catena:${user.id}`).maybeSingle();
+    if (lock && Date.now() - Date.parse(lock.value) < 4 * 60000) return new Response(JSON.stringify({ ok: true, gia_in_corso: true }), { headers: { ...CORS, "Content-Type": "application/json" } });
     const { data: gia } = await admin.from("tutorials").select("lezione").eq("user_id", user.id).not("lezione", "is", null);
     const fatte = new Set((gia || []).map((x: { lezione: string }) => x.lezione));
     const coda = ((Array.isArray(b.lezioni) ? b.lezioni : []) as Lez[]).slice(0, 80).filter((l) => !fatte.has(`${l.corso}/${l.id}`));
-    if (coda.length) prossimo(sec.value, { user_id: user.id, coda });
+    const { count: sospese } = await admin.from("tutorials").select("id", { count: "exact", head: true }).eq("user_id", user.id).not("lezione", "is", null).or("stato.eq.proposta,and(stato.eq.approvato,img_status.in.(da_fare,in_corso,bloccato))");
+    if (sospese) await admin.from("tutorials").update({ img_status: "da_fare" }).eq("user_id", user.id).not("lezione", "is", null).eq("img_status", "bloccato");
+    if (coda.length || sospese) prossimo(sec.value, { user_id: user.id, coda });
     return new Response(JSON.stringify({ ok: true, in_coda: coda.length }), { headers: { ...CORS, "Content-Type": "application/json" } });
   }
   try {

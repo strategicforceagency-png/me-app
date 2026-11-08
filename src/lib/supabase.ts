@@ -299,6 +299,13 @@ async function makeTransparent(url: string): Promise<string> {
 }
 
 /* ---------- chiamata generica a una edge function con sotto-percorso ---------- */
+/** Gli errori di Google arrivano in inglese: si traducono in qualcosa di comprensibile. */
+export function traduciErrore(m: string) {
+  if (/prepayment credits are depleted|credits? (are |is )?(depleted|exhausted)|billing account|402/i.test(m)) return "Il credito di Google AI è finito: lo ricarichi su aistudio.google.com (Billing › Buy credits) e Alfred torna operativo subito.";
+  if (/quota|resource.?exhausted|rate limit|429/i.test(m)) return "Google AI è momentaneamente al limite di richieste: riprovi tra un minuto.";
+  if (/overloaded|unavailable|503|high demand/i.test(m)) return "Google AI è sovraccarico in questo momento: riprovi tra poco.";
+  return m;
+}
 export async function fn<T = any>(name: string, path: string, body: unknown = {}): Promise<T> {
   const { data } = await supabase.auth.getSession();
   const r = await fetch(`${SUPABASE_URL}/functions/v1/${name}${path ? "/" + path : ""}`, {
@@ -307,7 +314,7 @@ export async function fn<T = any>(name: string, path: string, body: unknown = {}
     body: JSON.stringify(body),
   });
   const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw new AiError(j.error || `Errore ${r.status}`, j.code);
+  if (!r.ok) throw new AiError(traduciErrore(j.error || `Errore ${r.status}`), j.code);
   return j as T;
 }
 

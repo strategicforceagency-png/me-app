@@ -377,9 +377,10 @@ export function LessonTutorial({ lezione }: { lezione: string }) {
 
 /** Una volta per dispositivo: chiede al server di creare (in background) i tutorial illustrati delle lezioni pratiche. */
 export function avviaLibreria() {
-  const K = "habitus-libreria-tutorial-v1";
+  // al massimo ogni 6 ore per dispositivo: riprende anche il lavoro interrotto (es. credito finito)
+  const K = "habitus-libreria-tutorial-v2";
   try {
-    if (localStorage.getItem(K)) return;
+    if (Date.now() - Number(localStorage.getItem(K) || 0) < 6 * 3600000) return;
     localStorage.setItem(K, String(Date.now()));
   } catch {
     return;
