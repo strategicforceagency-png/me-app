@@ -200,7 +200,8 @@ Rispondi SOLO con JSON valido in italiano:
     const vai = VAI.includes(out.vai) ? out.vai : "alfred";
     const esito = String(out.esito || "").trim() + (senza_ricerca ? "\n\n_La ricerca web di Google oggi non era disponibile: ho usato ciò che so, verifichi prezzi e disponibilità._" : "");
     await admin.from("incarichi").update({ stato: "fatto", esito, breve: String(out.breve || "").slice(0, 200), vai, fonti, fatto_at: new Date().toISOString() }).eq("id", id);
-    if (!t.riservato) await admin.from("maestro_messages").insert({ user_id: t.user_id, role: "model", text: `${String(out.sintesi || out.breve || "").trim()}\n\n📋 **Incarico svolto** — ${t.testo}\n\n${esito}` });
+    // anche dalle chiamate riservate: la telefonata non si salva, ma il risultato richiesto sì
+    await admin.from("maestro_messages").insert({ user_id: t.user_id, role: "model", text: `${String(out.sintesi || out.breve || "").trim()}\n\n📋 **Incarico svolto** — ${t.testo}\n\n${esito}` });
     if (out.seguito?.testo) {
       const quando = daRoma(out.seguito.quando);
       if (quando && new Date(quando).getTime() > Date.now()) await admin.from("incarichi").insert({ user_id: t.user_id, testo: String(out.seguito.testo), quando, origine: "seguito", riservato: t.riservato });
