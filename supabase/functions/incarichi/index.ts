@@ -58,7 +58,9 @@ type Fonte = { titolo: string; url: string };
 const CLAUDE_MODEL = Deno.env.get("CLAUDE_MODEL") || "claude-sonnet-5-5";
 type CMsg = { role: "user" | "assistant"; content: string };
 /** Chiama Claude. Con cerca=true usa la ricerca web di Anthropic. Restituisce testo e fonti consultate. */
-async function claude(system: string, messages: CMsg[], opts: { cerca?: boolean; max?: number; ms?: number } = {}) {
+// prezzi Sonnet 5.5 (USD per milione di token) e ricerca web (USD per ricerca)
+const PREZZO = { in: 2, out: 10, cache: 0.1, ricerca: 0.01 };
+async function claude(system: string, messages: CMsg[], opts: { cerca?: boolean; max?: number; ms?: number; log?: (u: Record<string, unknown>) => unknown } = {}) {
   const k = (Deno.env.get("ANTHROPIC_API_KEY") || "").trim();
   if (!k) throw new Error("Claude non configurato");
   const r = await fetch("https://api.anthropic.com/v1/messages", {
@@ -75,6 +77,16 @@ async function claude(system: string, messages: CMsg[], opts: { cerca?: boolean;
   });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(j?.error?.message || `Claude: errore ${r.status}`);
+  {
+    const u = j.usage || {};
+    const ricerche = u.server_tool_use?.web_search_requests || 0;
+    const costo = ((u.input_tokens || 0) * PREZZO.in + (u.output_tokens || 0) * PREZZO.out + (u.cache_read_input_tokens || 0) * PREZZO.cache) / 1e6 + ricerche * PREZZO.ricerca;
+    try {
+      await opts.log?.({ modello: CLAUDE_MODEL, input: u.input_tokens || 0, output: u.output_tokens || 0, cache_read: u.cache_read_input_tokens || 0, ricerche, costo });
+    } catch {
+      /* il contatore non deve mai bloccare la risposta */
+    }
+  }
   // deno-lint-ignore no-explicit-any
   const blocchi = (j.content || []) as any[];
   const testo = blocchi.filter((b) => b.type === "text").map((b) => b.text).join("").trim();
@@ -151,17 +163,17 @@ async function ricerca(domanda: string): Promise<{ testo: string; fonti: Fonte[]
   throw new Error(last);
 }
 /** Prima cerca davvero sul web (in prosa), poi scrive il resoconto in JSON partendo da ciò che ha trovato. */
-async function ask(prompt: string, incarico: string) {
+async function ask(prompt: string, incarico: string, log?: (u: Record<string, unknown>) => unknown) {
   // con Claude: ricerca web vera e resoconto in un'unica passata, poi lo si chiede in JSON
   try {
     const cerca = await claude(
       "Sei l'assistente di ricerca di un maggiordomo. Usa la ricerca web per trovare informazioni aggiornate e verificabili (orari, giorni di apertura, prezzi, disponibilità, recensioni, indirizzi, telefoni, alternative). Riporta solo fatti trovati, con il sito da cui vengono. Rispondi in italiano.",
       [{ role: "user", content: `Oggi è ${oraRoma()}. Incarico: «${incarico}»` }],
-      { cerca: true, max: 3000, ms: 120000 },
+      { cerca: true, max: 3000, ms: 120000, log },
     );
     const scritto = await claude("Rispondi esclusivamente con un oggetto JSON valido, senza testo prima o dopo e senza blocchi di codice.", [
       { role: "user", content: `${prompt}\n\nRICERCA WEB APPENA FATTA (usa questi fatti, non inventarne altri; se qualcosa non risulta, dillo):\n${cerca.testo.slice(0, 12000)}` },
-    ], { max: 3000 });
+    ], { max: 3000, log });
     const out = parseJson(scritto.testo);
     if (out?.esito) return { out, fonti: cerca.fonti, senza_ricerca: cerca.fonti.length === 0 };
   } catch (e) {
@@ -243,7 +255,7 @@ Rispondi SOLO con JSON valido in italiano:
 "breve":"testo della notifica, max 140 caratteri, con la cosa più importante",
 "vai":"la sezione dell'app più utile per proseguire, una tra ${VAI.join(", ")}",
 "seguito":null oppure {"testo":"un eventuale incarico successivo che lui ha chiesto (es. ricordarglielo più avanti)","quando":"YYYY-MM-DDTHH:MM ora italiana"}}`;
-    const { out, fonti, senza_ricerca } = await ask(prompt, t.testo);
+    const { out, fonti, senza_ricerca } = await ask(prompt, t.testo, (u) => admin.from("uso_ai").insert({ user_id: t.user_id, funzione: "incarico", ...u }));
     const vai = VAI.includes(out.vai) ? out.vai : "alfred";
     const esito = String(out.esito || "").trim() + (senza_ricerca ? "\n\n_La ricerca web di Google oggi non era disponibile: ho usato ciò che so, verifichi prezzi e disponibilità._" : "");
     await admin.from("incarichi").update({ stato: "fatto", esito, breve: String(out.breve || "").slice(0, 200), vai, fonti, fatto_at: new Date().toISOString() }).eq("id", id);

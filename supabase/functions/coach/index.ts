@@ -46,7 +46,9 @@ async function models(key: string) {
 const CLAUDE_MODEL = Deno.env.get("CLAUDE_MODEL") || "claude-sonnet-5-5";
 type CMsg = { role: "user" | "assistant"; content: string };
 /** Chiama Claude. Con cerca=true usa la ricerca web di Anthropic. Restituisce testo e fonti consultate. */
-async function claude(system: string, messages: CMsg[], opts: { cerca?: boolean; max?: number; ms?: number } = {}) {
+// prezzi Sonnet 5.5 (USD per milione di token) e ricerca web (USD per ricerca)
+const PREZZO = { in: 2, out: 10, cache: 0.1, ricerca: 0.01 };
+async function claude(system: string, messages: CMsg[], opts: { cerca?: boolean; max?: number; ms?: number; log?: (u: Record<string, unknown>) => unknown } = {}) {
   const k = (Deno.env.get("ANTHROPIC_API_KEY") || "").trim();
   if (!k) throw new Error("Claude non configurato");
   const r = await fetch("https://api.anthropic.com/v1/messages", {
@@ -63,6 +65,16 @@ async function claude(system: string, messages: CMsg[], opts: { cerca?: boolean;
   });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(j?.error?.message || `Claude: errore ${r.status}`);
+  {
+    const u = j.usage || {};
+    const ricerche = u.server_tool_use?.web_search_requests || 0;
+    const costo = ((u.input_tokens || 0) * PREZZO.in + (u.output_tokens || 0) * PREZZO.out + (u.cache_read_input_tokens || 0) * PREZZO.cache) / 1e6 + ricerche * PREZZO.ricerca;
+    try {
+      await opts.log?.({ modello: CLAUDE_MODEL, input: u.input_tokens || 0, output: u.output_tokens || 0, cache_read: u.cache_read_input_tokens || 0, ricerche, costo });
+    } catch {
+      /* il contatore non deve mai bloccare la risposta */
+    }
+  }
   // deno-lint-ignore no-explicit-any
   const blocchi = (j.content || []) as any[];
   const testo = blocchi.filter((b) => b.type === "text").map((b) => b.text).join("").trim();
@@ -184,7 +196,7 @@ Il suo quaderno (insegnamenti che ha raccolto da contenuti esterni, verificati e
     // prima Claude; se non risponde si passa a Gemini
     try {
       const cm: CMsg[] = contents.map((c: { role: string; parts: { text: string }[] }) => ({ role: c.role === "model" ? "assistant" : "user", content: c.parts[0].text }));
-      const r = await claude(system, cm, { max: 1500, ms: 60000 });
+      const r = await claude(system, cm, { max: 1500, ms: 60000, log: (u) => sb.from("uso_ai").insert({ funzione: "alfred", ...u }) });
       return json(await conIncarichi(r.testo));
     } catch (e) {
       console.log("claude non disponibile, uso gemini:", (e as Error).message);
