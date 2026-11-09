@@ -41,6 +41,39 @@ async function models(key: string) {
   return textModels;
 }
 
+
+/* ---------- Claude (Anthropic): motore principale per il testo; Gemini resta di riserva ---------- */
+const CLAUDE_MODEL = Deno.env.get("CLAUDE_MODEL") || "claude-sonnet-5-5";
+type CMsg = { role: "user" | "assistant"; content: string };
+/** Chiama Claude. Con cerca=true usa la ricerca web di Anthropic. Restituisce testo e fonti consultate. */
+async function claude(system: string, messages: CMsg[], opts: { cerca?: boolean; max?: number; ms?: number } = {}) {
+  const k = (Deno.env.get("ANTHROPIC_API_KEY") || "").trim();
+  if (!k) throw new Error("Claude non configurato");
+  const r = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "x-api-key": k, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+    signal: AbortSignal.timeout(opts.ms || 90000),
+    body: JSON.stringify({
+      model: CLAUDE_MODEL,
+      max_tokens: opts.max || 2000,
+      system,
+      messages,
+      ...(opts.cerca ? { tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 5 }] } : {}),
+    }),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j?.error?.message || `Claude: errore ${r.status}`);
+  // deno-lint-ignore no-explicit-any
+  const blocchi = (j.content || []) as any[];
+  const testo = blocchi.filter((b) => b.type === "text").map((b) => b.text).join("").trim();
+  const fonti: { titolo: string; url: string }[] = [];
+  for (const b of blocchi)
+    if (b.type === "web_search_tool_result" && Array.isArray(b.content))
+      for (const x of b.content) if (x.url && !fonti.some((f) => f.url === x.url)) fonti.push({ titolo: x.title || new URL(x.url).hostname, url: x.url });
+  if (!testo) throw new Error("Claude: risposta vuota");
+  return { testo, fonti: fonti.slice(0, 8), troncata: j.stop_reason === "max_tokens" };
+}
+
 // deno-lint-ignore no-explicit-any
 const schedaText = (s: any) => (s?.ritratto || s?.fatti?.length ? `${s.ritratto || ""} ${(s.fatti || []).map((f: { testo: string; cat: string }) => `[${f.cat}] ${f.testo}`).join("; ")}`.slice(0, 3500) : "ancora vuota");
 
@@ -148,6 +181,14 @@ Il suo quaderno (insegnamenti che ha raccolto da contenuti esterni, verificati e
       return { answer: raw.replace(re, "").replace(/\n{3,}/g, "\n\n").trim(), incarichi };
     };
 
+    // prima Claude; se non risponde si passa a Gemini
+    try {
+      const cm: CMsg[] = contents.map((c: { role: string; parts: { text: string }[] }) => ({ role: c.role === "model" ? "assistant" : "user", content: c.parts[0].text }));
+      const r = await claude(system, cm, { max: 1500, ms: 60000 });
+      return json(await conIncarichi(r.testo));
+    } catch (e) {
+      console.log("claude non disponibile, uso gemini:", (e as Error).message);
+    }
     let last = "Nessun modello AI disponibile";
     let riserva = "";
     for (const m of ordina(await models(key))) {

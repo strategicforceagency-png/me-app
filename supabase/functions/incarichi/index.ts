@@ -54,6 +54,38 @@ function parseJson(t: string) {
   }
 }
 type Fonte = { titolo: string; url: string };
+/* ---------- Claude (Anthropic): motore principale per il testo; Gemini resta di riserva ---------- */
+const CLAUDE_MODEL = Deno.env.get("CLAUDE_MODEL") || "claude-sonnet-5-5";
+type CMsg = { role: "user" | "assistant"; content: string };
+/** Chiama Claude. Con cerca=true usa la ricerca web di Anthropic. Restituisce testo e fonti consultate. */
+async function claude(system: string, messages: CMsg[], opts: { cerca?: boolean; max?: number; ms?: number } = {}) {
+  const k = (Deno.env.get("ANTHROPIC_API_KEY") || "").trim();
+  if (!k) throw new Error("Claude non configurato");
+  const r = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "x-api-key": k, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+    signal: AbortSignal.timeout(opts.ms || 90000),
+    body: JSON.stringify({
+      model: CLAUDE_MODEL,
+      max_tokens: opts.max || 2000,
+      system,
+      messages,
+      ...(opts.cerca ? { tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 5 }] } : {}),
+    }),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j?.error?.message || `Claude: errore ${r.status}`);
+  // deno-lint-ignore no-explicit-any
+  const blocchi = (j.content || []) as any[];
+  const testo = blocchi.filter((b) => b.type === "text").map((b) => b.text).join("").trim();
+  const fonti: { titolo: string; url: string }[] = [];
+  for (const b of blocchi)
+    if (b.type === "web_search_tool_result" && Array.isArray(b.content))
+      for (const x of b.content) if (x.url && !fonti.some((f) => f.url === x.url)) fonti.push({ titolo: x.title || new URL(x.url).hostname, url: x.url });
+  if (!testo) throw new Error("Claude: risposta vuota");
+  return { testo, fonti: fonti.slice(0, 8), troncata: j.stop_reason === "max_tokens" };
+}
+
 // deno-lint-ignore no-explicit-any
 async function ask0(prompt: string, search: boolean): Promise<{ out: any; fonti: Fonte[] }> {
   let last = "Nessun modello AI disponibile";
@@ -120,6 +152,21 @@ async function ricerca(domanda: string): Promise<{ testo: string; fonti: Fonte[]
 }
 /** Prima cerca davvero sul web (in prosa), poi scrive il resoconto in JSON partendo da ciò che ha trovato. */
 async function ask(prompt: string, incarico: string) {
+  // con Claude: ricerca web vera e resoconto in un'unica passata, poi lo si chiede in JSON
+  try {
+    const cerca = await claude(
+      "Sei l'assistente di ricerca di un maggiordomo. Usa la ricerca web per trovare informazioni aggiornate e verificabili (orari, giorni di apertura, prezzi, disponibilità, recensioni, indirizzi, telefoni, alternative). Riporta solo fatti trovati, con il sito da cui vengono. Rispondi in italiano.",
+      [{ role: "user", content: `Oggi è ${oraRoma()}. Incarico: «${incarico}»` }],
+      { cerca: true, max: 3000, ms: 120000 },
+    );
+    const scritto = await claude("Rispondi esclusivamente con un oggetto JSON valido, senza testo prima o dopo e senza blocchi di codice.", [
+      { role: "user", content: `${prompt}\n\nRICERCA WEB APPENA FATTA (usa questi fatti, non inventarne altri; se qualcosa non risulta, dillo):\n${cerca.testo.slice(0, 12000)}` },
+    ], { max: 3000 });
+    const out = parseJson(scritto.testo);
+    if (out?.esito) return { out, fonti: cerca.fonti, senza_ricerca: cerca.fonti.length === 0 };
+  } catch (e) {
+    console.log("claude non disponibile, uso gemini:", (e as Error).message);
+  }
   let trovato: { testo: string; fonti: Fonte[] } | null = null;
   try {
     trovato = await ricerca(`Sei l'assistente di ricerca di un maggiordomo. Cerca online tutto ciò che serve per svolgere questo incarico, con informazioni aggiornate e verificabili (orari, giorni di apertura, prezzi, disponibilità, recensioni, indirizzi, alternative). Riporta i fatti trovati citando i siti, senza inventare nulla. Oggi è ${oraRoma()}. Incarico: «${incarico}»`);
