@@ -105,7 +105,7 @@ type HRow = { day: string; metric: string; value: number; source: string; extra:
 
 async function healthData(sb: ReturnType<typeof admin>, uid: string, today: string) {
   const since = new Date(Date.parse(today) - 40 * 86400000).toISOString().slice(0, 10);
-  const { data } = await sb.from("health_metrics").select("day, metric, value, source, extra, updated_at").eq("user_id", uid).gte("day", since).in("metric", ["sleep_hours", "hrv", "rhr", "steps", "exercise_min", "time_in_daylight", "recovery"]).order("day");
+  const { data } = await sb.from("health_metrics").select("day, metric, value, source, extra, updated_at").eq("user_id", uid).gte("day", since).in("metric", ["sleep_hours", "hrv", "rhr", "steps", "exercise_min", "time_in_daylight", "recovery", "resp_rate", "apple_sleeping_wrist_temperature", "skin_temp", "headphone_audio_exposure"]).order("day");
   const by: Record<string, HRow[]> = {};
   for (const r of (data || []) as HRow[]) {
     const a = (by[r.metric] ||= []);
@@ -116,6 +116,24 @@ async function healthData(sb: ReturnType<typeof admin>, uid: string, today: stri
   return by;
 }
 const base = (a: HRow[] | undefined) => (a && a.length ? { last: a[a.length - 1], base: a.length > 5 ? med(a.slice(-31, -1).map((r) => r.value)) : NaN } : null);
+/** Segnali che il corpo sta combattendo qualcosa: confronto dell'ultima notte con la mediana del mese. */
+function segnali(d: Record<string, HRow[]>, day: string) {
+  const at = (k: string) => {
+    const a = d[k] || [];
+    const last = a[a.length - 1];
+    if (!last || last.day !== day) return null;
+    const prev = a.slice(-31, -1).map((r) => r.value);
+    return prev.length >= 7 ? { v: last.value, b: med(prev) } : null;
+  };
+  const out: string[] = [];
+  let forti = 0;
+  const rhr = at("rhr"), hrv = at("hrv"), resp = at("resp_rate"), temp = at("skin_temp") || at("apple_sleeping_wrist_temperature");
+  if (rhr && rhr.v - rhr.b >= 5) { out.push(`battito a riposo +${Math.round(rhr.v - rhr.b)}`); forti++; }
+  if (temp && temp.v - temp.b >= 0.5) { out.push(`temperatura +${(temp.v - temp.b).toFixed(1)}°`); forti++; }
+  if (hrv && hrv.v <= hrv.b * 0.8) out.push(`HRV −${Math.round((1 - hrv.v / hrv.b) * 100)}%`);
+  if (resp && resp.v - resp.b >= 1) out.push(`respiro +${(resp.v - resp.b).toFixed(1)}/min`);
+  return { lista: out, allerta: out.length >= 3 || (forti >= 1 && out.length >= 2) || forti >= 2 };
+}
 function lettoMin(sleep: HRow[] | undefined) {
   const w = (sleep || []).slice(-14).filter((r) => r.extra?.start && r.extra?.end);
   if (w.length < 3) return null;
@@ -136,6 +154,8 @@ async function saluteTick(sb: ReturnType<typeof admin>, p: any, s: any, now: { d
   if (on("salute_passi_on") && win(17 * 60 + 30)) kinds.push("salute_passi");
   if (on("salute_settimana_on") && now.wd === 0 && win(18 * 60)) kinds.push("salute_settimana");
   if (on("salute_letto_on")) kinds.push("salute_letto");
+  if (on("salute_allerta_on") && now.min >= 6 * 60 && now.min < 13 * 60) kinds.push("salute_allerta");
+  if (on("salute_cuffie_on") && win(21 * 60)) kinds.push("salute_cuffie");
   if (!kinds.length) return out;
   // già inviate oggi?
   const { data: sent } = await sb.from("push_log").select("kind").eq("user_id", p.id).eq("day", now.day).in("kind", kinds);
@@ -165,13 +185,23 @@ async function saluteTick(sb: ReturnType<typeof admin>, p: any, s: any, now: { d
       const score = rec ? Math.round(rec.value) : Math.round(parts.reduce((a, x) => a + x.v * x.w, 0) / parts.reduce((a, x) => a + x.w, 0));
       const rd = r && isFinite(r.base) ? r.last.value - r.base : 0;
       const debt = (d.sleep_hours || []).slice(-7).reduce((a, x) => a + Math.max(0, SONNO_OB - x.value), 0);
-      const lm = lettoMin(d.sleep_hours);
       let consiglio: string;
       if (score >= 70) consiglio = "Hai recuperato bene: buona giornata per spingere in allenamento.";
       else if (score >= 45) consiglio = sl.value < 6 ? "Giornata moderata. Caffè solo entro le 14 e 10 minuti di sole stamattina." : "Giornata moderata: allenati, ma senza cercare il massimo.";
       else consiglio = `${rd >= 5 ? "Battito a riposo alto: " : ""}oggi recupero. Camminata, acqua, niente alcol stasera.`;
-      const sera = sl.value < 6.5 && lm != null ? ` Stasera a letto alle ${hhmmS(lm)}.` : "";
+      const sera = sl.value < 6 ? " Se riesci, un pisolino di 20 minuti nel primo pomeriggio." : "";
       out.push({ kind, inApp: true, msg: { title: `Notte: ${hmS(sl.value)} · prontezza ${score}`, body: `${consiglio}${sera}${debt > 5 ? ` Debito della settimana: ${hmS(debt)}.` : ""}`, url: "./?vai=salute", tag: "salute" } });
+    }
+    if (kind === "salute_allerta") {
+      if (!todayV("sleep_hours") && !todayV("rhr")) continue;
+      const sg = segnali(d, now.day);
+      if (!sg.allerta) continue;
+      out.push({ kind, inApp: true, msg: { title: "Il corpo sta lavorando sodo", body: `Stanotte: ${sg.lista.join(", ")} rispetto alla tua media. Spesso succede 1-2 giorni prima di un malanno, o dopo stress e notti difficili. Oggi: acqua, niente alcol, allenamento leggero o riposo, e appena il piccolo dorme, dormi anche tu.`, url: "./?vai=salute", tag: "salute" } });
+    }
+    if (kind === "salute_cuffie") {
+      const h = todayV("headphone_audio_exposure");
+      if (!h || h.value < 80) continue;
+      out.push({ kind, msg: { title: "Volume alto in cuffia", body: `Oggi una media di ${Math.round(h.value)} dB. Sopra gli 80 l'udito si affatica: domani abbassa di un paio di tacche, le orecchie ringraziano.`, url: "./?vai=salute", tag: "salute" } });
     }
     if (kind === "salute_luce") {
       const l = todayV("time_in_daylight");
@@ -190,8 +220,8 @@ async function saluteTick(sb: ReturnType<typeof admin>, p: any, s: any, now: { d
       const lm = lettoMin(d.sleep_hours);
       if (lm == null || !win((lm - 45 + 1440) % 1440)) continue;
       const sl = d.sleep_hours?.[d.sleep_hours.length - 1];
-      const poco = sl && sl.value < 6.5 ? ` Ieri notte ${hmS(sl.value)}: stanotte recuperiamo.` : "";
-      out.push({ kind, msg: { title: `Tra 45 minuti a letto (${hhmmS(lm)})`, body: `Luci basse, telefono lontano, prepara i vestiti per domani.${poco}`, url: "./?vai=salute", tag: "salute" } });
+      const poco = sl && sl.value < 6.5 ? ` Ieri notte ${hmS(sl.value)}: ogni ora prima di mezzanotte vale doppio.` : "";
+      out.push({ kind, msg: { title: "Ora di staccare", body: `Luci basse e telefono lontano. Se il piccolo dorme, approfittane e vai a letto anche tu.${poco}`, url: "./?vai=salute", tag: "salute" } });
     }
     if (kind === "salute_settimana") {
       const avg = (k: string, from: number, to: number) => {
@@ -203,7 +233,7 @@ async function saluteTick(sb: ReturnType<typeof admin>, p: any, s: any, now: { d
       const bits = [`sonno medio ${hmS(s1)}${s0 != null ? ` (${s1 >= s0 ? "+" : "−"}${Math.round(Math.abs(s1 - s0) * 60)} min)` : ""}`];
       if (p1 != null) bits.push(`${Math.round(p1).toLocaleString("it-IT")} passi al giorno`);
       if (r1 != null && r0 != null) bits.push(`battito a riposo ${Math.round(r1)} bpm (${r1 <= r0 ? "in calo" : "in salita"})`);
-      const focus = s1 < 6.5 ? "La priorità della prossima settimana è il sonno: stessa ora a letto ogni sera." : p1 != null && p1 < 7000 ? "Prossima settimana: una camminata al giorno." : "Ottima settimana: continua così.";
+      const focus = s1 < 6.5 ? "Priorità della prossima settimana: a letto appena il piccolo si addormenta, e un pisolino quando puoi." : p1 != null && p1 < 7000 ? "Prossima settimana: una camminata al giorno." : "Ottima settimana: continua così.";
       out.push({ kind, inApp: true, msg: { title: "La tua settimana in salute", body: `${bits.join(" · ")}. ${focus}`, url: "./?vai=salute", tag: "salute" } });
     }
   }

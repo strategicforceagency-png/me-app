@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Activity, Apple, Bell, Check, ChevronDown, Copy, Dumbbell, Flame, Footprints, HeartPulse, Link2, Loader2, Moon, RefreshCw, Sun, Unlink } from "lucide-react";
+import { Activity, Apple, Bell, Check, ChevronDown, Copy, Dumbbell, Flame, Footprints, HeartPulse, Link2, Loader2, Moon, RefreshCw, ShieldCheck, Sun, Unlink } from "lucide-react";
 import { ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { PrimaryButton } from "../components/ui";
 import { useApp } from "../lib/store";
@@ -190,21 +190,24 @@ export function Health() {
                 </div>
                 {orario && (
                   <div className="rounded-[20px] bg-gold-tint border border-gold/30 p-5">
-                    <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-gold">Il tuo orario ideale</div>
-                    <div className="font-display text-[28px] font-semibold mt-1">A letto alle {orario.letto}</div>
+                    <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-gold">Il sonno con un neonato</div>
+                    <div className="font-display text-[26px] font-semibold mt-1">Ideale: a letto alle {orario.letto}</div>
                     <p className="text-[13.5px] text-muted mt-1 leading-snug">
-                      Di solito ti addormenti verso le {orario.addormentamento} e ti svegli alle {orario.sveglia}. Per arrivare a {hm(SONNO_OBIETTIVO)} di sonno vero serve coricarsi alle {orario.letto}: la sera ti avviso 45 minuti prima.
+                      Di solito ti addormenti verso le {orario.addormentamento} e ti svegli alle {orario.sveglia}. Con il piccolo le notti non le decidi tu: l'obiettivo è prendere il sonno quando arriva.
                     </p>
                     <ul className="mt-3 text-[13px] space-y-1.5">
-                      <li>• Stessa ora di sveglia anche nel weekend</li>
-                      <li>• Niente caffè dopo le 14, niente alcol nelle 3 ore prima</li>
-                      <li>• Luce del sole al mattino, luci basse e schermi giù la sera</li>
+                      <li>• Quando lui dorme la sera, vai a letto anche tu: niente telefono "solo cinque minuti"</li>
+                      <li>• Se avete il biberon, alternate le notti: un turno intero vale più di due mezzi</li>
+                      <li>• Un pisolino di 20 minuti nel primo pomeriggio, mai dopo le 16</li>
+                      <li>• Caffè solo entro le 14, niente alcol la sera</li>
                     </ul>
                   </div>
                 )}
               </div>
             </section>
           )}
+
+          {hasData && <Segnali series={series} />}
 
           {hasData && (
             <section className="mt-6">
@@ -229,6 +232,8 @@ export function Health() {
                     ["resp_rate", "Respiro di notte", (v: number) => `${v.toFixed(1)}/min`, "Se sale molto, spesso è stanchezza"],
                     ["spo2", "Ossigeno", (v: number) => `${Math.round(v)}%`, "Normale sopra il 95%"],
                     ["walking_speed", "Passo", (v: number) => `${v.toFixed(1)} km/h`, "Velocità di camminata"],
+                    ["breathing_disturbances", "Disturbi del respiro", (v: number) => v.toFixed(1), "Episodi/ora di notte: normale sotto 5"],
+                    ["headphone_audio_exposure", "Volume in cuffia", (v: number) => `${Math.round(v)} dB`, "Media del giorno: meglio sotto 80"],
                     ["weight", "Peso", (v: number) => `${v.toFixed(1)} kg`, ""],
                     ["body_fat", "Massa grassa", (v: number) => `${v.toFixed(1)}%`, ""],
                     ["strain", "Strain", (v: number) => v.toFixed(1), ""],
@@ -304,6 +309,55 @@ export function Health() {
   );
 }
 
+/** Battito, temperatura, respiro e HRV dell'ultima notte rispetto alla mediana del mese. */
+function Segnali({ series }: { series: Record<string, Row[]> }) {
+  const at = (k: string) => {
+    const a = series[k] || [];
+    const last = a[a.length - 1];
+    if (!last) return null;
+    const prev = a.slice(-31, -1).map((r) => r.value).sort((x, y) => x - y);
+    if (prev.length < 7) return null;
+    const m = Math.floor(prev.length / 2);
+    const b = prev.length % 2 ? prev[m] : (prev[m - 1] + prev[m]) / 2;
+    return { v: last.value, b, day: last.day };
+  };
+  const rhr = at("rhr"), temp = at("skin_temp") || at("apple_sleeping_wrist_temperature"), resp = at("resp_rate"), hrv = at("hrv");
+  const items = [
+    rhr && { label: "Battito a riposo", val: `${Math.round(rhr.v)} bpm`, d: `${rhr.v - rhr.b >= 0 ? "+" : "−"}${Math.abs(Math.round(rhr.v - rhr.b))} sulla media`, bad: rhr.v - rhr.b >= 5, strong: true },
+    temp && { label: "Temperatura notte", val: `${temp.v.toFixed(1)}°`, d: `${temp.v - temp.b >= 0 ? "+" : "−"}${Math.abs(temp.v - temp.b).toFixed(1)}° sulla media`, bad: temp.v - temp.b >= 0.5, strong: true },
+    resp && { label: "Respiro di notte", val: `${resp.v.toFixed(1)}/min`, d: `${resp.v - resp.b >= 0 ? "+" : "−"}${Math.abs(resp.v - resp.b).toFixed(1)} sulla media`, bad: resp.v - resp.b >= 1, strong: false },
+    hrv && { label: "HRV", val: `${Math.round(hrv.v)} ms`, d: `${hrv.v >= hrv.b ? "+" : "−"}${Math.abs(Math.round((hrv.v / hrv.b - 1) * 100))}% sulla media`, bad: hrv.v <= hrv.b * 0.8, strong: false },
+  ].filter(Boolean) as { label: string; val: string; d: string; bad: boolean; strong: boolean }[];
+  if (!items.length) return null;
+  const n = items.filter((x) => x.bad).length;
+  const forti = items.filter((x) => x.bad && x.strong).length;
+  const allerta = n >= 3 || (forti >= 1 && n >= 2) || forti >= 2;
+  return (
+    <section className="mt-6">
+      <SectionTitle icon={<ShieldCheck size={13} />}>Segnali del corpo</SectionTitle>
+      <div className={`mt-3 rounded-[20px] p-5 ${allerta ? "bg-danger-tint" : "bg-surface shadow-soft"}`}>
+        <div className="font-semibold text-[15.5px]">{allerta ? "Il corpo sta combattendo qualcosa" : n ? "Un segnale fuori dalla norma, niente di preoccupante" : "Tutto nella tua norma"}</div>
+        <p className="text-[13px] text-muted mt-1 leading-snug">
+          {allerta
+            ? "Spesso succede 1-2 giorni prima di un malanno, o dopo stress e notti difficili. Oggi acqua, niente alcol, allenamento leggero e appena puoi, dormi."
+            : "Confronto l'ultima notte con la tua media del mese. Se più segnali salgono insieme ti avviso al mattino."}
+        </p>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          {items.map((x) => (
+            <div key={x.label} className="rounded-[14px] bg-card px-3 py-2.5">
+              <div className="text-[11px] text-muted flex items-center gap-1">
+                <span className={`h-1.5 w-1.5 rounded-full ${x.bad ? "bg-[rgb(var(--bad))]" : "bg-[rgb(var(--ok))]"}`} /> {x.label}
+              </div>
+              <div className="text-[16px] font-semibold mt-0.5">{x.val}</div>
+              <div className="text-[10.5px] text-muted">{x.d}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function SectionTitle({ children, icon }: { children: ReactNode; icon?: ReactNode }) {
   return (
     <h2 className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted flex items-center gap-2">
@@ -371,10 +425,12 @@ function Goal({ label, icon, value, goal, fmt, avg }: { label: string; icon: Rea
 }
 
 const NOTIFICHE: { k: string; label: string; hint: (letto?: string) => string }[] = [
+  { k: "salute_allerta_on", label: "Allarme malanno", hint: () => "Al mattino, se battito, temperatura, respiro e HRV dicono che il corpo sta combattendo qualcosa" },
+  { k: "salute_cuffie_on", label: "Volume in cuffia", hint: () => "Alle 21 se in giornata hai ascoltato sopra gli 80 dB" },
   { k: "salute_mattina_on", label: "Com'è andata la notte", hint: () => "Al risveglio: sonno, prontezza e come impostare la giornata" },
   { k: "salute_luce_on", label: "Luce del giorno", hint: () => "Alle 13 se hai preso poco sole: 15 minuti fuori" },
   { k: "salute_passi_on", label: "Muoviti", hint: () => "Alle 17:30 se sei sotto i 5.000 passi" },
-  { k: "salute_letto_on", label: "Ora di staccare", hint: (l) => `45 minuti prima di andare a letto${l ? ` (alle ${l})` : ""}` },
+  { k: "salute_letto_on", label: "Ora di staccare", hint: (l) => `La sera${l ? ` verso le ${l.replace(/^(\d+):(\d+)$/, (_, h, m) => { const t = (+h * 60 + +m - 45 + 1440) % 1440; return `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`; })}` : ""}: luci basse, e se il piccolo dorme, a letto anche tu` },
   { k: "salute_settimana_on", label: "La settimana in salute", hint: () => "Domenica alle 18: sonno, passi e battito a confronto" },
 ];
 
