@@ -1,3 +1,4 @@
+import { jsonrepair } from "npm:jsonrepair@3.13.1";
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 
 /**
@@ -42,12 +43,17 @@ async function models(key: string) {
 }
 
 function parseJson(t: string) {
-  try {
-    return JSON.parse(t);
-  } catch {
-    const m = t.match(/\{[\s\S]*\}/);
-    return m ? JSON.parse(m[0]) : null;
+  const tries = [t, t.match(/\{[\s\S]*\}/)?.[0] || ""];
+  for (const x of tries) {
+    if (!x) continue;
+    try {
+      return JSON.parse(x);
+    } catch { /* provo a riparare */ }
+    try {
+      return JSON.parse(jsonrepair(x));
+    } catch { /* niente */ }
   }
+  return null;
 }
 
 const PILL = ["stile", "portamento", "linguaggio", "fisico", "salute", "grooming", "mente"];
@@ -109,13 +115,13 @@ function validate(p: any) {
 }
 
 // deno-lint-ignore no-explicit-any
-async function gemini(key: string, prompt: string): Promise<any> {
+async function gemini(key: string, prompt: string, ok?: (o: any) => boolean): Promise<any> {
   let last = "Nessun modello AI disponibile";
   for (const m of ordina(await models(key))) {
     const r = await gfetch(`${GEMINI}/${m}:generateContent?key=${key}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json", temperature: 0.7, maxOutputTokens: 24000 } }),
+      body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json", temperature: 0.7, maxOutputTokens: 32768 } }),
     }, 120000); // il percorso è lungo da scrivere: più tempo prima di cambiare modello
     const j = await r.json().catch(() => ({}));
     if (!r.ok) {
@@ -126,8 +132,8 @@ async function gemini(key: string, prompt: string): Promise<any> {
     // deno-lint-ignore no-explicit-any
     const text = (j.candidates?.[0]?.content?.parts || []).filter((p: any) => !p.thought).map((p: any) => p.text || "").join("");
     const out = parseJson(text);
-    if (out) return out;
-    last = "Risposta AI non valida";
+    if (out && (!ok || ok(out))) return out;
+    last = "Risposta AI non valida o incompleta, riprova";
   }
   throw new Error(/quota|exceeded|demand|overloaded|no longer available/i.test(last) ? "L'AI ha esaurito per ora la quota gratuita di Google: riprova tra qualche minuto (con la fatturazione attiva su Google AI Studio non ci sono limiti)" : last);
 }
@@ -264,7 +270,7 @@ Costruisci il SUO percorso personale di 12 settimane. Regole:
 Rispondi SOLO con JSON valido con questa struttura:
 {"archetipo":{"nome":"","descrizione":"","motto":"","icone":[""]},"ritratto":"2-3 frasi su chi è oggi e chi può diventare","pilastri":[{"id":"stile","punteggio":3,"diagnosi":"","obiettivo":"","priorita":1}],"fasi":[{"nome":"Fondamenta","da":1,"a":4,"focus":""}],"settimane":[{"n":1,"tema":"","missioni":[{"pilastro":"stile","titolo":"","dettaglio":"","lezione":null}]}],"abitudini":[{"titolo":"","pilastro":"salute","quando":"mattina","dalla_settimana":1,"minimo":""}],"prove":[{"settimana":4,"pilastro":"portamento","titolo":"","dettaglio":"","criteri":[""]}],"allenamento":{"obiettivo":"","sessioni":[{"giorno":"Lun","nome":"","durata_min":45,"riscaldamento":"","esercizi":[{"nome":"","serie":3,"ripetizioni":"8-10","recupero_s":90,"note":""}],"defaticamento":""}],"progressione":"","note":""},"alimentazione":{"obiettivo":"","principi":[""],"giornata_tipo":[{"pasto":"Colazione","esempio":""}],"da_limitare":[""],"idratazione":""},"guardaroba":{"direzione":"","strategia":"","essenziali":[{"nome":"","priorita":"alta","ricerca":"","budget":"","costo_stimato":80,"dove":""}],"regole":[""]}}`;
 
-    const path = validate(await gemini(key, prompt));
+    const path = validate(await gemini(key, prompt, (o) => !!o?.archetipo?.nome && Array.isArray(o.settimane) && o.settimane.length >= 8 && !!o.allenamento?.sessioni));
     const start = new Date().toISOString().slice(0, 10);
     const { error } = await sb.from("profiles").update({ path, path_started_at: b.keepStart ? undefined : start }).eq("id", user.id);
     if (error) throw new Error(error.message);
