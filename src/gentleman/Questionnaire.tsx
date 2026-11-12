@@ -34,7 +34,8 @@ const BUILDING = [
 export function Questionnaire({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
   const app = useApp();
   const [answers, setAnswers] = useState<Answers>(() => {
-    const d = loadDraft();
+    // le risposte già inviate (salvate nel profilo) + la bozza locale, che è più recente
+    const d: Answers = { ...((app.profile?.gentleman as Answers) || {}), ...loadDraft() };
     if (app.profile?.altezza && d.altezza == null) d.altezza = app.profile.altezza;
     if (app.profile?.peso && d.peso == null) d.peso = app.profile.peso;
     return d;
@@ -57,6 +58,15 @@ export function Questionnaire({ onClose, onDone }: { onClose: () => void; onDone
   const val = q ? answers[q.id] : undefined;
   const sectionIdx = q ? SEZIONI.findIndex((s) => s.id === q.sezione.id) : -1;
   const firstOfSection = q ? ALL_QUESTIONS.findIndex((x) => x.sezione.id === q.sezione.id) === i : false;
+
+  const answered = (x: (typeof ALL_QUESTIONS)[number], v: unknown) => {
+    if (x.tipo === "multi") return Array.isArray(v) && v.length > 0;
+    if (x.tipo === "text") return !!x.facoltativa || (typeof v === "string" && v.trim().length > 2);
+    if (x.tipo === "number") return typeof v === "number" || x.predefinito != null;
+    return v != null && v !== "";
+  };
+  const firstMissing = ALL_QUESTIONS.findIndex((x) => !answered(x, answers[x.id]));
+  const complete = firstMissing === -1;
 
   const valid = useMemo(() => {
     if (!q) return true;
@@ -184,9 +194,21 @@ export function Questionnaire({ onClose, onDone }: { onClose: () => void; onDone
                     </li>
                   ))}
                 </ul>
-                <button onClick={() => go(1)} className="mt-10 h-13 py-3.5 px-6 rounded-full bg-brand text-brand-fg font-semibold shadow-pill flex items-center justify-center gap-2 self-start">
-                  {Object.keys(answers).length > 2 ? "Riprendi" : "Iniziamo"} <ArrowRight size={18} />
-                </button>
+                {complete ? (
+                  <div className="mt-10 flex flex-col gap-3 self-start">
+                    <p className="text-[14px] text-muted">Hai già risposto a tutte le domande.</p>
+                    <button onClick={() => submit()} className="h-13 py-3.5 px-6 rounded-full bg-brand text-brand-fg font-semibold shadow-pill flex items-center justify-center gap-2">
+                      Costruisci il percorso con queste risposte <ArrowRight size={18} />
+                    </button>
+                    <button onClick={() => { setDir(1); setI(0); }} className="h-11 px-6 rounded-full bg-card text-[14px] font-medium">
+                      Rivedi le risposte
+                    </button>
+                  </div>
+                ) : (
+                  <button onClick={() => { setDir(1); setI(firstMissing > 0 ? firstMissing : 0); }} className="mt-10 h-13 py-3.5 px-6 rounded-full bg-brand text-brand-fg font-semibold shadow-pill flex items-center justify-center gap-2 self-start">
+                    {Object.keys(answers).length > 2 ? `Riprendi dalla domanda ${firstMissing + 1}` : "Iniziamo"} <ArrowRight size={18} />
+                  </button>
+                )}
               </motion.div>
             ) : (
               <motion.div
