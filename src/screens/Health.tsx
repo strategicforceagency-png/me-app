@@ -1,9 +1,12 @@
 import { motion } from "framer-motion";
-import { Activity, Apple, Check, ChevronDown, Copy, Dumbbell, Flame, Footprints, HeartPulse, Link2, Loader2, Moon, RefreshCw, Scale, Unlink, Waves, Zap } from "lucide-react";
+import { Activity, Apple, Bell, Check, ChevronDown, Copy, Dumbbell, Flame, Footprints, HeartPulse, Link2, Loader2, Moon, RefreshCw, Sun, Unlink } from "lucide-react";
 import { ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { PrimaryButton } from "../components/ui";
 import { useApp } from "../lib/store";
-import { supabase, SUPABASE_KEY, SUPABASE_URL } from "../lib/supabase";
+import { Reminders, supabase, SUPABASE_KEY, SUPABASE_URL } from "../lib/supabase";
+import { enablePush } from "../lib/push";
+import { DEFAULT_REMINDERS } from "../components/Reminders";
+import { consiglio, debito, ESERCIZIO_OBIETTIVO, LUCE_OBIETTIVO_MIN, luceMin, orari, PASSI_OBIETTIVO, prontezza, SONNO_OBIETTIVO, vsBase } from "../lib/salute";
 
 type Row = { day: string; metric: string; value: number; source: string; extra: Record<string, number | string> | null };
 type Workout = { ext_id: string; source: string; start_at: string; end_at: string; sport: string; strain: number | null; kcal: number | null; avg_hr: number | null; distance_m: number | null };
@@ -100,26 +103,30 @@ export function Health() {
   const last = (k: string) => series[k]?.[series[k].length - 1];
   const hasData = rows.length > 0;
   const appleLast = rows.filter((r) => r.source === "apple").map((r) => r.day).sort().pop();
+  const today = new Date().toLocaleDateString("sv-SE");
+  const todayOf = (k: string) => (last(k)?.day === today ? last(k)!.value : 0);
 
   const rec = last("recovery");
-  const tiles: { k: string; label: string; icon: ReactNode; fmt: (v: number) => string; sub?: (r: Row) => string | null }[] = [
-    { k: "sleep_hours", label: "Sonno", icon: <Moon size={16} />, fmt: hm, sub: () => (last("sleep_perf") ? `Performance ${Math.round(last("sleep_perf")!.value)}%` : null) },
-    { k: "hrv", label: "HRV", icon: <Waves size={16} />, fmt: (v) => `${Math.round(v)} ms` },
-    { k: "rhr", label: "FC a riposo", icon: <HeartPulse size={16} />, fmt: (v) => `${Math.round(v)} bpm` },
-    { k: "strain", label: "Strain", icon: <Zap size={16} />, fmt: (v) => v.toFixed(1) },
-    { k: "steps", label: "Passi", icon: <Footprints size={16} />, fmt: (v) => Math.round(v).toLocaleString("it-IT") },
-    { k: "active_kcal", label: "Calorie attive", icon: <Flame size={16} />, fmt: (v) => `${Math.round(v)} kcal` },
-    { k: "weight", label: "Peso", icon: <Scale size={16} />, fmt: (v) => `${v.toFixed(1)} kg` },
-    { k: "body_fat", label: "Massa grassa", icon: <Activity size={16} />, fmt: (v) => `${v.toFixed(1)}%` },
-  ];
-  const visibleTiles = tiles.filter((t) => last(t.k));
+  const score = rec ? Math.round(rec.value) : prontezza(series.sleep_hours, series.hrv, series.rhr);
+  const sl = last("sleep_hours");
+  const hb = vsBase(series.hrv);
+  const rb = vsBase(series.rhr);
+  const rhrDelta = rb && isFinite(rb.base) ? rb.last.value - rb.base : undefined;
+  const advice = score != null ? consiglio(score, sl?.value, rhrDelta) : null;
+  const orario = orari(series.sleep_hours);
+  const deb = debito(series.sleep_hours);
+  const media7 = (k: string) => {
+    const w = (series[k] || []).filter((r) => r.day !== today).slice(-7);
+    return w.length ? w.reduce((a, r) => a + r.value, 0) / w.length : null;
+  };
+  const sleep7 = media7("sleep_hours");
 
   return (
     <div className="px-5 lg:px-10 pb-28 lg:pb-12">
       <header className="flex items-end justify-between gap-3">
         <div>
           <h1 className="font-display text-[36px] lg:text-[44px] font-semibold leading-none">Salute</h1>
-          <p className="text-muted text-[14px] mt-2">Recovery, sonno e attività da Whoop e Apple Salute.</p>
+          <p className="text-muted text-[14px] mt-2">Come hai dormito, quanto sei carico, cosa fare oggi.</p>
         </div>
         {whoop?.connected && (
           <button onClick={() => sync(7)} disabled={syncing} className="h-10 px-4 rounded-full border border-line bg-surface text-[13px] font-semibold flex items-center gap-2 shrink-0">
@@ -134,67 +141,130 @@ export function Health() {
         </div>
       ) : (
         <>
-          {hasData && (
-            <section className="mt-6 grid gap-3 lg:grid-cols-[minmax(0,340px)_1fr]">
-              {/* Recovery */}
-              <div className="rounded-[22px] bg-surface shadow-soft p-5 flex items-center gap-5">
-                {rec ? (
-                  <>
-                    <Ring value={rec.value} color={recColor(rec.value)} />
-                    <div>
-                      <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-gold">Recovery · {fmtDay(rec.day)}</div>
-                      <div className="font-display text-[26px] font-semibold leading-tight mt-1">
-                        {rec.value >= 67 ? "Pronto a spingere" : rec.value >= 34 ? "Giornata moderata" : "Giornata di recupero"}
-                      </div>
-                      <div className="text-[13px] text-muted mt-1">
-                        {rec.value >= 67 ? "Il corpo ha recuperato: via libera ad allenamenti intensi." : rec.value >= 34 ? "Allenati, ma senza esagerare." : "Meglio un allenamento leggero o riposo attivo."}
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <div className="text-muted text-[14px]">La recovery arriva da Whoop: collegalo qui sotto.</div>
-                )}
+          {hasData && score != null && advice && (
+            <section className="mt-6 rounded-[24px] bg-surface shadow-soft p-5 lg:p-6">
+              <div className="flex items-center gap-5">
+                <Ring value={score} color={recColor(score)} />
+                <div className="min-w-0">
+                  <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-gold">{rec ? `Recovery · ${fmtDay(rec.day)}` : `Prontezza · ${sl ? fmtDay(sl.day) : "oggi"}`}</div>
+                  <div className="font-display text-[26px] font-semibold leading-tight mt-1">{advice.titolo}</div>
+                  <div className="text-[13.5px] text-muted mt-1 leading-snug">{advice.testo}</div>
+                </div>
               </div>
-              {/* Tiles */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {visibleTiles.map((t) => {
-                  const r = last(t.k)!;
-                  return (
-                    <div key={t.k} className="rounded-[18px] bg-surface shadow-soft p-4">
-                      <div className="flex items-center gap-1.5 text-muted text-[12px]">
-                        <span className="text-gold">{t.icon}</span>
-                        {t.label}
-                      </div>
-                      <div className="text-[22px] font-semibold mt-1.5 tracking-tight">{t.fmt(r.value)}</div>
-                      <div className="text-[11.5px] text-muted mt-0.5">{t.sub?.(r) || fmtDay(r.day)}</div>
+              <div className="mt-4 grid grid-cols-3 gap-2">
+                <Chip label="Sonno" value={sl ? hm(sl.value) : "—"} note={sl ? (sl.value >= SONNO_OBIETTIVO ? "obiettivo raggiunto" : `${hm(SONNO_OBIETTIVO - sl.value)} sotto`) : ""} good={sl ? sl.value >= 7 : undefined} />
+                <Chip label="HRV" value={hb ? `${Math.round(hb.last.value)} ms` : "—"} note={hb && isFinite(hb.base) ? `media ${Math.round(hb.base)}` : ""} good={hb && isFinite(hb.base) ? hb.last.value >= hb.base * 0.95 : undefined} />
+                <Chip label="FC riposo" value={rb ? `${Math.round(rb.last.value)} bpm` : "—"} note={rb && isFinite(rb.base) ? `media ${Math.round(rb.base)}` : ""} good={rhrDelta != null ? rhrDelta <= 3 : undefined} />
+              </div>
+              {!rec && <p className="text-[11px] text-muted mt-3">Calcolata da sonno, HRV e battito a riposo rispetto alla tua media del mese.</p>}
+            </section>
+          )}
+
+          {sl && (
+            <section className="mt-6">
+              <SectionTitle icon={<Moon size={13} />}>Sonno</SectionTitle>
+              <div className="mt-3 grid gap-3 lg:grid-cols-2">
+                <div className="rounded-[20px] bg-surface shadow-soft p-5">
+                  <div className="flex items-baseline justify-between">
+                    <div>
+                      <div className="text-[12px] text-muted">Notte · {fmtDay(sl.day)}</div>
+                      <div className="text-[30px] font-semibold tracking-tight">{hm(sl.value)}</div>
                     </div>
-                  );
-                })}
+                    {sl.extra?.start && sl.extra?.end && (
+                      <div className="text-right text-[12.5px] text-muted">
+                        {String(sl.extra.start).slice(11, 16)} → {String(sl.extra.end).slice(11, 16)}
+                      </div>
+                    )}
+                  </div>
+                  <Phases extra={sl.extra} />
+                  <div className="mt-4 grid grid-cols-2 gap-3 text-[13px]">
+                    <div>
+                      <div className="text-muted text-[12px]">Media 7 notti</div>
+                      <div className="font-semibold">{sleep7 != null ? hm(sleep7) : "—"}</div>
+                    </div>
+                    <div>
+                      <div className="text-muted text-[12px]">Debito della settimana</div>
+                      <div className={`font-semibold ${deb > 5 ? "text-danger" : ""}`}>{deb > 0.1 ? hm(deb) : "Nessuno"}</div>
+                    </div>
+                  </div>
+                </div>
+                {orario && (
+                  <div className="rounded-[20px] bg-gold-tint border border-gold/30 p-5">
+                    <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-gold">Il tuo orario ideale</div>
+                    <div className="font-display text-[28px] font-semibold mt-1">A letto alle {orario.letto}</div>
+                    <p className="text-[13.5px] text-muted mt-1 leading-snug">
+                      Di solito ti addormenti verso le {orario.addormentamento} e ti svegli alle {orario.sveglia}. Per arrivare a {hm(SONNO_OBIETTIVO)} di sonno vero serve coricarsi alle {orario.letto}: la sera ti avviso 45 minuti prima.
+                    </p>
+                    <ul className="mt-3 text-[13px] space-y-1.5">
+                      <li>• Stessa ora di sveglia anche nel weekend</li>
+                      <li>• Niente caffè dopo le 14, niente alcol nelle 3 ore prima</li>
+                      <li>• Luce del sole al mattino, luci basse e schermi giù la sera</li>
+                    </ul>
+                  </div>
+                )}
               </div>
             </section>
           )}
 
           {hasData && (
-            <section className="mt-8">
-              <h2 className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted flex items-center gap-2">
-                <span className="h-1.5 w-1.5 rounded-full bg-gold" /> Ultimi 14 giorni
-              </h2>
+            <section className="mt-6">
+              <SectionTitle icon={<Footprints size={13} />}>Oggi in movimento</SectionTitle>
+              <div className="mt-3 grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <Goal label="Passi" icon={<Footprints size={15} />} value={todayOf("steps")} goal={PASSI_OBIETTIVO} fmt={(v) => Math.round(v).toLocaleString("it-IT")} avg={media7("steps")} />
+                <Goal label="Esercizio" icon={<Flame size={15} />} value={todayOf("exercise_min")} goal={ESERCIZIO_OBIETTIVO} fmt={(v) => `${Math.round(v)} min`} avg={media7("exercise_min")} />
+                <Goal label="Luce del giorno" icon={<Sun size={15} />} value={luceMin(todayOf("time_in_daylight"))} goal={LUCE_OBIETTIVO_MIN} fmt={(v) => `${Math.round(v)} min`} avg={media7("time_in_daylight") != null ? luceMin(media7("time_in_daylight")!) : null} />
+                <Goal label="Ore in piedi" icon={<Activity size={15} />} value={todayOf("stand_h")} goal={12} fmt={(v) => `${Math.round(v)} h`} avg={media7("stand_h")} />
+              </div>
+              <p className="text-[11px] text-muted mt-2">I dati di oggi arrivano dall'iPhone ogni ora: in mattinata possono essere ancora parziali.</p>
+            </section>
+          )}
+
+          {hasData && (
+            <section className="mt-6">
+              <SectionTitle icon={<HeartPulse size={13} />}>Cuore e forma</SectionTitle>
+              <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {(
+                  [
+                    ["vo2max", "VO₂ max", (v: number) => v.toFixed(1), "Capacità aerobica: sale con il cardio"],
+                    ["resp_rate", "Respiro di notte", (v: number) => `${v.toFixed(1)}/min`, "Se sale molto, spesso è stanchezza"],
+                    ["spo2", "Ossigeno", (v: number) => `${Math.round(v)}%`, "Normale sopra il 95%"],
+                    ["walking_speed", "Passo", (v: number) => `${v.toFixed(1)} km/h`, "Velocità di camminata"],
+                    ["weight", "Peso", (v: number) => `${v.toFixed(1)} kg`, ""],
+                    ["body_fat", "Massa grassa", (v: number) => `${v.toFixed(1)}%`, ""],
+                    ["strain", "Strain", (v: number) => v.toFixed(1), ""],
+                  ] as [string, string, (v: number) => string, string][]
+                )
+                  .filter(([k]) => last(k))
+                  .map(([k, label, f, note]) => (
+                    <div key={k} className="rounded-[18px] bg-surface shadow-soft p-4">
+                      <div className="text-muted text-[12px]">{label}</div>
+                      <div className="text-[21px] font-semibold mt-1 tracking-tight">{f(last(k)!.value)}</div>
+                      <div className="text-[11px] text-muted mt-0.5 leading-snug">{note || fmtDay(last(k)!.day)}</div>
+                    </div>
+                  ))}
+              </div>
+            </section>
+          )}
+
+          {hasData && (
+            <section className="mt-6">
+              <SectionTitle>Ultimi 14 giorni</SectionTitle>
               <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                {series.sleep_hours && <Trend title="Sonno" rows={series.sleep_hours} fmt={hm} color={(v) => (v >= 7 ? "rgb(var(--ok))" : v >= 6 ? "rgb(var(--warn))" : "rgb(var(--bad))")} />}
                 {series.recovery && <Trend title="Recovery" rows={series.recovery} max={100} color={(v) => recColor(v)} fmt={(v) => `${Math.round(v)}%`} />}
-                {series.sleep_hours && <Trend title="Sonno" rows={series.sleep_hours} fmt={hm} />}
+                {series.rhr && <Trend title="FC a riposo" rows={series.rhr} fmt={(v) => `${Math.round(v)} bpm`} relative />}
                 {series.hrv && <Trend title="HRV" rows={series.hrv} fmt={(v) => `${Math.round(v)} ms`} />}
                 {series.steps && <Trend title="Passi" rows={series.steps} fmt={(v) => Math.round(v).toLocaleString("it-IT")} />}
-                {series.strain && <Trend title="Strain" rows={series.strain} max={21} fmt={(v) => v.toFixed(1)} />}
                 {series.weight && <Trend title="Peso" rows={series.weight} fmt={(v) => `${v.toFixed(1)} kg`} relative />}
               </div>
             </section>
           )}
 
+          <HealthNotifications letto={orario?.letto} />
+
           {workouts.length > 0 && (
             <section className="mt-8">
-              <h2 className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted flex items-center gap-2">
-                <span className="h-1.5 w-1.5 rounded-full bg-gold" /> Allenamenti recenti
-              </h2>
+              <SectionTitle icon={<Dumbbell size={13} />}>Allenamenti recenti</SectionTitle>
               <div className="mt-3 rounded-[20px] bg-surface shadow-soft divide-y divide-line">
                 {workouts.map((w) => {
                   const min = w.start_at && w.end_at ? Math.round((Date.parse(w.end_at) - Date.parse(w.start_at)) / 60000) : null;
@@ -222,9 +292,7 @@ export function Health() {
           )}
 
           <section className="mt-8">
-            <h2 className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted flex items-center gap-2">
-              <span className="h-1.5 w-1.5 rounded-full bg-gold" /> Collegamenti
-            </h2>
+            <SectionTitle>Collegamenti</SectionTitle>
             <div className="mt-3 grid gap-3 lg:grid-cols-2">
               <WhoopCard status={whoop} syncing={syncing} onSync={() => sync(30)} onChange={load} />
               <AppleCard token={app.profile?.ingest_token ?? ""} last={appleLast} />
@@ -233,6 +301,129 @@ export function Health() {
         </>
       )}
     </div>
+  );
+}
+
+function SectionTitle({ children, icon }: { children: ReactNode; icon?: ReactNode }) {
+  return (
+    <h2 className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted flex items-center gap-2">
+      {icon ? <span className="text-gold">{icon}</span> : <span className="h-1.5 w-1.5 rounded-full bg-gold" />} {children}
+    </h2>
+  );
+}
+
+function Chip({ label, value, note, good }: { label: string; value: string; note: string; good?: boolean }) {
+  return (
+    <div className="rounded-[14px] bg-card px-3 py-2.5">
+      <div className="text-[11px] text-muted flex items-center gap-1">
+        {good != null && <span className={`h-1.5 w-1.5 rounded-full ${good ? "bg-[rgb(var(--ok))]" : "bg-[rgb(var(--warn))]"}`} />}
+        {label}
+      </div>
+      <div className="text-[16px] font-semibold mt-0.5">{value}</div>
+      <div className="text-[10.5px] text-muted truncate">{note}</div>
+    </div>
+  );
+}
+
+function Phases({ extra }: { extra: Row["extra"] }) {
+  if (!extra) return null;
+  const parts = [
+    ["Profondo", Number(extra.deep_h) || 0, "#3B4BA8"],
+    ["REM", Number(extra.rem_h) || 0, "#7C6CD8"],
+    ["Leggero", Number(extra.core_h) || 0, "#9FB6E8"],
+    ["Sveglio", Number(extra.awake_h) || 0, "rgb(var(--warn))"],
+  ] as [string, number, string][];
+  const tot = parts.reduce((a, p) => a + p[1], 0);
+  if (!tot) return null;
+  return (
+    <div className="mt-3">
+      <div className="flex h-2.5 rounded-full overflow-hidden">
+        {parts.map(([l, v, c]) => v > 0 && <div key={l} style={{ width: `${(v / tot) * 100}%`, background: c }} />)}
+      </div>
+      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11.5px] text-muted">
+        {parts.map(([l, v, c]) => (
+          <span key={l} className="inline-flex items-center gap-1">
+            <span className="h-2 w-2 rounded-full" style={{ background: c }} /> {l} {hm(v)}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function Goal({ label, icon, value, goal, fmt, avg }: { label: string; icon: ReactNode; value: number; goal: number; fmt: (v: number) => string; avg: number | null }) {
+  const pct = Math.min(100, (value / goal) * 100);
+  return (
+    <div className="rounded-[18px] bg-surface shadow-soft p-4">
+      <div className="flex items-center gap-1.5 text-muted text-[12px]">
+        <span className="text-gold">{icon}</span> {label}
+      </div>
+      <div className="text-[21px] font-semibold mt-1 tracking-tight">{fmt(value)}</div>
+      <div className="mt-2 h-1.5 rounded-full bg-line overflow-hidden">
+        <motion.div className="h-full rounded-full" style={{ background: pct >= 100 ? "rgb(var(--ok))" : "rgb(var(--gold))" }} initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 0.6 }} />
+      </div>
+      <div className="text-[11px] text-muted mt-1.5">
+        Obiettivo {fmt(goal)}
+        {avg != null ? ` · media ${fmt(avg)}` : ""}
+      </div>
+    </div>
+  );
+}
+
+const NOTIFICHE: { k: string; label: string; hint: (letto?: string) => string }[] = [
+  { k: "salute_mattina_on", label: "Com'è andata la notte", hint: () => "Al risveglio: sonno, prontezza e come impostare la giornata" },
+  { k: "salute_luce_on", label: "Luce del giorno", hint: () => "Alle 13 se hai preso poco sole: 15 minuti fuori" },
+  { k: "salute_passi_on", label: "Muoviti", hint: () => "Alle 17:30 se sei sotto i 5.000 passi" },
+  { k: "salute_letto_on", label: "Ora di staccare", hint: (l) => `45 minuti prima di andare a letto${l ? ` (alle ${l})` : ""}` },
+  { k: "salute_settimana_on", label: "La settimana in salute", hint: () => "Domenica alle 18: sonno, passi e battito a confronto" },
+];
+
+function HealthNotifications({ letto }: { letto?: string }) {
+  const app = useApp();
+  const r = { ...DEFAULT_REMINDERS, ...(app.profile?.promemoria || {}) };
+  const [busy, setBusy] = useState(false);
+  const save = (patch: Record<string, unknown>) => app.setProfile({ promemoria: { ...r, ...patch } as Reminders });
+  const attiva = async () => {
+    setBusy(true);
+    try {
+      await enablePush();
+      await save({ attivi: true });
+      app.toast("Notifiche attive");
+    } catch (e) {
+      app.toast((e as Error).message);
+    }
+    setBusy(false);
+  };
+  return (
+    <section className="mt-8">
+      <SectionTitle icon={<Bell size={13} />}>Notifiche per stare meglio</SectionTitle>
+      <div className="mt-3 rounded-[20px] bg-surface shadow-soft px-5 py-2">
+        {!r.attivi && (
+          <div className="py-3 flex items-center gap-3">
+            <div className="flex-1 text-[13px] text-muted">Le notifiche su questo telefono sono spente.</div>
+            <button onClick={attiva} disabled={busy} className="h-9 px-4 rounded-full bg-brand text-brand-fg text-[13px] font-semibold flex items-center gap-1.5">
+              {busy && <Loader2 size={14} className="animate-spin" />} Attiva
+            </button>
+          </div>
+        )}
+        <div className="divide-y divide-line">
+          {NOTIFICHE.map((n) => {
+            const en = r[n.k] !== false;
+            return (
+              <div key={n.k} className="flex items-center gap-3 py-3">
+                <button onClick={() => save({ [n.k]: !en })} className={`h-6 w-10 rounded-full relative transition shrink-0 ${en ? "bg-brand" : "bg-line"}`} aria-label={n.label}>
+                  <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-surface shadow transition-all ${en ? "left-[18px]" : "left-0.5"}`} />
+                </button>
+                <div className="flex-1 min-w-0">
+                  <div className="text-[14.5px] font-medium">{n.label}</div>
+                  <div className="text-[12px] text-muted">{n.hint(letto)}</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </section>
   );
 }
 

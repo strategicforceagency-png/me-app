@@ -365,7 +365,7 @@ function Shell() {
       app.setTab("percorso");
       setTimeout(() => window.dispatchEvent(new CustomEvent("habitus:revisione")), 600);
     } else if (vai === "alfred") setTimeout(() => window.dispatchEvent(new CustomEvent("habitus:apri-alfred")), 800);
-    else if (vai && ["percorso", "linguaggio", "budget", "accademia", "fisico", "progressi", "armadio", "contenuti", "persone", "regali", "uscite", "lettere", "fisionomia", "profumi", "pelletteria", "outfit", "stile"].includes(vai)) app.setTab(vai as Tab);
+    else if (vai && ["percorso", "linguaggio", "budget", "accademia", "fisico", "progressi", "armadio", "contenuti", "persone", "regali", "uscite", "lettere", "fisionomia", "profumi", "pelletteria", "outfit", "stile", "salute"].includes(vai)) app.setTab(vai as Tab);
     if (q.size) history.replaceState(null, "", window.location.pathname);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

@@ -357,7 +357,7 @@ export async function uploadBlob(bucket: string, uid: string, blob: Blob, prefix
 }
 
 export type Budget = { mensile: number; approccio?: "qualita" | "quantita" | "mix"; inizio_mese?: number };
-export type Reminders = { attivi: boolean; tz: string; mattina: string; sera: string; revisione: string; mattina_on?: boolean; sera_on?: boolean; revisione_on?: boolean; ricorrenze_on?: boolean };
+export type Reminders = { attivi: boolean; tz: string; mattina: string; sera: string; revisione: string; mattina_on?: boolean; sera_on?: boolean; revisione_on?: boolean; ricorrenze_on?: boolean; [k: string]: unknown };
 
 /**
  * Habitus impara a conoscerti: riscrive in background la tua scheda interna
