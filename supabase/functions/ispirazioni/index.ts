@@ -91,6 +91,98 @@ const b64 = (buf: ArrayBuffer) => {
   return btoa(s);
 };
 
+
+/* ---------- link di Instagram: video intero, audio e didascalia ---------- */
+const UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1";
+const dec = (s: string) => s.replace(/\\u0026/g, "&").replace(/\\\//g, "/").replace(/\\"/g, '"').replace(/&amp;/g, "&").replace(/&#039;/g, "'").replace(/&quot;/g, '"');
+async function igEmbed(url: string) {
+  const m = url.match(/instagram\.com\/(?:[^/]+\/)?(p|reel|reels|tv)\/([A-Za-z0-9_-]+)/);
+  if (!m) return null;
+  const kind = m[1] === "reels" ? "reel" : m[1];
+  const html = await (await fetch(`https://www.instagram.com/${kind}/${m[2]}/embed/captioned/`, { headers: { "User-Agent": UA, "Accept-Language": "it-IT,it;q=0.9" } })).text();
+  const img = html.match(/class="EmbeddedMediaImage"[^>]*src="([^"]+)"/)?.[1] || html.match(/"display_url\\?":\\?"([^"\\]+)/)?.[1] || html.match(/<meta property="og:image" content="([^"]+)"/)?.[1];
+  const video = html.match(/"video_url\\?":\\?"([^"]+?)\\?"/)?.[1] || null;
+  const username = html.match(/class="UsernameText"[^>]*>([^<]+)</)?.[1] || html.match(/"username\\?":\\?"([^"\\]+)/)?.[1] || null;
+  const caption = html.match(/class="Caption"[^>]*>([\s\S]*?)<div class="CaptionComments/)?.[1]?.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim() || null;
+  return { shortcode: m[2], image: img ? dec(img) : null, video: video ? dec(video) : null, username, caption: caption ? dec(caption) : null };
+}
+const FIELDS = "id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,children{media_type,media_url,thumbnail_url}";
+
+/** Scarica i post dai link: con Instagram collegato prende il video vero (con audio) e la didascalia completa. */
+async function daiLink(sb: ReturnType<typeof admin>, uid: string, urls: string[], id?: string) {
+  const { data: conn } = await sb.from("instagram_connections").select("access_token, ig_user_id").eq("user_id", uid).maybeSingle();
+  const images: string[] = [];
+  const videos: { path: string; mime: string; caption?: string; permalink?: string }[] = [];
+  const captions: { caption: string; permalink?: string }[] = [];
+  let handle: string | null = null;
+  const save = async (url: string, name: string, max = 45 * 1024 * 1024) => {
+    try {
+      const r = await fetch(url, { headers: { "User-Agent": UA } });
+      if (!r.ok) return null;
+      if (Number(r.headers.get("content-length") || 0) > max) { await r.body?.cancel(); return null; }
+      const type = (r.headers.get("content-type") || "application/octet-stream").split(";")[0];
+      const buf = await r.arrayBuffer();
+      if (buf.byteLength > max) return null;
+      const path = `${uid}/link-${name}-${crypto.randomUUID().slice(0, 8)}.${type.includes("mp4") ? "mp4" : type.includes("png") ? "png" : "jpg"}`;
+      const { error } = await sb.storage.from("inspirations").upload(path, buf, { contentType: type });
+      return error ? null : { path, type };
+    } catch {
+      return null;
+    }
+  };
+  for (const [k, url] of urls.slice(0, 5).entries()) {
+    const e = await igEmbed(url).catch(() => null);
+    if (!e) continue;
+    handle ||= e.username;
+    let fatto = false;
+    if (e.username && conn) {
+      try {
+        const u = new URL(`https://graph.facebook.com/v23.0/${conn.ig_user_id}`);
+        u.searchParams.set("fields", `business_discovery.username(${e.username}){username,media.limit(50){${FIELDS}}}`);
+        u.searchParams.set("access_token", conn.access_token);
+        const j = await (await fetch(u)).json();
+        // deno-lint-ignore no-explicit-any
+        const hit = (j.business_discovery?.media?.data || []).find((m: any) => String(m.permalink || "").includes(e.shortcode));
+        if (hit) {
+          const cap = String(hit.caption || "").slice(0, 2000);
+          if (cap) captions.push({ caption: cap, permalink: hit.permalink });
+          // deno-lint-ignore no-explicit-any
+          const items: any[] = hit.media_type === "CAROUSEL_ALBUM" ? (hit.children?.data || []).slice(0, 6) : [hit];
+          for (const [n, it] of items.entries()) {
+            if (it.media_type === "VIDEO") {
+              if (it.thumbnail_url) { const s = await save(it.thumbnail_url, `${k}t${n}`, 15e6); if (s) images.push(s.path); }
+              const v = it.media_url && videos.length < 3 ? await save(it.media_url, `${k}v${n}`) : null;
+              if (v) videos.push({ path: v.path, mime: v.type || "video/mp4", caption: cap, permalink: hit.permalink });
+            } else if (it.media_url) {
+              const s = await save(it.media_url, `${k}f${n}`, 15e6);
+              if (s) images.push(s.path);
+            }
+          }
+          fatto = true;
+        }
+      } catch { /* profilo personale: si usa l'anteprima */ }
+    }
+    if (!fatto) {
+      if (e.video && videos.length < 3) {
+        const v = await save(e.video, `${k}v`);
+        if (v) videos.push({ path: v.path, mime: v.type || "video/mp4", caption: e.caption || undefined, permalink: url });
+      }
+      if (e.image) { const s = await save(e.image, `${k}f`, 15e6); if (s) images.push(s.path); }
+      if (e.caption) captions.push({ caption: e.caption, permalink: url });
+    }
+  }
+  if (!images.length && !videos.length) throw new Error("Post non leggibile (privato o non disponibile): carica il video o uno screenshot");
+  const row = { kind: "link", handle, image_paths: images, videos, captions, status: "analisi", analysis: null, temi: null, error: null };
+  if (id) {
+    const { error } = await sb.from("inspirations").update(row).eq("id", id).eq("user_id", uid);
+    if (error) throw new Error(error.message);
+    return { id, video: videos.length > 0, handle };
+  }
+  const { data, error } = await sb.from("inspirations").insert({ user_id: uid, title: handle ? null : "Ispirazione", ...row }).select("id").single();
+  if (error) throw new Error(error.message);
+  return { id: data.id as string, video: videos.length > 0, handle };
+}
+
 const TEMI = ["stile", "profumi", "grooming", "pelletteria", "scarpe", "orologi", "galateo", "linguaggio", "fitness", "alimentazione", "cultura", "altro"];
 
 /** Passo 1: guarda il contenuto e dice di cosa parla. */
@@ -119,7 +211,7 @@ async function temi(sb: ReturnType<typeof admin>, uid: string, id: string) {
   parts.push({
     text: `Questo è un contenuto che ${insp.handle ? `viene dal profilo @${insp.handle}` : "l'utente ha salvato come ispirazione"} (foto, fotogrammi, video con audio${capt ? " e didascalie" : ""}).
 ${capt ? `Didascalie:\n${capt.slice(0, 6000)}\n` : ""}
-Ascolta l'audio e leggi le scritte nel video. Dimmi di cosa parla davvero il contenuto e smista gli argomenti tra: ${TEMI.join(", ")}.
+Ascolta l'audio e leggi le scritte nel video: conta soprattutto ciò che l'autore DICE e scrive. Come è vestito chi parla NON è un argomento, a meno che il contenuto parli proprio di abbigliamento. Dimmi di cosa parla davvero il contenuto e smista gli argomenti tra: ${TEMI.join(", ")}.
 - "stile" solo se il contenuto mostra o discute outfit e abbigliamento in modo rilevante.
 - Se si parla di profumi, elenca OGNI profumo citato o mostrato, con nome e maison come li hai capiti, e in "cosa_dice" cosa ne dice l'autore (es. "il migliore per l'ufficio", "dura 12 ore"). Non inventare profumi non citati.
 - Allo stesso modo elenca gli oggetti di pelletteria citati (borse, cinture, portafogli) in "pelle".
@@ -238,6 +330,11 @@ Deno.serve(async (req) => {
       const r = await temi(sb, u.user.id, String(b.id));
       if (r.temi.profumi.length) catena(u.user.id, String(b.id), sec!.value);
       return json(r);
+    }
+    if (b.action === "link") {
+      const urls: string[] = (Array.isArray(b.urls) ? b.urls : [b.url]).map(String).filter((x: string) => /instagram\.com\//.test(x));
+      if (!urls.length) return json({ error: "Serve il link di un post o reel di Instagram" }, 400);
+      return json(await daiLink(sb, u.user.id, urls, b.id ? String(b.id) : undefined));
     }
     if (b.action === "riprendi") {
       // riparte la verifica rimasta ferma (es. credito esaurito)

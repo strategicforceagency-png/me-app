@@ -466,16 +466,15 @@ function AddInspirationSheet({ open, onClose, onCreated, reload }: { open: boole
       const paths: string[] = [];
       let user: string | null = cleanHandle || null;
       if (mode === "link") {
-        for (let k = 0; k < urls.length; k++) {
-          setBusy(`Scarico i post ${k + 1}/${urls.length}…`);
-          try {
-            const r = await ai<{ path: string; username: string | null }>({ action: "ig_post", url: urls[k] });
-            paths.push(r.path);
-            user ||= r.username;
-          } catch (e) {
-            app.toast((e as Error).message);
-          }
-        }
+        // il server scarica il video vero (con l'audio) e la didascalia, poi si analizza ciò che dice l'autore
+        setBusy(urls.length > 1 ? `Scarico i ${urls.length} post…` : "Scarico il post e il video…");
+        const r = await fn<{ id: string; video: boolean; handle: string | null }>("ispirazioni", "", { action: "link", urls });
+        if (!r.video) app.toast("Del post ho solo l'anteprima e la didascalia: per l'audio completo carica il video");
+        analyze(r.id, r.handle);
+        reset();
+        onClose();
+        onCreated(r.id);
+        return;
       }
       const videos: { path: string; mime: string }[] = [];
       for (let k = 0; k < files.length; k++) {
