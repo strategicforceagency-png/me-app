@@ -13,7 +13,7 @@ type Item = {
   nome: string;
   marca: string | null;
   colore: string | null;
-  stato: "mio" | "desidero" | "provato";
+  stato: "mio" | "desidero" | "provato" | "scoperta";
   voto: number | null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   dettagli: any;
@@ -26,6 +26,7 @@ const STATI: { id: Item["stato"]; label: string }[] = [
   { id: "mio", label: "I miei" },
   { id: "desidero", label: "Desidero" },
   { id: "provato", label: "Provati" },
+  { id: "scoperta", label: "Da scoprire" },
 ];
 
 const Title = ({ t, sub }: { t: string; sub: string }) => (
@@ -213,7 +214,7 @@ export function FragrancesScreen() {
       <div className="rounded-[20px] bg-surface shadow-soft p-4 space-y-2.5">
         <input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Nome (es. Vétiver)" autoComplete="off" className={inputCls} />
         <input value={marca} onChange={(e) => setMarca(e.target.value)} placeholder="Maison (es. Guerlain)" autoComplete="off" className={inputCls} />
-        <Chips small opts={STATI.map((s) => ({ id: s.id, label: s.id === "mio" ? "Lo possiedo" : s.id === "desidero" ? "Lo desidero" : "L'ho provato" }))} value={stato} onChange={(v) => setStato(v as Item["stato"])} />
+        <Chips small opts={STATI.filter((s) => s.id !== "scoperta").map((s) => ({ id: s.id, label: s.id === "mio" ? "Lo possiedo" : s.id === "desidero" ? "Lo desidero" : "L'ho provato" }))} value={stato} onChange={(v) => setStato(v as Item["stato"])} />
         <div className="flex gap-2">
           <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => setFoto(e.target.files?.[0] || null)} />
           <button onClick={() => fileRef.current?.click()} className="h-11 px-4 rounded-full bg-card text-[13.5px] font-semibold flex items-center gap-1.5">
@@ -279,6 +280,21 @@ export function FragrancesScreen() {
                     {[d.occasioni?.length ? `Per: ${d.occasioni.join(", ")}` : null, d.durata ? `Durata ${d.durata}` : null, d.dosi ? `Dosi: ${d.dosi}` : null, d.prezzo ? `Prezzo ${d.prezzo}` : null].filter(Boolean).join(" · ")}
                   </div>
                   {!!d.simili?.length && <div className="mt-1 text-[12.5px] text-muted">Simili: {d.simili.join(", ")}</div>}
+                  {d.verifica && (
+                    <div className="mt-3 rounded-[14px] bg-card p-3">
+                      <div className="text-[11px] font-semibold uppercase tracking-[.08em] text-muted">
+                        Da {d.ispirazione?.fonte || "un'ispirazione"} · verificato sul web
+                      </div>
+                      {d.verifica.affermazione && (
+                        <div className="text-[13px] mt-1">
+                          «{d.verifica.affermazione}» —{" "}
+                          <b className={d.verifica.esito === "confermata" ? "text-[rgb(var(--ok))]" : d.verifica.esito === "smentita" ? "text-danger" : ""}>{d.verifica.esito}</b>
+                        </div>
+                      )}
+                      {d.verifica.giudizio && <p className="text-[13px] leading-relaxed mt-1 text-ink/85">{d.verifica.giudizio}</p>}
+                    </div>
+                  )}
+                  {d.fonti?.length > 0 && <Fonti fonti={d.fonti} />}
                 </>
               ) : (
                 <button onClick={() => scheda(x.id)} className="mt-3 text-[13px] font-semibold text-gold flex items-center gap-1">
@@ -286,7 +302,7 @@ export function FragrancesScreen() {
                 </button>
               )}
               <div className="mt-3 flex flex-wrap gap-1.5">
-                {STATI.filter((s) => s.id !== x.stato).map((s) => (
+                {STATI.filter((s) => s.id !== x.stato && s.id !== "scoperta").map((s) => (
                   <button key={s.id} onClick={() => upd(x.id, { stato: s.id })} className="h-8 px-3 rounded-full bg-card text-[12px] font-medium">
                     Sposta in {s.label}
                   </button>

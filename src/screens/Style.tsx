@@ -31,7 +31,24 @@ type Inspiration = {
   status: "nuovo" | "analisi" | "pronto" | "errore";
   error: string | null;
   created_at: string;
+  temi?: Temi | null;
 };
+type ProfumoCitato = { nome: string; marca: string; cosa_dice: string; stato: "in_verifica" | "pubblicato" | "scartato" | "doppione"; motivo?: string; esito?: string; valido?: boolean };
+type Temi = { sintesi: string; argomenti: { tema: string; peso: number; sintesi: string }[]; profumi: ProfumoCitato[]; pelle: { nome: string; marca: string; cosa_dice: string }[] };
+const TEMA_LABEL: Record<string, string> = { stile: "Stile", profumi: "Profumi", grooming: "Grooming", pelletteria: "Pelletteria", scarpe: "Scarpe", orologi: "Orologi", galateo: "Galateo", linguaggio: "Linguaggio", fitness: "Fitness", alimentazione: "Alimentazione", cultura: "Cultura", altro: "Altro" };
+const temiLabel = (t?: Temi | null) => (t?.argomenti || []).sort((a, b) => (b.peso || 0) - (a.peso || 0)).slice(0, 3).map((a) => TEMA_LABEL[a.tema] || a.tema).join(" · ");
+/** Capisce di cosa parla l'ispirazione; l'analisi di stile parte solo se c'è davvero dello stile. */
+export async function analizzaIspirazione(id: string) {
+  let stile = true;
+  try {
+    const r = await fn<{ stile: boolean }>("ispirazioni", "", { action: "temi", id });
+    stile = r.stile;
+  } catch {
+    /* se lo smistamento non riesce, si fa comunque l'analisi di stile */
+  }
+  if (stile) await ai({ action: "inspire", id });
+  return stile;
+}
 type PickKind = "look" | "stile" | "palette" | "capo" | "formula";
 type Pick = { id: string; inspiration_id: string | null; kind: PickKind; key: string; value: unknown };
 export type Guide = {
@@ -70,6 +87,13 @@ export function StyleScreen() {
     setPicks((p.data as Pick[]) || []);
     setLoading(false);
   }, [app]);
+  // mentre qualcosa è in analisi o in verifica, aggiorna da solo
+  useEffect(() => {
+    const busy = insps.some((i) => i.status === "analisi" || i.temi?.profumi?.some((p) => p.stato === "in_verifica"));
+    if (!busy) return;
+    const t = window.setInterval(load, 6000);
+    return () => window.clearInterval(t);
+  }, [insps, load]);
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -347,7 +371,7 @@ function InspirationCard({ i, count, onOpen }: { i: Inspiration; count: number; 
           <div className="absolute inset-0 bg-ink/45 grid place-items-center">
             <div className="flex flex-col items-center gap-1.5 text-white">
               <Sparkles className="animate-pulse" size={20} />
-              <span className="text-[11.5px] font-medium">Analizzo lo stile…</span>
+              <span className="text-[11.5px] font-medium">Analizzo il contenuto…</span>
             </div>
           </div>
         )}
@@ -361,7 +385,7 @@ function InspirationCard({ i, count, onOpen }: { i: Inspiration; count: number; 
         <div className="text-[14px] font-semibold truncate">{i.handle ? `@${i.handle}` : i.title || "Ispirazione"}</div>
         <div className="text-[12px] text-muted truncate">
           {i.status === "pronto"
-            ? i.analysis?.stili?.slice(0, 2).map((s) => s.nome).join(" · ") || "Analizzata"
+            ? i.analysis?.stili?.slice(0, 2).map((s) => s.nome).join(" · ") || temiLabel(i.temi) || "Analizzata"
             : i.status === "errore"
               ? "Analisi non riuscita"
               : i.status === "analisi"
@@ -400,8 +424,8 @@ function AddInspirationSheet({ open, onClose, onCreated, reload }: { open: boole
 
   const analyze = (id: string, user: string | null) => {
     // analisi in background: la card mostra lo stato
-    ai({ action: "inspire", id })
-      .then(() => app.toast(`Stile ${user ? "di @" + user : ""} analizzato`))
+    analizzaIspirazione(id)
+      .then((stile) => app.toast(stile ? `Stile ${user ? "di @" + user : ""} analizzato` : "Contenuto analizzato: trovi gli argomenti nell'ispirazione"))
       .catch((e) => app.toast((e as Error).message))
       .finally(reload);
   };
@@ -628,6 +652,62 @@ function HeartBtn({ on, onClick, className = "" }: { on: boolean; onClick: () =>
   );
 }
 
+function TemiBlock({ t }: { t: Temi }) {
+  const app = useApp();
+  const STATO: Record<ProfumoCitato["stato"], string> = { in_verifica: "Lo sto verificando…", pubblicato: "Verificato e pubblicato", scartato: "Scartato", doppione: "Già in collezione" };
+  return (
+    <div className="space-y-4">
+      {t.sintesi && <p className="text-[15px] leading-relaxed">{t.sintesi}</p>}
+      {!!t.argomenti.length && (
+        <Group title="Argomenti">
+          <div className="space-y-2">
+            {[...t.argomenti].sort((a, b) => (b.peso || 0) - (a.peso || 0)).map((a) => (
+              <div key={a.tema} className="rounded-[14px] bg-surface border border-line px-3.5 py-2.5">
+                <div className="text-[14px] font-semibold">
+                  {TEMA_LABEL[a.tema] || a.tema} <span className="text-[11px] text-muted font-normal">{a.peso}%</span>
+                </div>
+                <div className="text-[12.5px] text-muted leading-snug">{a.sintesi}</div>
+              </div>
+            ))}
+          </div>
+        </Group>
+      )}
+      {!!t.profumi.length && (
+        <Group title={`Profumi citati (${t.profumi.length})`} hint="Li cerco uno per uno sul web, verifico le fonti e pubblico solo quelli affidabili">
+          <div className="divide-y divide-line rounded-[16px] border border-line bg-surface">
+            {t.profumi.map((p) => (
+              <div key={p.nome + p.marca} className="px-3.5 py-2.5">
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[14px] font-semibold truncate">{p.nome}{p.marca ? <span className="text-muted font-normal"> · {p.marca}</span> : null}</div>
+                    {p.cosa_dice && <div className="text-[12px] text-muted italic">«{p.cosa_dice}»</div>}
+                  </div>
+                  <span className={`text-[11px] font-semibold shrink-0 flex items-center gap-1 ${p.stato === "pubblicato" ? "text-[rgb(var(--ok))]" : p.stato === "scartato" ? "text-danger" : "text-muted"}`}>
+                    {p.stato === "in_verifica" && <Loader2 size={11} className="animate-spin" />}
+                    {STATO[p.stato]}
+                  </span>
+                </div>
+                {p.stato === "pubblicato" && p.esito && <div className="text-[11.5px] text-muted mt-0.5">Affermazione {p.esito}</div>}
+                {p.motivo && p.stato !== "pubblicato" && <div className="text-[11.5px] text-muted mt-0.5">{p.motivo}</div>}
+              </div>
+            ))}
+          </div>
+          {t.profumi.some((p) => p.stato === "pubblicato") && (
+            <button onClick={() => app.setTab("profumi")} className="mt-2 h-9 px-4 rounded-full bg-brand text-brand-fg text-[13px] font-semibold">
+              Apri Profumi › Da scoprire
+            </button>
+          )}
+        </Group>
+      )}
+      {!!t.pelle.length && (
+        <Group title="Pelletteria citata">
+          <div className="text-[13px] text-muted">{t.pelle.map((x) => [x.nome, x.marca].filter(Boolean).join(" di ")).join(" · ")}</div>
+        </Group>
+      )}
+    </div>
+  );
+}
+
 function InspirationSheet({
   insp,
   onClose,
@@ -661,7 +741,7 @@ function InspirationSheet({
     if (!insp) return;
     setRetrying(true);
     try {
-      await ai({ action: "inspire", id: insp.id });
+      await analizzaIspirazione(insp.id);
     } catch (e) {
       app.toast((e as Error).message);
     }
@@ -675,7 +755,7 @@ function InspirationSheet({
         <div className="space-y-6 pb-6">
           {insp.status === "analisi" && (
             <div className="rounded-[16px] bg-gold-tint p-4 flex items-center gap-3 text-[14px]">
-              <Sparkles className="text-gold animate-pulse shrink-0" size={18} /> Sto analizzando outfit e stile: ci vogliono circa 20-40 secondi.
+              <Sparkles className="text-gold animate-pulse shrink-0" size={18} /> Sto guardando il contenuto: capisco di cosa parla e smisto gli argomenti. Ci vuole meno di un minuto.
             </div>
           )}
           {insp.status === "errore" && (
@@ -685,6 +765,12 @@ function InspirationSheet({
                 {retrying ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />} Riprova
               </button>
             </div>
+          )}
+
+          {insp.temi ? <TemiBlock t={insp.temi} /> : insp.status === "pronto" && (
+            <button onClick={retry} disabled={retrying} className="text-[13px] font-semibold text-gold flex items-center gap-1.5">
+              {retrying ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />} Capisci di cosa parla (profumi, grooming…)
+            </button>
           )}
 
           {a && (
