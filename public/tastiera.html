@@ -5,11 +5,17 @@ textarea,input,[contenteditable]{box-sizing:border-box;width:100%;font-size:16px
 .ns{-webkit-user-select:none;user-select:none;padding:8px;border:1px dashed #999;border-radius:16px}.ns textarea{-webkit-user-select:text;user-select:text}p{font-size:14px;color:#555}</style></head>
 <body>
 <h1>Prova suggerimenti tastiera</h1>
-<p>Tocchi ogni campo, scriva "Ciao come" e guardi la barra sopra la tastiera: compaiono parole suggerite o solo il Suo nome? Mi dica le lettere dei campi che funzionano.</p>
+<p><b>Lo apra dall'app installata se può</b> (oppure in Safari). Tocchi ogni campo, scriva "Ciao come" e guardi la barra sopra la tastiera: compaiono parole suggerite o solo il Suo nome? Mi dica le lettere dei campi che funzionano.</p>
 <label>A · campo semplice</label><textarea rows="2"></textarea>
 <label>B · autocomplete spento</label><textarea rows="2" autocomplete="off" autocorrect="on" spellcheck="true" name="messaggio"></textarea>
 <label>C · dentro un blocco non selezionabile (come prima l'app)</label><div class="ns"><textarea rows="2" autocomplete="off"></textarea></div>
 <label>D · riga singola</label><input type="text" autocomplete="off">
 <label>E · campo ricerca</label><input type="search">
 <label>F · area modificabile</label><div contenteditable="true"></div>
+<label>G · autocomplete inventato</label><textarea rows="2" autocomplete="habitus-chat" name="corpo"></textarea>
+<label>H · nessun attributo, nome senza trattino</label><textarea rows="2" name="corpo2" enterkeyhint="send"></textarea>
+<label>I · dentro un modulo con autocomplete spento</label><form autocomplete="off" onsubmit="return false"><textarea rows="2"></textarea></form>
+<label>J · autocomplete acceso</label><textarea rows="2" autocomplete="on"></textarea>
+<label>K · area modificabile con correzione</label><div contenteditable="true" autocorrect="on" spellcheck="true" autocapitalize="sentences" role="textbox"></div>
+<label>L · nome con trattino (come ora l'app per i campi a riga singola)</label><input type="text" autocomplete="off" name="testo-libero">
 </body></html>
