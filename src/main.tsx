@@ -39,16 +39,13 @@ function scritturaLibera(el: Element) {
   if (el.hasAttribute("autocomplete") && el.getAttribute("autocomplete") !== "off") return;
   if (el.dataset.libero) return;
   el.dataset.libero = "1";
-  el.setAttribute("autocorrect", "on");
-  el.setAttribute("spellcheck", "true");
-  if (!el.hasAttribute("autocapitalize")) el.setAttribute("autocapitalize", "sentences");
   if (el instanceof HTMLTextAreaElement) {
-    // provato sull'app installata: funziona solo senza "autocomplete", con un nome con numero e il tasto "invia"
-    el.removeAttribute("autocomplete");
+    // provato sull'app installata (campo H): SOLO nome con numero e tasto "invia", nessun altro attributo
+    ["autocomplete", "autocorrect", "spellcheck", "autocapitalize"].forEach((a) => el.removeAttribute(a));
     el.setAttribute("name", `corpo${++nCampo}`);
-    if (!el.hasAttribute("enterkeyhint")) el.setAttribute("enterkeyhint", "send");
+    el.setAttribute("enterkeyhint", "send");
   } else {
-    // riga singola: provato, funziona con autocomplete spento e nome col trattino
+    // riga singola (campo L): autocomplete spento e nome col trattino
     el.setAttribute("autocomplete", "off");
     el.setAttribute("name", "testo-libero");
   }
