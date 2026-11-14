@@ -1,4 +1,4 @@
-import { Camera, Download, Heart, Loader2, LogOut, Moon, Plus, Settings, Shirt, SlidersHorizontal, Sun, Trash2 } from "lucide-react";
+import { Camera, Download, Heart, Loader2, Keyboard, LogOut, Moon, Plus, Settings, Shirt, SlidersHorizontal, Sun, Trash2 } from "lucide-react";
 import { RemindersCard } from "../components/Reminders";
 import { PasskeysCard } from "../components/Passkeys";
 import { AlfredSettings } from "../components/AlfredSettings";
@@ -313,6 +313,9 @@ function SettingsSheet({ open, onClose }: { open: boolean; onClose: () => void }
         >
           Salva
         </PrimaryButton>
+        <a href="./tastiera.html" className="w-full h-12 rounded-full bg-card font-medium flex items-center justify-center gap-2 mb-3">
+          <Keyboard size={18} /> Prova tastiera
+        </a>
         <button onClick={() => supabase.auth.signOut()} className="w-full h-12 rounded-full bg-card font-medium flex items-center justify-center gap-2">
           <LogOut size={18} /> Esci
         </button>
@@ -368,6 +371,10 @@ function AccountTools() {
             <span className="block text-[12.5px] text-muted">Tutto il percorso, l'armadio, i progressi e i diari in un file. Le foto restano nell'archivio.</span>
           </span>
         </button>
+        <a href="./tastiera.html" className="w-full flex items-center gap-3 px-5 py-4 text-left text-muted">
+          <Keyboard size={19} />
+          <span className="flex-1 text-[15px] font-medium">Prova tastiera</span>
+        </a>
         <button onClick={() => supabase.auth.signOut()} className="w-full flex items-center gap-3 px-5 py-4 text-left text-muted">
           <LogOut size={19} />
           <span className="flex-1 text-[15px] font-medium">Esci</span>
