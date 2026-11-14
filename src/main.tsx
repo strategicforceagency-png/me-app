@@ -32,18 +32,26 @@ setTimeout(controllaVersione, 3000);
  * Restano esclusi email, password, numeri e i campi che indicano già cosa compilare.
  */
 const LIBERI = new Set(["", "text", "search"]);
+let nCampo = 0;
 function scritturaLibera(el: Element) {
   if (!(el instanceof HTMLTextAreaElement || el instanceof HTMLInputElement)) return;
   if (el instanceof HTMLInputElement && !LIBERI.has(el.getAttribute("type") || "")) return;
   if (el.hasAttribute("autocomplete") && el.getAttribute("autocomplete") !== "off") return;
   if (el.dataset.libero) return;
   el.dataset.libero = "1";
-  el.setAttribute("autocomplete", "off");
   el.setAttribute("autocorrect", "on");
   el.setAttribute("spellcheck", "true");
   if (!el.hasAttribute("autocapitalize")) el.setAttribute("autocapitalize", "sentences");
-  // senza "name" che ricordi un dato personale, Safari non propone la scheda contatto
-  if (!el.getAttribute("name")) el.setAttribute("name", el instanceof HTMLTextAreaElement ? "messaggio" : "testo-libero");
+  if (el instanceof HTMLTextAreaElement) {
+    // provato sull'app installata: funziona solo senza "autocomplete", con un nome con numero e il tasto "invia"
+    el.removeAttribute("autocomplete");
+    el.setAttribute("name", `corpo${++nCampo}`);
+    if (!el.hasAttribute("enterkeyhint")) el.setAttribute("enterkeyhint", "send");
+  } else {
+    // riga singola: provato, funziona con autocomplete spento e nome col trattino
+    el.setAttribute("autocomplete", "off");
+    el.setAttribute("name", "testo-libero");
+  }
 }
 const scan = (root: ParentNode) => root.querySelectorAll("input, textarea").forEach(scritturaLibera);
 new MutationObserver((ms) =>
