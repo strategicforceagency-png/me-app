@@ -1,7 +1,7 @@
 import { CourseNotes } from "./Contents";
 import { avviaLibreria, CourseTutorials, LessonTutorial } from "./Tutorials";
 import { motion } from "framer-motion";
-import { ArrowLeft, ArrowRight, Check, CheckCircle2, ChevronRight, Clock, Feather, Footprints, GraduationCap, Heart, Lightbulb, Loader2, Scissors, Send, Shirt, Sparkles, Umbrella, Watch, X, SprayCan, Briefcase } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, CheckCircle2, ChevronRight, Clock, Feather, Flame, Footprints, GraduationCap, Heart, Lightbulb, Loader2, Scissors, Send, Shirt, Sparkles, Umbrella, Watch, X, SprayCan, Briefcase } from "lucide-react";
 import { Fragment, ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { Figure } from "../academy/figures";
 import { allLessons, CORSI, lessonKey } from "../academy/content";
@@ -30,6 +30,7 @@ const ICONS: Record<string, (p: { size?: number }) => JSX.Element> = {
   heart: (p) => <Heart size={p.size} strokeWidth={1.8} />,
   spray: (p) => <SprayCan size={p.size} strokeWidth={1.8} />,
   briefcase: (p) => <Briefcase size={p.size} strokeWidth={1.8} />,
+  flame: (p) => <Flame size={p.size} strokeWidth={1.8} />,
 };
 
 /* ---------------- testo con **grassetto** ed elenchi ---------------- */
